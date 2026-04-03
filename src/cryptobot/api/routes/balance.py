@@ -82,3 +82,35 @@ def get_balance_history(
         (f"-{days} days",),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+@router.get("/history/snapshots")
+def get_balance_history_snapshots(
+    hours: int = Query(1, ge=1, le=720),
+    _: UserResponse = Depends(get_current_user),
+):
+    """시간 기반 자산 추이 (market_snapshots 기반).
+
+    1시간~30일까지 지원. 데이터 포인트는 최대 200개로 제한.
+    """
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT timestamp, btc_price, market_state
+        FROM market_snapshots
+        WHERE timestamp >= datetime('now', ?)
+        ORDER BY timestamp
+        """,
+        (f"-{hours} hours",),
+    ).fetchall()
+
+    if not rows:
+        return []
+
+    # 데이터 포인트가 너무 많으면 샘플링
+    data = [dict(r) for r in rows]
+    if len(data) > 200:
+        step = len(data) // 200
+        data = data[::step] + [data[-1]]
+
+    return data

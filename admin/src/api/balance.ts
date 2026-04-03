@@ -15,3 +15,14 @@ export async function getBalanceHistory(days: number = 30): Promise<BalanceHisto
   const { data } = await client.get<BalanceHistory[]>("/balance/history", { params: { days } });
   return data;
 }
+
+export interface SnapshotHistory {
+  timestamp: string;
+  btc_price: number;
+  market_state: string;
+}
+
+export async function getBalanceHistorySnapshots(hours: number): Promise<SnapshotHistory[]> {
+  const { data } = await client.get<SnapshotHistory[]>("/balance/history/snapshots", { params: { hours } });
+  return data;
+}

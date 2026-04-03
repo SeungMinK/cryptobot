@@ -521,7 +521,7 @@ class Database:
                 logger.info("봇 설정 기본값 삽입 완료 (%d개)", len(_DEFAULT_BOT_CONFIG))
 
             conn.commit()
-            logger.info("데이터베이스 초기화 완료: %s", self._db_path)
+            logger.debug("데이터베이스 연결 준비 완료: %s", self._db_path)
         except sqlite3.Error as e:
             raise DatabaseError(f"데이터베이스 초기화 실패: {e}") from e
 

@@ -32,11 +32,15 @@ class UpbitConfig:
 class SlackConfig:
     """Slack 알림 설정."""
 
+    bot_token: str = field(default_factory=lambda: os.getenv("SLACK_BOT_TOKEN", ""))
+    channel: str = field(default_factory=lambda: os.getenv("SLACK_CHANNEL", ""))
+    # [DEPRECATED] Webhook 방식 — Bot Token 방식 사용 권장
     webhook_url: str = field(default_factory=lambda: os.getenv("SLACK_WEBHOOK_URL", ""))
 
     @property
     def is_configured(self) -> bool:
-        return bool(self.webhook_url)
+        """Bot Token 방식 또는 Webhook 방식 중 하나라도 설정되어 있으면 True."""
+        return bool(self.bot_token and self.channel) or bool(self.webhook_url)
 
 
 @dataclass(frozen=True)

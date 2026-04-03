@@ -3,6 +3,7 @@ import { getStrategies, getActivationHistory, activateStrategy, deactivateStrate
 import type { Strategy, StrategyActivation, StrategySimulation } from "../types/strategies";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { formatPercent, formatDateTime, formatKRW } from "../utils/format";
+import { getParamDesc } from "../utils/paramDescriptions";
 
 const MARKET_SECTIONS = [
   { state: "sideways", label: "횡보장 전략", emoji: "➡️", desc: "변동이 적은 박스권에서 유리" },
@@ -304,42 +305,57 @@ function ParamsEditor({ strategy, onClose, onSaved }: {
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-secondary)", fontSize: 18, cursor: "pointer" }}>x</button>
         </div>
 
-        {/* AS-IS vs TO-BE 파라미터 */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 8 }}>현재 (AS-IS)</div>
-            {Object.entries(currentParams).map(([key, value]) => (
-              <div key={key} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
-                <span style={{ fontSize: 13 }}>{key}</span>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>{String(value)}</span>
-              </div>
-            ))}
+        {/* 파라미터 편집 — 설명 포함 */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 0, fontSize: 12, fontWeight: 600, color: "var(--text-muted)", padding: "0 0 8px", borderBottom: "1px solid var(--border)" }}>
+            <span>파라미터</span>
+            <span style={{ width: 80, textAlign: "center" }}>현재값</span>
+            <span style={{ width: 90, textAlign: "center", color: "#4a9eff" }}>변경값</span>
           </div>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#4a9eff", marginBottom: 8 }}>변경 (TO-BE)</div>
-            {Object.entries(editParams).map(([key, value]) => (
-              <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
-                <span style={{ fontSize: 13 }}>{key}</span>
-                <input
-                  type="number"
-                  step="0.05"
-                  value={value}
-                  onChange={(e) => setEditParams((prev) => ({ ...prev, [key]: e.target.value }))}
-                  style={{
-                    width: 80,
-                    padding: "4px 8px",
-                    borderRadius: 6,
-                    border: value !== String(currentParams[key]) ? "2px solid #4a9eff" : "1px solid var(--border)",
-                    background: "var(--bg-secondary)",
-                    color: "var(--text-primary)",
-                    fontSize: 13,
-                    textAlign: "right",
-                    fontWeight: 600,
-                  }}
-                />
+          {Object.entries(editParams).map(([key, value]) => {
+            const desc = getParamDesc(strategy.name, key);
+            const changed = value !== String(currentParams[key]);
+            return (
+              <div key={key} style={{ padding: "12px 0", borderBottom: "1px solid var(--border)" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8, alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>
+                      {desc.label}
+                      {desc.unit && <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 4 }}>({desc.unit})</span>}
+                    </div>
+                  </div>
+                  <div style={{ width: 80, textAlign: "center", fontSize: 14, color: changed ? "var(--text-muted)" : "var(--text-primary)", textDecoration: changed ? "line-through" : "none" }}>
+                    {String(currentParams[key])}
+                  </div>
+                  <input
+                    type="number"
+                    step={desc.step || 0.05}
+                    min={desc.min}
+                    max={desc.max}
+                    value={value}
+                    onChange={(e) => setEditParams((prev) => ({ ...prev, [key]: e.target.value }))}
+                    style={{
+                      width: 90,
+                      padding: "6px 8px",
+                      borderRadius: 6,
+                      border: changed ? "2px solid #4a9eff" : "1px solid var(--border)",
+                      background: "var(--bg-secondary)",
+                      color: "var(--text-primary)",
+                      fontSize: 14,
+                      textAlign: "right",
+                      fontWeight: 600,
+                    }}
+                  />
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{desc.description}</div>
+                {desc.tip && (
+                  <div style={{ fontSize: 11, color: "#4a9eff", marginTop: 2 }}>
+                    {desc.tip}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
 
         {/* 시뮬레이션 결과 */}

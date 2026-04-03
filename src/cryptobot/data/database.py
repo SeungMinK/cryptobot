@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS trades (
     profit_pct REAL,
     profit_krw REAL,
     hold_duration_minutes INTEGER,
+    strategy_params_json TEXT,
+    strategy_selection_reason TEXT,
     FOREIGN KEY (buy_trade_id) REFERENCES trades(id)
 );
 
@@ -127,6 +129,45 @@ CREATE TABLE IF NOT EXISTS daily_reports (
     FOREIGN KEY (active_param_id) REFERENCES strategy_params(id)
 );
 
+CREATE TABLE IF NOT EXISTS strategies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    description TEXT,
+    category TEXT NOT NULL,
+    market_states TEXT NOT NULL,
+    timeframe TEXT,
+    difficulty TEXT,
+    default_params_json TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT FALSE,
+    is_available BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS strategy_activations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    strategy_name TEXT NOT NULL,
+    action TEXT NOT NULL,
+    source TEXT NOT NULL,
+    market_state TEXT,
+    reason TEXT,
+    previous_strategy TEXT,
+    performance_at_switch_json TEXT,
+    FOREIGN KEY (strategy_name) REFERENCES strategies(name)
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    display_name TEXT,
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_login_at DATETIME
+);
+
 CREATE TABLE IF NOT EXISTS llm_decisions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -164,6 +205,109 @@ INSERT INTO strategy_params (
 );
 """
 
+# 전략 마스터 데이터
+_DEFAULT_STRATEGIES = [
+    {
+        "name": "volatility_breakout",
+        "display_name": "변동성 돌파",
+        "description": "시가 + 전일 변동폭 × K 돌파 시 매수. 래리 윌리엄스의 단기 전략.",
+        "category": "volatility",
+        "market_states": "bullish",
+        "timeframe": "1d",
+        "difficulty": "easy",
+        "default_params_json": '{"k_value": 0.5}',
+        "is_active": True,
+    },
+    {
+        "name": "ma_crossover",
+        "display_name": "이동평균 교차",
+        "description": "단기 MA가 장기 MA를 돌파하면 매수/매도. 가장 고전적인 추세 추종 전략.",
+        "category": "trend",
+        "market_states": "bullish,bearish",
+        "timeframe": "1d",
+        "difficulty": "easy",
+        "default_params_json": '{"short_period": 5, "long_period": 20}',
+        "is_active": False,
+    },
+    {
+        "name": "macd",
+        "display_name": "MACD",
+        "description": "MACD-시그널 라인 교차로 추세 강도와 방향 판단.",
+        "category": "trend",
+        "market_states": "bullish,bearish",
+        "timeframe": "1d",
+        "difficulty": "easy",
+        "default_params_json": '{"fast": 12, "slow": 26, "signal_period": 9}',
+        "is_active": False,
+    },
+    {
+        "name": "supertrend",
+        "display_name": "슈퍼트렌드",
+        "description": "ATR 기반 동적 지지/저항선으로 추세 추종. 변동성 적응형.",
+        "category": "trend",
+        "market_states": "bullish,bearish",
+        "timeframe": "1d",
+        "difficulty": "medium",
+        "default_params_json": '{"st_period": 10, "st_multiplier": 3.0}',
+        "is_active": False,
+    },
+    {
+        "name": "rsi_mean_reversion",
+        "display_name": "RSI 평균 회귀",
+        "description": "RSI 과매도 반등 매수, 과매수 하락 매도. 횡보장 전용.",
+        "category": "mean_reversion",
+        "market_states": "sideways",
+        "timeframe": "1h",
+        "difficulty": "easy",
+        "default_params_json": '{"rsi_period": 14, "oversold": 30, "overbought": 70}',
+        "is_active": False,
+    },
+    {
+        "name": "bollinger_bands",
+        "display_name": "볼린저 밴드",
+        "description": "밴드 이탈 후 복귀 시 반전 진입. 횡보장에서 높은 승률.",
+        "category": "mean_reversion",
+        "market_states": "sideways",
+        "timeframe": "1h",
+        "difficulty": "easy",
+        "default_params_json": '{"bb_period": 20, "bb_std": 2.0}',
+        "is_active": False,
+    },
+    {
+        "name": "grid_trading",
+        "display_name": "그리드 트레이딩",
+        "description": "가격 범위를 격자로 나누어 분할 매수/매도. 추세 예측 불필요.",
+        "category": "grid",
+        "market_states": "sideways",
+        "timeframe": "1h",
+        "difficulty": "medium",
+        "default_params_json": '{"grid_count": 10, "range_pct": 10.0}',
+        "is_active": False,
+    },
+    {
+        "name": "breakout_momentum",
+        "display_name": "브레이크아웃 모멘텀",
+        "description": "N일 최고가 돌파 매수. 터틀 트레이딩 핵심 전략.",
+        "category": "momentum",
+        "market_states": "bullish,sideways",
+        "timeframe": "1d",
+        "difficulty": "easy",
+        "default_params_json": '{"entry_period": 20, "exit_period": 10}',
+        "is_active": False,
+    },
+    {
+        "name": "bollinger_squeeze",
+        "display_name": "볼린저 스퀴즈",
+        "description": "밴드 수축 후 폭발적 움직임 포착. 횡보→추세 전환 구간.",
+        "category": "volatility",
+        "market_states": "sideways,bullish",
+        "timeframe": "1d",
+        "difficulty": "medium",
+        "default_params_json": '{"bb_period": 20, "bb_std": 2.0, "squeeze_lookback": 120}',
+        "is_active": False,
+    },
+]
+
 
 class Database:
     """SQLite 데이터베이스 연결 관리.
@@ -198,6 +342,32 @@ class Database:
             if row[0] == 0:
                 conn.executescript(_DEFAULT_PARAMS)
                 logger.info("기본 전략 파라미터 삽입 완료")
+
+            # 전략 마스터 데이터 삽입
+            row = conn.execute("SELECT COUNT(*) FROM strategies").fetchone()
+            if row[0] == 0:
+                for s in _DEFAULT_STRATEGIES:
+                    conn.execute(
+                        """
+                        INSERT INTO strategies (
+                            name, display_name, description, category,
+                            market_states, timeframe, difficulty,
+                            default_params_json, is_active
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            s["name"],
+                            s["display_name"],
+                            s["description"],
+                            s["category"],
+                            s["market_states"],
+                            s["timeframe"],
+                            s["difficulty"],
+                            s["default_params_json"],
+                            s["is_active"],
+                        ),
+                    )
+                logger.info("전략 마스터 데이터 삽입 완료 (%d개)", len(_DEFAULT_STRATEGIES))
 
             conn.commit()
             logger.info("데이터베이스 초기화 완료: %s", self._db_path)

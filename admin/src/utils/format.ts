@@ -16,12 +16,18 @@ export function formatDate(isoString: string): string {
 }
 
 export function formatDateTime(isoString: string): string {
-  return new Date(isoString).toLocaleString("ko-KR", {
+  // SQLite CURRENT_TIMESTAMP는 UTC — 명시적으로 Z 붙여서 KST 변환
+  const date = isoString.endsWith("Z") || isoString.includes("+")
+    ? new Date(isoString)
+    : new Date(isoString + "Z");
+  return date.toLocaleString("ko-KR", {
+    timeZone: "Asia/Seoul",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
   });
 }
 

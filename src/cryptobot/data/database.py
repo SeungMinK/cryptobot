@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS strategies (
     difficulty TEXT,
     default_params_json TEXT,
     is_active BOOLEAN NOT NULL DEFAULT FALSE,
+    status TEXT NOT NULL DEFAULT 'inactive',
     is_available BOOLEAN NOT NULL DEFAULT TRUE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -401,6 +402,14 @@ _DEFAULT_BOT_CONFIG = [
         "description": "연속으로 이 횟수만큼 손실 시 매매 중단",
     },
     {
+        "key": "strategy_switch_delay_seconds",
+        "value": "30",
+        "value_type": "int",
+        "category": "bot",
+        "display_name": "전략 전환 대기 시간 (초)",
+        "description": "새 전략 활성화 시 기존 전략이 종료되기까지 대기하는 시간",
+    },
+    {
         "key": "k_value",
         "value": "0.5",
         "value_type": "float",
@@ -447,6 +456,24 @@ class Database:
             conn = self.connection
             conn.executescript(_SCHEMA)
 
+            # 마이그레이션: strategies에 status 컬럼 추가 (기존 DB 호환)
+            try:
+                conn.execute("SELECT status FROM strategies LIMIT 1")
+            except sqlite3.OperationalError:
+                conn.execute("ALTER TABLE strategies ADD COLUMN status TEXT NOT NULL DEFAULT 'inactive'")
+                conn.execute("UPDATE strategies SET status = 'active' WHERE is_active = TRUE")
+                conn.execute("UPDATE strategies SET status = 'inactive' WHERE is_active = FALSE")
+                logger.info("strategies 테이블에 status 컬럼 추가 완료")
+
+            # 마이그레이션: bot_config에 새 설정 추가 (기존 DB 호환)
+            existing = conn.execute("SELECT key FROM bot_config WHERE key = 'strategy_switch_delay_seconds'").fetchone()
+            if existing is None:
+                conn.execute(
+                    "INSERT OR IGNORE INTO bot_config (key, value, value_type, category, display_name, description) VALUES (?, ?, ?, ?, ?, ?)",
+                    ("strategy_switch_delay_seconds", "30", "int", "bot", "전략 전환 대기 시간 (초)", "새 전략 활성화 시 기존 전략이 종료되기까지 대기하는 시간"),
+                )
+                logger.info("bot_config에 strategy_switch_delay_seconds 추가")
+
             # 기본 파라미터가 없으면 삽입
             row = conn.execute("SELECT COUNT(*) FROM strategy_params").fetchone()
             if row[0] == 0:
@@ -462,8 +489,8 @@ class Database:
                         INSERT INTO strategies (
                             name, display_name, description, category,
                             market_states, timeframe, difficulty,
-                            default_params_json, is_active
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            default_params_json, is_active, status
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             s["name"],
@@ -475,6 +502,7 @@ class Database:
                             s["difficulty"],
                             s["default_params_json"],
                             s["is_active"],
+                            "active" if s["is_active"] else "inactive",
                         ),
                     )
                 logger.info("전략 마스터 데이터 삽입 완료 (%d개)", len(_DEFAULT_STRATEGIES))

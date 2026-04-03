@@ -63,11 +63,15 @@ def get_strategy_stats(name: str, _: UserResponse = Depends(get_current_user)):
 
 @router.put("/{name}/activate")
 def activate_strategy(name: str, body: ActivateRequest = None, _: UserResponse = Depends(get_current_user)):
-    """전략 활성화."""
+    """전략 활성화 (기존 전략은 자동 종료)."""
     repo = get_strategy_repo()
     reason = body.reason if body else None
     success = repo.activate(name, source="manual", reason=reason)
     if not success:
+        # 전환 중이거나 전략이 없는 경우
+        switching = repo._db.execute("SELECT name FROM strategies WHERE status = 'shutting_down'").fetchone()
+        if switching:
+            raise HTTPException(status_code=409, detail=f"전략 '{switching['name']}' 종료 중 — 잠시 후 다시 시도")
         raise HTTPException(status_code=404, detail=f"전략 '{name}'을 찾을 수 없습니다")
     return {"status": "activated", "strategy": name}
 

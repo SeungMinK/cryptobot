@@ -44,6 +44,7 @@ export default function StrategiesPage() {
   if (loading) return <div className="loading">로딩 중...</div>;
 
   const activeStrategies = strategies.filter((s) => s.is_active);
+  const hasSwitching = strategies.some((s) => s.status === "shutting_down");
 
   return (
     <div>
@@ -76,8 +77,8 @@ export default function StrategiesPage() {
                   <span className="badge badge-blue">{s.difficulty}</span>
                 </div>
               </div>
-              <span className={`badge ${s.is_active ? "badge-green" : "badge-red"}`}>
-                {s.is_active ? "활성" : "비활성"}
+              <span className={`badge ${s.status === "active" ? "badge-green" : s.status === "shutting_down" ? "badge-yellow" : "badge-red"}`}>
+                {s.status === "active" ? "활성" : s.status === "shutting_down" ? "종료중" : "비활성"}
               </span>
             </div>
             <p className="strategy-desc">{s.description}</p>
@@ -108,14 +109,18 @@ export default function StrategiesPage() {
               <span className="badge badge-blue">{s.timeframe}</span>
             </div>
             <div style={{ marginTop: 12 }}>
-              {s.is_active ? (
+              {s.status === "shutting_down" ? (
+                <button className="btn btn-sm" disabled style={{ opacity: 0.5 }}>
+                  종료 중...
+                </button>
+              ) : s.status === "active" ? (
                 <button className="btn btn-danger btn-sm" onClick={() => setConfirm({ name: s.name, action: "deactivate" })}>
                   비활성화
                 </button>
               ) : (
                 <button
                   className="btn btn-primary btn-sm"
-                  disabled={!s.is_available}
+                  disabled={!s.is_available || hasSwitching}
                   onClick={() => setConfirm({ name: s.name, action: "activate" })}
                 >
                   활성화
@@ -148,8 +153,8 @@ export default function StrategiesPage() {
                     <td style={{ fontSize: 12 }}>{formatDateTime(a.timestamp)}</td>
                     <td>{a.strategy_name}</td>
                     <td>
-                      <span className={`badge ${a.action === "activate" ? "badge-green" : "badge-red"}`}>
-                        {a.action === "activate" ? "활성화" : "비활성화"}
+                      <span className={`badge ${a.action === "activate" ? "badge-green" : a.action === "shutting_down" ? "badge-yellow" : "badge-red"}`}>
+                        {a.action === "activate" ? "활성화" : a.action === "shutting_down" ? "종료중" : "비활성화"}
                       </span>
                     </td>
                     <td><span className="badge badge-blue">{a.source}</span></td>
@@ -167,8 +172,12 @@ export default function StrategiesPage() {
 
       {confirm && (
         <ConfirmDialog
-          title={`전략 ${confirm.action === "activate" ? "활성화" : "비활성화"}`}
-          message={`'${confirm.name}' 전략을 ${confirm.action === "activate" ? "활성화" : "비활성화"}하시겠습니까?`}
+          title={`전략 ${confirm.action === "activate" ? "전환" : "비활성화"}`}
+          message={
+            confirm.action === "activate"
+              ? `'${confirm.name}' 전략으로 전환하시겠습니까? 기존 전략은 자동으로 종료됩니다.`
+              : `'${confirm.name}' 전략을 비활성화하시겠습니까?`
+          }
           onConfirm={handleToggle}
           onCancel={() => setConfirm(null)}
         />

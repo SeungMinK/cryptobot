@@ -55,7 +55,7 @@ class StrategyRepository:
     # ── 전략 활성화/비활성화 ──
 
     def activate(self, name: str, source: str = "manual", reason: str | None = None) -> bool:
-        """전략 활성화.
+        """전략 활성화 (단일 활성화 — 기존 전략은 자동 종료).
 
         Args:
             name: 전략 이름
@@ -70,17 +70,69 @@ class StrategyRepository:
             logger.warning("전략 '%s' 없음 — 활성화 실패", name)
             return False
 
-        if strategy["is_active"]:
+        if strategy["is_active"] and strategy.get("status") == "active":
             return True  # 이미 활성화됨
 
+        # 전환 중인 전략이 있으면 차단
+        switching = self._db.execute(
+            "SELECT name FROM strategies WHERE status = 'shutting_down'"
+        ).fetchone()
+        if switching:
+            logger.warning("전략 '%s' 종료 중 — 전환 대기 필요", switching["name"])
+            return False
+
+        now = datetime.now().isoformat()
+
+        # 기존 활성 전략을 shutting_down으로 전환
+        current_active = self._db.execute(
+            "SELECT name FROM strategies WHERE is_active = TRUE AND name != ?",
+            (name,),
+        ).fetchall()
+
+        for row in current_active:
+            old_name = row["name"]
+            self._db.execute(
+                "UPDATE strategies SET status = 'shutting_down', updated_at = ? WHERE name = ?",
+                (now, old_name),
+            )
+            self._record_activation(old_name, "shutting_down", source, f"전환: {old_name} → {name}")
+            logger.info("전략 종료 중: %s → shutting_down", old_name)
+
+        # 새 전략 활성화
         self._db.execute(
-            "UPDATE strategies SET is_active = TRUE, updated_at = ? WHERE name = ?",
-            (datetime.now().isoformat(), name),
+            "UPDATE strategies SET is_active = TRUE, status = 'active', updated_at = ? WHERE name = ?",
+            (now, name),
         )
         self._record_activation(name, "activate", source, reason)
         self._db.commit()
         logger.info("전략 활성화: %s (by %s)", name, source)
         return True
+
+    def complete_shutdown(self) -> list[str]:
+        """shutting_down 상태의 전략을 inactive로 전환. 봇에서 주기적으로 호출.
+
+        Returns:
+            종료 완료된 전략 이름 목록
+        """
+        rows = self._db.execute(
+            "SELECT name FROM strategies WHERE status = 'shutting_down'"
+        ).fetchall()
+
+        completed = []
+        now = datetime.now().isoformat()
+        for row in rows:
+            name = row["name"]
+            self._db.execute(
+                "UPDATE strategies SET is_active = FALSE, status = 'inactive', updated_at = ? WHERE name = ?",
+                (now, name),
+            )
+            self._record_activation(name, "deactivate", "auto", "전환 종료")
+            completed.append(name)
+            logger.info("전략 종료 완료: %s → inactive", name)
+
+        if completed:
+            self._db.commit()
+        return completed
 
     def deactivate(self, name: str, source: str = "manual", reason: str | None = None) -> bool:
         """전략 비활성화."""
@@ -88,11 +140,11 @@ class StrategyRepository:
         if strategy is None:
             return False
 
-        if not strategy["is_active"]:
+        if not strategy["is_active"] and strategy.get("status") == "inactive":
             return True
 
         self._db.execute(
-            "UPDATE strategies SET is_active = FALSE, updated_at = ? WHERE name = ?",
+            "UPDATE strategies SET is_active = FALSE, status = 'inactive', updated_at = ? WHERE name = ?",
             (datetime.now().isoformat(), name),
         )
         self._record_activation(name, "deactivate", source, reason)

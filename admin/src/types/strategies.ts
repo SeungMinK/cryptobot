@@ -16,6 +16,7 @@ export interface Strategy {
   difficulty: string;
   default_params_json: string;
   is_active: boolean;
+  status: "active" | "shutting_down" | "inactive";
   is_available: boolean;
   created_at: string;
   updated_at: string;
@@ -26,7 +27,7 @@ export interface StrategyActivation {
   id: number;
   timestamp: string;
   strategy_name: string;
-  action: "activate" | "deactivate";
+  action: "activate" | "deactivate" | "shutting_down";
   source: "manual" | "llm" | "backtest";
   market_state: string;
   reason: string | null;

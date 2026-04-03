@@ -96,8 +96,6 @@ class CryptoBot:
         # 스케줄 등록
         self._scheduler.add_job(self._tick, "interval", seconds=10, id="main_tick")
         self._scheduler.add_job(self._daily_report, "cron", hour=0, minute=0, id="daily_report")
-        # 5분마다 전략 변경 확인 (Admin에서 활성화/비활성화 시 반영)
-        self._scheduler.add_job(self._refresh_strategy, "interval", minutes=5, id="strategy_refresh")
 
         # Graceful shutdown
         signal.signal(signal.SIGINT, self._shutdown)
@@ -145,6 +143,9 @@ class CryptoBot:
     def _tick(self) -> None:
         """10초마다 실행되는 메인 로직."""
         try:
+            # 0. 전략/설정 변경 확인
+            self._refresh_strategy()
+
             if self._strategy is None:
                 return
 
@@ -381,7 +382,19 @@ class CryptoBot:
 
     def _refresh_strategy(self) -> None:
         """Admin에서 전략이 변경되었는지 확인하고 반영."""
-        row = self._db.execute("SELECT name FROM strategies WHERE is_active = TRUE LIMIT 1").fetchone()
+        from cryptobot.data.strategy_repository import StrategyRepository
+
+        repo = StrategyRepository(self._db)
+
+        # shutting_down 상태의 전략을 종료 완료 처리
+        completed = repo.complete_shutdown()
+        for name in completed:
+            logger.info("전략 종료 완료: %s", name)
+
+        # 활성 전략(status=active) 확인
+        row = self._db.execute(
+            "SELECT name FROM strategies WHERE is_active = TRUE AND status = 'active' LIMIT 1"
+        ).fetchone()
         new_name = row["name"] if row else "volatility_breakout"
 
         if new_name == self._strategy_name:
@@ -396,16 +409,6 @@ class CryptoBot:
         self._strategy = new_strategy
         self._strategy_name = new_name
         logger.info("전략 전환: %s → %s", old_name, new_name)
-
-        # strategy_activations에 기록
-        self._db.execute(
-            """
-            INSERT INTO strategy_activations (strategy_name, action, source, reason, previous_strategy)
-            VALUES (?, 'activate', 'bot_refresh', '전략 자동 전환', ?)
-            """,
-            (new_name, old_name),
-        )
-        self._db.commit()
 
         self._notifier.notify_bot_status(f"전략 전환: {old_name} → {new_name}")
 

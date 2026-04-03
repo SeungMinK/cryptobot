@@ -118,16 +118,32 @@ pip install -e ".[dev]"
 cp .env.example .env
 # .env 파일에 API Key 입력
 
+# Admin 웹 의존성 설치
+cd admin && npm install && cd ..
+
 # DB 초기화
 python scripts/setup_db.py
+```
 
-# 봇 실행
+### 바로 실행
+
+```bash
+# 전체 한번에 실행 (봇 + API 서버 + Admin 웹)
+bash scripts/start_all.sh
+```
+
+Ctrl+C로 전체 종료. 로그에 `[BOT]`, `[API]`, `[WEB]` 태그로 구분됨.
+
+### 개별 실행
+
+```bash
+# 봇만 실행
 python -m cryptobot
 
-# API 서버 실행 (별도 터미널)
-uvicorn cryptobot.api.main:app --reload --port 8000
+# API 서버만 (port 8000)
+uvicorn cryptobot.api.main:app --port 8000 --app-dir src
 
-# Admin 대시보드 (별도 터미널)
+# Admin 대시보드만 (port 5173)
 cd admin && npm run dev
 ```
 

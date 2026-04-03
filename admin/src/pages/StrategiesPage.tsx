@@ -4,6 +4,12 @@ import type { Strategy, StrategyActivation, StrategySimulation } from "../types/
 import ConfirmDialog from "../components/ConfirmDialog";
 import { formatPercent, formatDateTime, formatKRW } from "../utils/format";
 
+const MARKET_SECTIONS = [
+  { state: "sideways", label: "횡보장 전략", emoji: "➡️", desc: "변동이 적은 박스권에서 유리" },
+  { state: "bullish", label: "상승장 전략", emoji: "📈", desc: "상승 추세에서 유리" },
+  { state: "bearish", label: "하락장 전략", emoji: "📉", desc: "하락 추세에서 유리" },
+] as const;
+
 export default function StrategiesPage() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [activations, setActivations] = useState<StrategyActivation[]>([]);
@@ -66,76 +72,35 @@ export default function StrategiesPage() {
         </div>
       )}
 
-      {/* Strategy cards */}
-      <div className="strategy-grid">
-        {strategies.map((s) => (
-          <div
-            key={s.name}
-            className={`strategy-card ${s.is_active ? "active-strategy" : ""}`}
-            onClick={() => setEditingStrategy(s)}
-            style={{ cursor: "pointer" }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div>
-                <h3>{s.display_name}</h3>
-                <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
-                  <span className="badge badge-purple">{s.category}</span>
-                  <span className="badge badge-blue">{s.difficulty}</span>
-                </div>
-              </div>
-              <span className={`badge ${s.status === "active" ? "badge-green" : s.status === "shutting_down" ? "badge-yellow" : "badge-red"}`}>
-                {s.status === "active" ? "활성" : s.status === "shutting_down" ? "종료중" : "비활성"}
-              </span>
+      {/* Strategy sections by market state */}
+      {MARKET_SECTIONS.map((section) => {
+        const sectionStrategies = strategies.filter((s) =>
+          s.market_states.includes(section.state)
+        );
+        if (sectionStrategies.length === 0) return null;
+
+        return (
+          <div key={section.state} style={{ marginBottom: 28 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <span style={{ fontSize: 20 }}>{section.emoji}</span>
+              <h2 style={{ margin: 0, fontSize: 18 }}>{section.label}</h2>
+              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{section.desc}</span>
             </div>
-            <p className="strategy-desc">{s.description}</p>
-            <div className="strategy-stats">
-              <div className="strategy-stat-item">
-                <div className="stat-label">총 거래</div>
-                <div className="stat-value">{s.stats?.total_trades ?? 0}</div>
-              </div>
-              <div className="strategy-stat-item">
-                <div className="stat-label">승률</div>
-                <div className="stat-value">{s.stats?.win_rate != null ? formatPercent(s.stats.win_rate * 100).replace("+", "") : "-"}</div>
-              </div>
-              <div className="strategy-stat-item">
-                <div className="stat-label">평균 수익률</div>
-                <div className={`stat-value ${(s.stats?.avg_profit_pct ?? 0) >= 0 ? "positive" : "negative"}`}>
-                  {s.stats?.avg_profit_pct != null ? formatPercent(s.stats.avg_profit_pct) : "-"}
-                </div>
-              </div>
-              <div className="strategy-stat-item">
-                <div className="stat-label">최대 손실</div>
-                <div className="stat-value negative">
-                  {s.stats?.max_loss_pct != null ? formatPercent(s.stats.max_loss_pct) : "-"}
-                </div>
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <span className="badge badge-yellow">{s.market_states}</span>
-              <span className="badge badge-blue">{s.timeframe}</span>
-            </div>
-            <div style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
-              {s.status === "shutting_down" ? (
-                <button className="btn btn-sm" disabled style={{ opacity: 0.5 }}>
-                  종료 중...
-                </button>
-              ) : s.status === "active" ? (
-                <button className="btn btn-danger btn-sm" onClick={() => setConfirm({ name: s.name, action: "deactivate" })}>
-                  비활성화
-                </button>
-              ) : (
-                <button
-                  className="btn btn-primary btn-sm"
-                  disabled={!s.is_available || hasSwitching}
-                  onClick={() => setConfirm({ name: s.name, action: "activate" })}
-                >
-                  활성화
-                </button>
-              )}
+            <div className="strategy-grid">
+              {sectionStrategies.map((s) => (
+                <StrategyCard
+                  key={`${section.state}-${s.name}`}
+                  strategy={s}
+                  hasSwitching={hasSwitching}
+                  onEdit={() => setEditingStrategy(s)}
+                  onActivate={() => setConfirm({ name: s.name, action: "activate" })}
+                  onDeactivate={() => setConfirm({ name: s.name, action: "deactivate" })}
+                />
+              ))}
             </div>
           </div>
-        ))}
-      </div>
+        );
+      })}
 
       {/* Activation History */}
       <div className="card">
@@ -196,6 +161,67 @@ export default function StrategiesPage() {
           onSaved={fetchData}
         />
       )}
+    </div>
+  );
+}
+
+
+// ── 전략 카드 ──
+
+function StrategyCard({ strategy: s, hasSwitching, onEdit, onActivate, onDeactivate }: {
+  strategy: Strategy;
+  hasSwitching: boolean;
+  onEdit: () => void;
+  onActivate: () => void;
+  onDeactivate: () => void;
+}) {
+  return (
+    <div
+      className={`strategy-card ${s.is_active ? "active-strategy" : ""}`}
+      onClick={onEdit}
+      style={{ cursor: "pointer" }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h3>{s.display_name}</h3>
+          <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+            <span className="badge badge-purple">{s.category}</span>
+            <span className="badge badge-blue">{s.difficulty}</span>
+          </div>
+        </div>
+        <span className={`badge ${s.status === "active" ? "badge-green" : s.status === "shutting_down" ? "badge-yellow" : "badge-red"}`}>
+          {s.status === "active" ? "활성" : s.status === "shutting_down" ? "종료중" : "비활성"}
+        </span>
+      </div>
+      <p className="strategy-desc">{s.description}</p>
+      <div className="strategy-stats">
+        <div className="strategy-stat-item">
+          <div className="stat-label">총 거래</div>
+          <div className="stat-value">{s.stats?.total_trades ?? 0}</div>
+        </div>
+        <div className="strategy-stat-item">
+          <div className="stat-label">승률</div>
+          <div className="stat-value">{s.stats?.win_rate != null ? formatPercent(s.stats.win_rate * 100).replace("+", "") : "-"}</div>
+        </div>
+        <div className="strategy-stat-item">
+          <div className="stat-label">평균 수익률</div>
+          <div className={`stat-value ${(s.stats?.avg_profit_pct ?? 0) >= 0 ? "positive" : "negative"}`}>
+            {s.stats?.avg_profit_pct != null ? formatPercent(s.stats.avg_profit_pct) : "-"}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <span className="badge badge-blue">{s.timeframe}</span>
+      </div>
+      <div style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
+        {s.status === "shutting_down" ? (
+          <button className="btn btn-sm" disabled style={{ opacity: 0.5 }}>종료 중...</button>
+        ) : s.status === "active" ? (
+          <button className="btn btn-danger btn-sm" onClick={onDeactivate}>비활성화</button>
+        ) : (
+          <button className="btn btn-primary btn-sm" disabled={!s.is_available || hasSwitching} onClick={onActivate}>활성화</button>
+        )}
+      </div>
     </div>
   );
 }

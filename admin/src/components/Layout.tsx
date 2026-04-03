@@ -10,29 +10,29 @@ export default function Layout() {
         <div className="sidebar-logo">CryptoBot</div>
         <nav className="sidebar-nav">
           <NavLink to="/" end className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
-            Dashboard
+            대시보드
           </NavLink>
           <NavLink to="/trades" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
-            Trades
+            매매 내역
           </NavLink>
           <NavLink to="/strategies" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
-            Strategies
+            전략 관리
           </NavLink>
           <NavLink to="/signals" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
-            Signals
+            매매 신호
           </NavLink>
           <NavLink to="/profit" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
-            Profit Analysis
+            수익률 분석
           </NavLink>
           <NavLink to="/config" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
-            Config
+            설정
           </NavLink>
         </nav>
         <div className="sidebar-footer">
           <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 8 }}>
             {user?.display_name || user?.username}
           </div>
-          <button onClick={logout}>Logout</button>
+          <button onClick={logout}>로그아웃</button>
         </div>
       </aside>
       <main className="main-content">

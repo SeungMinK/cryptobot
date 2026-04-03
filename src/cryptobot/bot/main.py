@@ -376,9 +376,9 @@ class CryptoBot:
             # DB의 default_params_json을 StrategyParams.extra에 매핑
             extra = json.loads(row["default_params_json"]) if row["default_params_json"] else {}
             params = StrategyParams(
-                stop_loss_pct=strategy_params.get("stop_loss_pct", -5.0),
-                trailing_stop_pct=strategy_params.get("trailing_stop_pct", -3.0),
-                position_size_pct=strategy_params.get("position_size_pct", 100.0),
+                stop_loss_pct=float(self._get_config("stop_loss_pct", "-5.0")),
+                trailing_stop_pct=float(self._get_config("trailing_stop_pct", "-3.0")),
+                position_size_pct=float(self._get_config("position_size_pct", "100.0")),
                 extra=extra,
             )
 
@@ -424,6 +424,12 @@ class CryptoBot:
             "SELECT name FROM strategies WHERE is_active = TRUE AND status = 'active' LIMIT 1"
         ).fetchone()
         new_name = row["name"] if row else "volatility_breakout"
+
+        # bot_config에서 리스크 파라미터 실시간 반영
+        if self._strategy is not None:
+            self._strategy.params.stop_loss_pct = float(self._get_config("stop_loss_pct", "-5.0"))
+            self._strategy.params.trailing_stop_pct = float(self._get_config("trailing_stop_pct", "-3.0"))
+            self._strategy.params.position_size_pct = float(self._get_config("position_size_pct", "100.0"))
 
         if new_name == self._strategy_name:
             return

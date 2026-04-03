@@ -25,33 +25,41 @@ def get_trades(
     """매매 내역 조회 (페이지네이션 + 필터)."""
     db = get_db()
     conditions = []
-    params = []
+    params: list = []
 
     if coin:
-        conditions.append("coin = ?")
+        conditions.append("t.coin = ?")
         params.append(coin)
     if strategy:
-        conditions.append("strategy = ?")
+        conditions.append("t.strategy = ?")
         params.append(strategy)
     if side:
-        conditions.append("side = ?")
+        conditions.append("t.side = ?")
         params.append(side)
     if date_from:
-        conditions.append("DATE(timestamp) >= ?")
+        conditions.append("DATE(t.timestamp) >= ?")
         params.append(date_from)
     if date_to:
-        conditions.append("DATE(timestamp) <= ?")
+        conditions.append("DATE(t.timestamp) <= ?")
         params.append(date_to)
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     offset = (page - 1) * limit
 
     # 총 개수
-    total = db.execute(f"SELECT COUNT(*) FROM trades {where}", tuple(params)).fetchone()[0]
+    total = db.execute(
+        f"SELECT COUNT(*) FROM trades t {where}", tuple(params)
+    ).fetchone()[0]
 
-    # 데이터
+    # 데이터 (trade_signals에서 confidence JOIN)
     rows = db.execute(
-        f"SELECT * FROM trades {where} ORDER BY id DESC LIMIT ? OFFSET ?",
+        f"""
+        SELECT t.*, ts.confidence as signal_confidence
+        FROM trades t
+        LEFT JOIN trade_signals ts ON ts.trade_id = t.id AND ts.executed = TRUE
+        {where}
+        ORDER BY t.id DESC LIMIT ? OFFSET ?
+        """,
         (*params, limit, offset),
     ).fetchall()
 

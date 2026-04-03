@@ -1,4 +1,4 @@
-# Development Work Hub
+깃# Development Work Hub
 
 > 이 폴더는 개발 작업 문서를 관리합니다.
 > 각 문서는 독립적으로 참조 가능하며, Claude에 붙여넣어 바이브코딩 컨텍스트로 활용합니다.

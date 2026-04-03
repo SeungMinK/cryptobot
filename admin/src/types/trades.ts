@@ -22,6 +22,7 @@ export interface Trade {
   hold_duration_minutes: number | null;
   strategy_params_json: string;
   strategy_selection_reason: string;
+  signal_confidence: number | null;
 }
 
 export interface TradesResponse {

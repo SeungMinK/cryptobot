@@ -148,6 +148,7 @@ export default function TradesPage() {
                     <th>수량</th>
                     <th>금액</th>
                     <th>전략</th>
+                    <th>신뢰도</th>
                     <th>수익률</th>
                     <th>수익금</th>
                   </tr>
@@ -166,6 +167,9 @@ export default function TradesPage() {
                       <td>{t.amount.toFixed(8)}</td>
                       <td>{formatKRW(t.total_krw)}</td>
                       <td><span className="badge badge-purple">{t.strategy}</span></td>
+                      <td style={{ fontSize: 12 }}>
+                        {t.signal_confidence != null ? `${(t.signal_confidence * 100).toFixed(1)}%` : "-"}
+                      </td>
                       <td className={t.profit_pct != null ? (t.profit_pct >= 0 ? "positive" : "negative") : ""}>
                         {t.profit_pct != null ? formatPercent(t.profit_pct) : "-"}
                       </td>

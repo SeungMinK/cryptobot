@@ -299,6 +299,19 @@ class CryptoBot:
             self._send_tick_report(snapshot, signal_result.signal_type, signal_result.confidence, signal_result.reason)
 
         if signal_result.signal_type != "sell":
+            # 보유 중 hold 신호도 기록
+            self._recorder.record_signal(
+                coin=config.bot.coin,
+                signal_type=signal_result.signal_type,
+                strategy=self._strategy_name,
+                confidence=signal_result.confidence,
+                trigger_reason=signal_result.reason,
+                current_price=current_price,
+                trigger_value=signal_result.trigger_value,
+                skip_reason=signal_result.reason,
+                snapshot_id=snapshot_id,
+                strategy_params_json=self._get_strategy_params_json(),
+            )
             return
 
         if not self._trader.is_ready:

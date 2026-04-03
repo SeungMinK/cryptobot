@@ -94,7 +94,18 @@
       "Bash(chmod +x /Users/seungminkim/worksapce/cryptobot/scripts/start_all.sh)",
       "Bash(git add scripts/start_all.sh && git commit -m \"$\\(cat <<'EOF'\nfeat: 전체 실행 스크립트 추가 \\(봇 + API + Admin 웹\\)\n\nbash scripts/start_all.sh 한 줄로 3개 서비스 동시 실행.\nCtrl+C로 전체 종료.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push 2>&1)",
       "Bash(source ~/.nvm/nvm.sh && nvm alias default 22 && nvm use default 2>&1)",
-      "Bash(git add README.md Makefile && git commit -m \"$\\(cat <<'EOF'\ndocs: README 실행법 정리 + Makefile 추가\n\nbash scripts/start_all.sh 또는 make start로 전체 실행.\nmake bot/api/web으로 개별 실행.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push 2>&1)"
+      "Bash(git add README.md Makefile && git commit -m \"$\\(cat <<'EOF'\ndocs: README 실행법 정리 + Makefile 추가\n\nbash scripts/start_all.sh 또는 make start로 전체 실행.\nmake bot/api/web으로 개별 실행.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push 2>&1)",
+      "Bash(nvm alias:*)",
+      "Read(//Users/seungminkim/**)",
+      "Bash(/usr/local/bin/node:*)",
+      "Bash(brew uninstall:*)",
+      "Read(//usr/local/bin/**)",
+      "Read(//usr/local/lib/node_modules/npm/bin/**)",
+      "Read(//usr/local/lib/node_modules/**)",
+      "Read(//usr/local/include/node/**)",
+      "Bash(sudo rm:*)",
+      "Bash(.venv/bin/python:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

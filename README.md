@@ -12,7 +12,7 @@ AI 기반 코인 자동매매 시스템. 규칙 기반 매매 전략에 LLM(Clau
 - **시장분석**: Claude Haiku API를 활용한 뉴스 기반 시장 상태 판단 (하루 4회)
 - **파라미터 자동 조절**: LLM이 시장 상황과 과거 매매 성과를 분석하여 전략 파라미터를 동적으로 조절
 - **데이터 파이프라인**: 시계열 시장 데이터 수집, 매매 신호/결과 기록, 일일 정산 자동화
-- **모니터링**: Slack 실시간 알림 + Streamlit 대시보드
+- **모니터링**: Slack 실시간 알림 + React Admin 대시보드
 
 ### Architecture
 
@@ -42,7 +42,8 @@ AI 기반 코인 자동매매 시스템. 규칙 기반 매매 전략에 LLM(Clau
 | Trading | pyupbit (Upbit API) |
 | Data | pandas, numpy, SQLite → PostgreSQL |
 | LLM | Anthropic Claude Haiku 4.5 |
-| Dashboard | Streamlit + Plotly |
+| API Server | FastAPI + uvicorn |
+| Dashboard | React + TypeScript + Vite |
 | Notification | Slack Webhook |
 | Scheduling | APScheduler → Airflow |
 | Infra | Docker, Docker Compose |
@@ -52,42 +53,34 @@ AI 기반 코인 자동매매 시스템. 규칙 기반 매매 전략에 LLM(Clau
 
 ```
 cryptobot/
-├── bot/                # 트레이딩 봇 코어
-│   ├── main.py         # 진입점, 스케줄러
-│   ├── config.py       # 설정 관리
-│   ├── strategy.py     # 매매 전략 엔진
-│   ├── trader.py       # 주문 실행
-│   ├── indicators.py   # 기술적 지표
-│   ├── scanner.py      # 종목 자동 선별
-│   └── risk.py         # 리스크 관리
+├── src/cryptobot/
+│   ├── bot/                # 트레이딩 봇 코어
+│   │   ├── main.py         # 진입점, 스케줄러
+│   │   ├── config.py       # 설정 관리
+│   │   ├── trader.py       # 주문 실행
+│   │   ├── indicators.py   # 기술적 지표
+│   │   ├── scanner.py      # 종목 자동 선별
+│   │   └── risk.py         # 리스크 관리
+│   │
+│   ├── strategies/         # 매매 전략 (Strategy Pattern)
+│   │   ├── base.py         # 전략 인터페이스
+│   │   ├── registry.py     # 전략 등록/선택
+│   │   └── *.py            # 9개 전략 구현체
+│   │
+│   ├── data/               # 데이터 레이어
+│   │   ├── database.py     # DB 연결 + 스키마
+│   │   ├── collector.py    # 시장 데이터 수집
+│   │   ├── recorder.py     # 매매/시장 기록 저장
+│   │   └── strategy_repository.py  # 전략 DB 관리
+│   │
+│   ├── api/                # FastAPI 웹 서버 (Admin 백엔드)
+│   ├── notifier/           # Slack 알림
+│   └── exceptions.py       # 공통 예외
 │
-├── data/               # 데이터 레이어
-│   ├── database.py     # DB 연결 관리
-│   ├── collector.py    # 시장 데이터 수집
-│   ├── recorder.py     # 매매/시장 기록 저장
-│   └── models.py       # 데이터 모델
-│
-├── llm/                # LLM 분석 레이어
-│   ├── analyzer.py     # Claude API 호출
-│   ├── prompts.py      # 프롬프트 템플릿
-│   ├── news_fetcher.py # 뉴스 수집
-│   └── param_tuner.py  # 파라미터 최적화
-│
-├── notifier/           # 알림
-│   └── slack.py        # Slack 알림/리포트
-│
-├── dashboard/          # Admin 대시보드
-│   ├── app.py          # Streamlit 메인
-│   └── pages/          # 대시보드 페이지
-│
-├── backtest/           # 백테스트 엔진
-│   ├── engine.py       # 시뮬레이션
-│   └── optimizer.py    # 파라미터 최적화
-│
-├── scripts/            # 유틸리티
-├── tests/              # 테스트
-└── docs/               # 문서
-    └── work/           # 개발 작업 문서
+├── admin/                  # React Admin 대시보드
+├── tests/                  # 테스트
+├── scripts/                # 유틸리티
+└── docs/work/              # 개발 작업 문서
 ```
 
 ## Data Design
@@ -115,11 +108,11 @@ llm_decisions (하루 4회)
 
 ```bash
 # 가상환경 생성
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 
 # 패키지 설치
-pip install -r requirements.txt
+pip install -e ".[dev]"
 
 # 환경변수 설정
 cp .env.example .env
@@ -129,18 +122,62 @@ cp .env.example .env
 python scripts/setup_db.py
 
 # 봇 실행
-python bot/main.py
+python -m cryptobot
 
-# 대시보드 실행 (별도 터미널)
-streamlit run dashboard/app.py
+# API 서버 실행 (별도 터미널)
+uvicorn cryptobot.api.main:app --reload --port 8000
+
+# Admin 대시보드 (별도 터미널)
+cd admin && npm run dev
 ```
 
 ## Development Roadmap
 
-- **Phase 1**: MVP — 변동성 돌파 전략, 단일 종목 자동매매, Slack 알림
-- **Phase 2**: LLM 연동 — Claude Haiku 시장분석, 멀티 종목, 백테스트, 대시보드
-- **Phase 3**: 컨테이너화 — Docker, PostgreSQL, dbt
-- **Phase 4**: 클라우드 — Oracle Cloud/AWS 배포, Airflow 오케스트레이션
+### Phase 1: MVP — 자동매매 기본 동작 (완료)
+
+- [x] #1 프로젝트 초기 설정
+- [x] #4 API Key 발급 + 연결 테스트
+- [x] #5 설정 관리 모듈 (config.py)
+- [x] #6 데이터베이스 초기화
+- [x] #7 기술적 지표 계산 모듈
+- [x] #8 변동성 돌파 전략 엔진 + 8개 추가 전략
+- [x] #9 주문 실행 모듈
+- [x] #10 시장 데이터 수집기
+- [x] #11 Slack 알림 모듈
+- [x] #12 메인 루프 + 스케줄러
+
+### Phase 2: Admin 대시보드 + LLM 연동
+
+**백엔드 API (FastAPI)**
+- [ ] #29 FastAPI 프로젝트 초기 설정
+- [ ] #30 JWT 인증 + 로그인 API
+- [ ] #31 매매 내역 API
+- [ ] #32 잔고 + 포지션 API
+- [ ] #33 전략 관리 API
+- [ ] #34 시장 현황 API
+
+**프론트엔드 (React)**
+- [ ] #35 React Admin 프로젝트 초기 설정
+- [ ] #36 대시보드 페이지 — 전체 현황
+- [ ] #37 대시보드 페이지 — 매매 내역
+- [ ] #38 대시보드 페이지 — 전략 관리
+- [ ] #39 대시보드 페이지 — 수익률 분석
+
+**LLM 연동**
+- [ ] #16 뉴스 수집기 (RSS)
+- [ ] #17 Claude Haiku 연동 — 시장분석
+- [ ] #18 LLM 파라미터 튜닝 — 매매 결과 피드백
+- [ ] #19 백테스트 엔진
+
+### Phase 3: 인프라 — 컨테이너화
+
+- [ ] #20 Docker 컨테이너화
+- [ ] #21 SQLite → PostgreSQL 마이그레이션
+
+### Phase 4: 클라우드 — 배포 + 오케스트레이션
+
+- [ ] #22 Airflow DAG 설계
+- [ ] #23 클라우드 배포 (Oracle/AWS)
 
 ## License
 

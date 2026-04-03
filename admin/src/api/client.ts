@@ -14,15 +14,21 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
+let isRedirecting = false;
+
 client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (
       error.response?.status === 401 &&
-      !error.config?.url?.includes("/auth/login")
+      !error.config?.url?.includes("/auth/login") &&
+      !error.config?.url?.includes("/auth/me")
     ) {
-      localStorage.removeItem("token");
-      window.location.href = "/login";
+      if (!isRedirecting) {
+        isRedirecting = true;
+        localStorage.removeItem("token");
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }

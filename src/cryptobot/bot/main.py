@@ -60,14 +60,14 @@ class CryptoBot:
         self._safety_check()
 
         # 스케줄 등록 — NestJS의 @Cron() 데코레이터와 동일
-        self._scheduler.add_job(self._tick, "interval", minutes=1, id="main_tick")
+        self._scheduler.add_job(self._tick, "interval", seconds=10, id="main_tick")
         self._scheduler.add_job(self._daily_report, "cron", hour=0, minute=0, id="daily_report")
 
         # Graceful shutdown
         signal.signal(signal.SIGINT, self._shutdown)
         signal.signal(signal.SIGTERM, self._shutdown)
 
-        logger.info("스케줄러 시작 (1분 간격)")
+        logger.info("스케줄러 시작 (10초 간격)")
         try:
             self._scheduler.start()
         except (KeyboardInterrupt, SystemExit):
@@ -142,7 +142,11 @@ class CryptoBot:
 
         # 매수 실행 — 리스크 점검 후 진행
         balance = self._trader.get_balance_krw()
-        buy_amount = self._risk.get_safe_position_size(balance)
+        buy_amount = self._risk.get_safe_position_size(
+            balance,
+            confidence=signal_result.confidence,
+            position_size_pct=self._strategy.params.position_size_pct,
+        )
 
         can_buy, reason = self._risk.check_can_buy(config.bot.coin, buy_amount, balance)
         if not can_buy:

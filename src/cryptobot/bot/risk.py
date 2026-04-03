@@ -1,0 +1,130 @@
+"""리스크 관리 모듈.
+
+NestJS의 Guard/Middleware와 비슷한 역할.
+매매 실행 전에 리스크 조건을 체크하고, 위험한 주문을 차단한다.
+"""
+
+import logging
+from dataclasses import dataclass
+
+from cryptobot.data.database import Database
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RiskLimits:
+    """리스크 한도 설정."""
+
+    max_daily_trades: int = 10  # 일일 최대 거래 횟수
+    max_daily_loss_pct: float = -10.0  # 일일 최대 손실률 (%)
+    max_position_size_krw: float = 1_000_000  # 최대 1회 매수 금액 (원)
+    min_balance_krw: float = 10_000  # 최소 유지 잔고 (원)
+    max_consecutive_losses: int = 3  # 연속 손실 시 매매 중단
+
+
+class RiskManager:
+    """리스크 관리자.
+
+    매매 전에 check_*() 메서드로 리스크를 점검한다.
+    NestJS의 Guard처럼, 조건 미충족 시 매매를 차단한다.
+    """
+
+    def __init__(self, db: Database, limits: RiskLimits | None = None) -> None:
+        self._db = db
+        self.limits = limits or RiskLimits()
+
+    def check_can_buy(self, coin: str, buy_amount_krw: float, current_balance_krw: float) -> tuple[bool, str]:
+        """매수 가능 여부 점검.
+
+        Args:
+            coin: 종목 코드
+            buy_amount_krw: 매수 금액
+            current_balance_krw: 현재 잔고
+
+        Returns:
+            (가능 여부, 사유)
+        """
+        # 1. 최소 잔고 유지 체크
+        remaining = current_balance_krw - buy_amount_krw
+        if remaining < self.limits.min_balance_krw:
+            return False, f"최소 잔고 미달: 잔여 {remaining:,.0f}원 < {self.limits.min_balance_krw:,.0f}원"
+
+        # 2. 최대 1회 매수 금액 체크
+        if buy_amount_krw > self.limits.max_position_size_krw:
+            return False, f"최대 매수 금액 초과: {buy_amount_krw:,.0f}원 > {self.limits.max_position_size_krw:,.0f}원"
+
+        # 3. 일일 거래 횟수 체크
+        today_count = self._get_today_trade_count(coin)
+        if today_count >= self.limits.max_daily_trades:
+            return False, f"일일 최대 거래 횟수 도달: {today_count}/{self.limits.max_daily_trades}"
+
+        # 4. 일일 손실률 체크
+        daily_pnl = self._get_today_pnl_pct(coin)
+        if daily_pnl <= self.limits.max_daily_loss_pct:
+            return False, f"일일 최대 손실 도달: {daily_pnl:.1f}% <= {self.limits.max_daily_loss_pct:.1f}%"
+
+        # 5. 연속 손실 체크
+        consecutive = self._get_consecutive_losses(coin)
+        if consecutive >= self.limits.max_consecutive_losses:
+            return False, f"연속 {consecutive}회 손실 — 매매 중단"
+
+        return True, "리스크 점검 통과"
+
+    def check_can_sell(self, coin: str) -> tuple[bool, str]:
+        """매도 가능 여부 점검. (현재는 항상 허용 — 손절은 막으면 안 됨)"""
+        return True, "매도 허용"
+
+    def get_safe_position_size(self, balance_krw: float) -> float:
+        """안전한 매수 금액 계산.
+
+        Args:
+            balance_krw: 현재 잔고
+
+        Returns:
+            매수 가능 금액 (원)
+        """
+        available = balance_krw - self.limits.min_balance_krw
+        if available <= 0:
+            return 0
+
+        return min(available, self.limits.max_position_size_krw)
+
+    def _get_today_trade_count(self, coin: str) -> int:
+        """오늘 거래 횟수."""
+        row = self._db.execute(
+            "SELECT COUNT(*) FROM trades WHERE coin = ? AND DATE(timestamp) = DATE('now')",
+            (coin,),
+        ).fetchone()
+        return row[0] if row else 0
+
+    def _get_today_pnl_pct(self, coin: str) -> float:
+        """오늘 누적 수익률."""
+        row = self._db.execute(
+            """
+            SELECT COALESCE(SUM(profit_pct), 0)
+            FROM trades
+            WHERE coin = ? AND side = 'sell' AND DATE(timestamp) = DATE('now')
+            """,
+            (coin,),
+        ).fetchone()
+        return float(row[0]) if row else 0.0
+
+    def _get_consecutive_losses(self, coin: str) -> int:
+        """최근 연속 손실 횟수."""
+        rows = self._db.execute(
+            """
+            SELECT profit_pct FROM trades
+            WHERE coin = ? AND side = 'sell' AND profit_pct IS NOT NULL
+            ORDER BY id DESC LIMIT ?
+            """,
+            (coin, self.limits.max_consecutive_losses),
+        ).fetchall()
+
+        count = 0
+        for row in rows:
+            if row["profit_pct"] < 0:
+                count += 1
+            else:
+                break
+        return count

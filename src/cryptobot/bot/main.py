@@ -10,11 +10,12 @@ NestJS의 main.ts (bootstrap) + AppModule과 동일한 역할.
 import logging
 import signal
 import sys
-from datetime import datetime
+from datetime import date, datetime
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from cryptobot.bot.config import config
+from cryptobot.bot.risk import RiskManager
 from cryptobot.bot.strategy import StrategyParams, VolatilityBreakoutStrategy
 from cryptobot.bot.trader import Trader
 from cryptobot.data.collector import DataCollector
@@ -37,6 +38,7 @@ class CryptoBot:
         self._collector = DataCollector(self._db, config.bot.coin)
         self._recorder = DataRecorder(self._db)
         self._notifier = SlackNotifier()
+        self._risk = RiskManager(self._db)
 
         # 전략 파라미터 로딩
         params = self._load_strategy_params()
@@ -138,9 +140,25 @@ class CryptoBot:
             logger.info("매수 신호 발생했으나 API Key 미설정 — 스킵")
             return
 
-        # 매수 실행
+        # 매수 실행 — 리스크 점검 후 진행
         balance = self._trader.get_balance_krw()
-        buy_amount = balance * (self._strategy.params.position_size_pct / 100)
+        buy_amount = self._risk.get_safe_position_size(balance)
+
+        can_buy, reason = self._risk.check_can_buy(config.bot.coin, buy_amount, balance)
+        if not can_buy:
+            self._recorder.record_signal(
+                coin=config.bot.coin,
+                signal_type="buy_signal",
+                strategy="volatility_breakout",
+                confidence=signal_result.confidence,
+                trigger_reason=signal_result.trigger_reason,
+                current_price=current_price,
+                trigger_value=signal_result.trigger_value,
+                skip_reason=reason,
+                snapshot_id=snapshot_id,
+            )
+            logger.info("매수 신호 발생했으나 리스크 차단: %s", reason)
+            return
 
         order = self._trader.buy_market(config.bot.coin, buy_amount)
         if order.success:
@@ -232,7 +250,58 @@ class CryptoBot:
     def _daily_report(self) -> None:
         """자정에 실행되는 일일 정산."""
         logger.info("일일 정산 실행")
-        # Phase 1에서는 기본 알림만, 상세 리포트는 Phase 2에서 구현
+        try:
+            today = date.today()
+            trades = self._recorder.get_today_trades(config.bot.coin)
+
+            sell_trades = [t for t in trades if t["side"] == "sell"]
+            wins = [t for t in sell_trades if (t.get("profit_pct") or 0) > 0]
+            losses = [t for t in sell_trades if (t.get("profit_pct") or 0) <= 0]
+            total_fees = sum(t.get("fee_krw", 0) for t in trades)
+
+            win_rate = (len(wins) / len(sell_trades) * 100) if sell_trades else 0
+            avg_profit = sum(t["profit_pct"] for t in wins) / len(wins) if wins else 0
+            avg_loss = sum(t["profit_pct"] for t in losses) / len(losses) if losses else 0
+
+            # 잔고 조회 (API Key 없으면 0)
+            balance = self._trader.get_balance_krw() if self._trader.is_ready else 0
+
+            trades_summary = {
+                "total": len(trades),
+                "buys": len([t for t in trades if t["side"] == "buy"]),
+                "sells": len(sell_trades),
+                "wins": len(wins),
+                "losses": len(losses),
+                "win_rate": round(win_rate, 1),
+                "avg_profit_pct": round(avg_profit, 2),
+                "avg_loss_pct": round(avg_loss, 2),
+                "total_fees": round(total_fees, 2),
+            }
+
+            # DB에 저장
+            self._recorder.save_daily_report(
+                report_date=today,
+                starting_balance=balance,
+                ending_balance=balance,
+                total_asset_value=balance,
+                realized_pnl=sum(t.get("profit_krw", 0) or 0 for t in sell_trades),
+                unrealized_pnl=0,
+                trades_summary=trades_summary,
+            )
+
+            # Slack 알림
+            daily_pnl = sum(t.get("profit_pct", 0) or 0 for t in sell_trades)
+            self._notifier.notify_daily_report(
+                date_str=today.isoformat(),
+                daily_return_pct=daily_pnl,
+                total_trades=len(trades),
+                win_rate=win_rate,
+                balance_krw=balance,
+            )
+
+        except Exception as e:
+            logger.error("일일 정산 에러: %s", e, exc_info=True)
+            self._notifier.notify_error(f"일일 정산 실패: {e}")
 
     def _safety_check(self) -> None:
         """봇 시작 시 안전 장치."""

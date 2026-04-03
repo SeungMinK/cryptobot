@@ -192,6 +192,16 @@ CREATE TABLE IF NOT EXISTS llm_decisions (
     evaluation_was_good BOOLEAN,
     FOREIGN KEY (input_market_snapshot_id) REFERENCES market_snapshots(id)
 );
+
+CREATE TABLE IF NOT EXISTS bot_config (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    value_type TEXT NOT NULL DEFAULT 'string',
+    category TEXT NOT NULL DEFAULT 'general',
+    display_name TEXT NOT NULL,
+    description TEXT,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 # 기본 전략 파라미터 (최초 1회 삽입)
@@ -308,6 +318,106 @@ _DEFAULT_STRATEGIES = [
     },
 ]
 
+# 봇 설정 기본값
+_DEFAULT_BOT_CONFIG = [
+    {
+        "key": "slack_tick_report",
+        "value": "false",
+        "value_type": "bool",
+        "category": "notification",
+        "display_name": "틱별 판단 리포트",
+        "description": "매 스케줄러 실행 시 매수/매도/HOLD 판단 근거를 Slack으로 발송",
+    },
+    {
+        "key": "slack_trade_notification",
+        "value": "true",
+        "value_type": "bool",
+        "category": "notification",
+        "display_name": "매매 체결 알림",
+        "description": "매수/매도 체결 시 Slack 알림 발송",
+    },
+    {
+        "key": "slack_daily_report",
+        "value": "true",
+        "value_type": "bool",
+        "category": "notification",
+        "display_name": "일일 정산 리포트",
+        "description": "자정에 일일 매매 성과를 Slack으로 발송",
+    },
+    {
+        "key": "tick_interval_seconds",
+        "value": "10",
+        "value_type": "int",
+        "category": "bot",
+        "display_name": "판단 주기 (초)",
+        "description": "매매 신호 판단 간격. 너무 짧으면 API 호출 제한에 걸릴 수 있음",
+    },
+    {
+        "key": "position_size_pct",
+        "value": "100",
+        "value_type": "float",
+        "category": "risk",
+        "display_name": "포지션 크기 (%)",
+        "description": "가용 잔고 대비 최대 매수 비율. 50이면 잔고의 50%까지만 매수",
+    },
+    {
+        "key": "stop_loss_pct",
+        "value": "-5.0",
+        "value_type": "float",
+        "category": "risk",
+        "display_name": "손절률 (%)",
+        "description": "매수가 대비 이 비율만큼 하락하면 자동 매도",
+    },
+    {
+        "key": "trailing_stop_pct",
+        "value": "-3.0",
+        "value_type": "float",
+        "category": "risk",
+        "display_name": "트레일링 스탑 (%)",
+        "description": "최고가 대비 이 비율만큼 하락하면 자동 매도",
+    },
+    {
+        "key": "max_daily_trades",
+        "value": "10",
+        "value_type": "int",
+        "category": "risk",
+        "display_name": "일일 최대 거래 횟수",
+        "description": "하루에 이 횟수 이상 거래하면 매매 중단",
+    },
+    {
+        "key": "max_daily_loss_pct",
+        "value": "-10.0",
+        "value_type": "float",
+        "category": "risk",
+        "display_name": "일일 최대 손실률 (%)",
+        "description": "일일 누적 손실이 이 비율을 초과하면 매매 중단",
+    },
+    {
+        "key": "max_consecutive_losses",
+        "value": "3",
+        "value_type": "int",
+        "category": "risk",
+        "display_name": "연속 손실 허용 횟수",
+        "description": "연속으로 이 횟수만큼 손실 시 매매 중단",
+    },
+    {
+        "key": "k_value",
+        "value": "0.5",
+        "value_type": "float",
+        "category": "strategy",
+        "display_name": "K 값 (변동성 돌파)",
+        "description": "변동성 돌파 전략의 K 계수. 높을수록 보수적 (0.0~1.0)",
+    },
+    {
+        "key": "allow_trading",
+        "value": "true",
+        "value_type": "bool",
+        "category": "bot",
+        "display_name": "매매 허용",
+        "description": "false로 설정하면 봇이 신호만 기록하고 실제 매매는 하지 않음",
+    },
+]
+
 
 class Database:
     """SQLite 데이터베이스 연결 관리.
@@ -368,6 +478,19 @@ class Database:
                         ),
                     )
                 logger.info("전략 마스터 데이터 삽입 완료 (%d개)", len(_DEFAULT_STRATEGIES))
+
+            # 봇 설정 기본값 삽입
+            row = conn.execute("SELECT COUNT(*) FROM bot_config").fetchone()
+            if row[0] == 0:
+                for cfg in _DEFAULT_BOT_CONFIG:
+                    conn.execute(
+                        """
+                        INSERT INTO bot_config (key, value, value_type, category, display_name, description)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (cfg["key"], cfg["value"], cfg["value_type"], cfg["category"], cfg["display_name"], cfg["description"]),
+                    )
+                logger.info("봇 설정 기본값 삽입 완료 (%d개)", len(_DEFAULT_BOT_CONFIG))
 
             conn.commit()
             logger.info("데이터베이스 초기화 완료: %s", self._db_path)

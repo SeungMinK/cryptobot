@@ -7,6 +7,7 @@ import DashboardPage from "./pages/DashboardPage";
 import TradesPage from "./pages/TradesPage";
 import StrategiesPage from "./pages/StrategiesPage";
 import ProfitAnalysisPage from "./pages/ProfitAnalysisPage";
+import ConfigPage from "./pages/ConfigPage";
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="/trades" element={<TradesPage />} />
             <Route path="/strategies" element={<StrategiesPage />} />
             <Route path="/profit" element={<ProfitAnalysisPage />} />
+            <Route path="/config" element={<ConfigPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

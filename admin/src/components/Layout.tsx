@@ -21,6 +21,9 @@ export default function Layout() {
           <NavLink to="/profit" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
             Profit Analysis
           </NavLink>
+          <NavLink to="/config" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
+            Config
+          </NavLink>
         </nav>
         <div className="sidebar-footer">
           <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 8 }}>

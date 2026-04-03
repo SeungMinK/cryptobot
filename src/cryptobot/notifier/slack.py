@@ -134,6 +134,43 @@ class SlackNotifier:
         """봇 시작/종료 알림."""
         return self.send(f"🤖 *봇 상태*: {status}")
 
+    def notify_tick_report(
+        self,
+        strategy_name: str,
+        signal_type: str,
+        confidence: float,
+        reason: str,
+        current_price: float,
+        market_state: str,
+        indicators: dict,
+    ) -> bool:
+        """틱별 판단 리포트 — 매수/매도/HOLD 근거 상세 발송."""
+        signal_emoji = {"buy": "🟢 매수", "sell": "🔴 매도"}.get(signal_type, "⏸️ HOLD")
+        confidence_bar = "█" * int(confidence * 10) + "░" * (10 - int(confidence * 10))
+
+        indicator_lines = []
+        if indicators.get("rsi_14") is not None:
+            indicator_lines.append(f"• RSI(14): {indicators['rsi_14']:.1f}")
+        if indicators.get("ma_5") is not None and indicators.get("ma_20") is not None:
+            indicator_lines.append(f"• MA(5/20): {indicators['ma_5']:,.0f} / {indicators['ma_20']:,.0f}")
+        if indicators.get("bb_upper") is not None and indicators.get("bb_lower") is not None:
+            indicator_lines.append(f"• 볼린저: {indicators['bb_lower']:,.0f} ~ {indicators['bb_upper']:,.0f}")
+        if indicators.get("atr_14") is not None:
+            indicator_lines.append(f"• ATR(14): {indicators['atr_14']:,.0f}")
+        indicator_text = "\n".join(indicator_lines) if indicator_lines else "• 지표 데이터 없음"
+
+        text = (
+            f"{signal_emoji} *틱 리포트*\n"
+            f"• 전략: {strategy_name}\n"
+            f"• 판단: {reason}\n"
+            f"• 신뢰도: [{confidence_bar}] {confidence:.1%}\n"
+            f"• BTC: {current_price:,.0f}원\n"
+            f"• 시장: {market_state}\n"
+            f"─── 지표 ───\n"
+            f"{indicator_text}"
+        )
+        return self.send(text)
+
     def notify_daily_report(
         self,
         date_str: str,

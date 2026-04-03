@@ -9,7 +9,7 @@ NestJS의 main.ts (bootstrap) + AppModule과 동일.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from cryptobot.api.routes import auth, balance, market, strategies, trades
+from cryptobot.api.routes import auth, balance, config, market, strategies, trades
 
 app = FastAPI(
     title="CryptoBot Admin API",
@@ -39,6 +39,7 @@ app.include_router(trades.router)
 app.include_router(balance.router)
 app.include_router(strategies.router)
 app.include_router(market.router)
+app.include_router(config.router)
 
 
 @app.get("/api/health", tags=["system"])

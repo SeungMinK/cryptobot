@@ -109,6 +109,39 @@ class CryptoBot:
         except (KeyboardInterrupt, SystemExit):
             self._shutdown()
 
+    def _get_config(self, key: str, default: str = "") -> str:
+        """DB에서 봇 설정 값 조회."""
+        row = self._db.execute("SELECT value FROM bot_config WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else default
+
+    def _get_config_bool(self, key: str, default: bool = False) -> bool:
+        """봇 설정 bool 값 조회."""
+        return self._get_config(key, str(default)).lower() == "true"
+
+    def _send_tick_report(self, snapshot: dict, signal_type: str, confidence: float, reason: str) -> None:
+        """틱별 판단 리포트를 Slack으로 발송."""
+        if not self._get_config_bool("slack_tick_report"):
+            return
+
+        indicators = {
+            "rsi_14": snapshot.get("btc_rsi_14"),
+            "ma_5": snapshot.get("btc_ma_5"),
+            "ma_20": snapshot.get("btc_ma_20"),
+            "bb_upper": snapshot.get("btc_bb_upper"),
+            "bb_lower": snapshot.get("btc_bb_lower"),
+            "atr_14": snapshot.get("btc_atr_14"),
+        }
+
+        self._notifier.notify_tick_report(
+            strategy_name=self._strategy_name,
+            signal_type=signal_type,
+            confidence=confidence,
+            reason=reason,
+            current_price=snapshot.get("btc_price", 0),
+            market_state=snapshot.get("market_state", "unknown"),
+            indicators=indicators,
+        )
+
     def _tick(self) -> None:
         """10초마다 실행되는 메인 로직."""
         try:
@@ -131,7 +164,7 @@ class CryptoBot:
 
             if active_trade:
                 # 보유 중 → 매도 신호 확인
-                self._check_and_sell(active_trade, current_price, snapshot_id)
+                self._check_and_sell(active_trade, current_price, snapshot_id, snapshot)
             else:
                 # 미보유 → 매수 신호 확인
                 self._check_and_buy(snapshot, current_price, snapshot_id)
@@ -147,6 +180,9 @@ class CryptoBot:
             return
 
         signal_result = self._strategy.check_buy(df, current_price)
+
+        # 틱 리포트 발송
+        self._send_tick_report(snapshot, signal_result.signal_type, signal_result.confidence, signal_result.reason)
 
         if signal_result.signal_type != "buy":
             self._recorder.record_signal(
@@ -234,7 +270,7 @@ class CryptoBot:
             )
             self._notifier.notify_trade("buy", config.bot.coin, order.price, order.amount, order.total_krw)
 
-    def _check_and_sell(self, active_trade: dict, current_price: float, snapshot_id: int) -> None:
+    def _check_and_sell(self, active_trade: dict, current_price: float, snapshot_id: int, snapshot: dict | None = None) -> None:
         """매도 신호 확인 및 실행."""
         df = self._collector.latest_df
         if df is None:
@@ -242,6 +278,10 @@ class CryptoBot:
 
         buy_price = active_trade["price"]
         signal_result = self._strategy.check_sell(df, current_price, buy_price)
+
+        # 틱 리포트 발송 (보유 중)
+        if snapshot:
+            self._send_tick_report(snapshot, signal_result.signal_type, signal_result.confidence, signal_result.reason)
 
         if signal_result.signal_type != "sell":
             return

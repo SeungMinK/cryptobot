@@ -5,6 +5,7 @@ import StatCard from "../components/StatCard";
 import Pagination from "../components/Pagination";
 import { formatKRW, formatDateTime, formatNumber } from "../utils/format";
 import { getParamDesc } from "../utils/paramDescriptions";
+import { getIndicatorDesc, getMarketStateKR, MARKET_STATE_KR } from "../utils/indicatorDescriptions";
 
 const SIGNAL_FILTERS = [
   { label: "전체", value: "" },
@@ -177,8 +178,11 @@ export default function SignalsPage() {
                     <td style={{ fontSize: 12, whiteSpace: "nowrap" }}>{formatKRW(s.current_price)}</td>
                     <td>
                       {s.market_state && (
-                        <span className={`badge ${s.market_state === "bullish" ? "badge-green" : s.market_state === "bearish" ? "badge-red" : "badge-yellow"}`}>
-                          {s.market_state}
+                        <span
+                          className={`badge ${s.market_state === "bullish" ? "badge-green" : s.market_state === "bearish" ? "badge-red" : "badge-yellow"}`}
+                          title={MARKET_STATE_KR[s.market_state]?.description || ""}
+                        >
+                          {getMarketStateKR(s.market_state)}
                         </span>
                       )}
                     </td>
@@ -219,29 +223,38 @@ export default function SignalsPage() {
               <DetailItem label="시간" value={formatDateTime(selected.timestamp)} />
               <DetailItem label="신호" value={selected.signal_type === "buy" ? "매수" : selected.signal_type === "sell" ? "매도" : "HOLD"} />
               <DetailItem label="전략" value={selected.strategy} />
-              <DetailItem label="신뢰도" value={`${(selected.confidence * 100).toFixed(1)}%`} />
+              <DetailItem label="신뢰도" value={`${(selected.confidence * 100).toFixed(1)}%`} caption="매수/매도 신호의 확신 정도. HOLD일 때는 항상 0%." />
               <DetailItem label="BTC 가격" value={formatKRW(selected.current_price)} />
-              <DetailItem label="시장 상태" value={selected.market_state || "-"} />
-              <DetailItem label="판단 근거" value={selected.trigger_reason || "-"} full />
+              <DetailItem
+                label="시장 상태"
+                value={selected.market_state ? getMarketStateKR(selected.market_state) : "-"}
+                caption={selected.market_state ? MARKET_STATE_KR[selected.market_state]?.description : undefined}
+              />
+              <DetailItem label="판단 근거" value={selected.trigger_reason || "-"} full caption="봇이 이 판단을 내린 이유" />
               {selected.skip_reason && (
-                <DetailItem label="스킵 사유" value={selected.skip_reason} full />
+                <DetailItem label="스킵 사유" value={selected.skip_reason} full caption="매수/매도 신호가 있었지만 실행하지 않은 이유" />
               )}
             </div>
 
             {(selected.btc_rsi_14 != null || selected.btc_ma_5 != null) && (
-              <>
-                <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0", paddingTop: 16 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>지표 데이터</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    {selected.btc_rsi_14 != null && <DetailItem label="RSI (14)" value={selected.btc_rsi_14.toFixed(1)} />}
-                    {selected.btc_ma_5 != null && <DetailItem label="MA (5)" value={formatKRW(selected.btc_ma_5)} />}
-                    {selected.btc_ma_20 != null && <DetailItem label="MA (20)" value={formatKRW(selected.btc_ma_20)} />}
-                    {selected.btc_bb_upper != null && <DetailItem label="볼린저 상단" value={formatKRW(selected.btc_bb_upper)} />}
-                    {selected.btc_bb_lower != null && <DetailItem label="볼린저 하단" value={formatKRW(selected.btc_bb_lower)} />}
-                    {selected.btc_atr_14 != null && <DetailItem label="ATR (14)" value={formatKRW(selected.btc_atr_14)} />}
-                  </div>
+              <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0", paddingTop: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>지표 데이터</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  {[
+                    { key: "btc_rsi_14", value: selected.btc_rsi_14?.toFixed(1) },
+                    { key: "btc_ma_5", value: selected.btc_ma_5 ? formatKRW(selected.btc_ma_5) : null },
+                    { key: "btc_ma_20", value: selected.btc_ma_20 ? formatKRW(selected.btc_ma_20) : null },
+                    { key: "btc_bb_upper", value: selected.btc_bb_upper ? formatKRW(selected.btc_bb_upper) : null },
+                    { key: "btc_bb_lower", value: selected.btc_bb_lower ? formatKRW(selected.btc_bb_lower) : null },
+                    { key: "btc_atr_14", value: selected.btc_atr_14 ? formatKRW(selected.btc_atr_14) : null },
+                  ].filter((i) => i.value != null).map((item) => {
+                    const desc = getIndicatorDesc(item.key);
+                    return (
+                      <DetailItem key={item.key} label={desc.label} value={item.value!} caption={desc.description} />
+                    );
+                  })}
                 </div>
-              </>
+              </div>
             )}
 
             {selected.trigger_value != null && (
@@ -296,11 +309,12 @@ function ConfidenceBar({ value }: { value: number }) {
   );
 }
 
-function DetailItem({ label, value, full }: { label: string; value: string; full?: boolean }) {
+function DetailItem({ label, value, full, caption }: { label: string; value: string; full?: boolean; caption?: string }) {
   return (
     <div style={full ? { gridColumn: "1 / -1" } : undefined}>
       <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 13 }}>{value}</div>
+      {caption && <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2, lineHeight: 1.4 }}>{caption}</div>}
     </div>
   );
 }

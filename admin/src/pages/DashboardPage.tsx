@@ -12,6 +12,7 @@ import type { Trade } from "../types/trades";
 import type { Strategy } from "../types/strategies";
 import StatCard from "../components/StatCard";
 import { formatKRW, formatPercent, formatNumber, formatDateTime } from "../utils/format";
+import { getMarketStateKR } from "../utils/indicatorDescriptions";
 
 const CHART_PERIODS = [
   { label: "1시간", hours: 1 },
@@ -159,7 +160,7 @@ export default function DashboardPage() {
                 <div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)" }}>시장 상태</div>
                   <span className={`badge ${marketState === "bullish" ? "badge-green" : marketState === "bearish" ? "badge-red" : "badge-yellow"}`}>
-                    {marketState}
+                    {getMarketStateKR(marketState)}
                   </span>
                 </div>
                 <div>

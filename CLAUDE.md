@@ -106,10 +106,10 @@ logger = logging.getLogger(__name__)
 
 ### Git 규칙
 
-- 브랜치: `feature/{기능명}`, `fix/{버그명}`, `refactor/{대상}`
-- 커밋 메시지: `feat:`, `fix:`, `refactor:`, `test:`, `docs:` 접두사 사용
-- 이슈 번호 연결: 커밋 메시지에 `(#이슈번호)` 포함
+- 브랜치: `{이슈번호}/{타입}/{설명}` (예: `29/feature/fastapi-setup`)
+- 커밋 메시지: `feat:`, `fix:`, `refactor:`, `test:`, `docs:` 접두사 + `(#이슈번호)`
 - PR은 관련 이슈에 `Related: #번호`로 연결
+- 상세 컨벤션: `CONVENTIONS.md` 참조
 
 ## 작업 시 주의사항
 

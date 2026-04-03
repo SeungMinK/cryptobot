@@ -19,6 +19,7 @@ build/
 
 # DB 파일
 *.db
+!data/example/*.db
 
 # IDE
 .idea/
@@ -40,3 +41,7 @@ htmlcov/
 
 # Ruff
 .ruff_cache/
+
+# Admin (React)
+admin/node_modules/
+admin/dist/

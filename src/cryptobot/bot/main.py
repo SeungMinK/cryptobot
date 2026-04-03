@@ -159,6 +159,10 @@ class CryptoBot:
             if self._strategy is None:
                 return
 
+            # 매매 허용 여부 확인
+            if not self._get_config_bool("allow_trading", True):
+                return
+
             # 1. 시장 데이터 수집
             snapshot_id = self._collector.collect_and_save()
             if snapshot_id is None:
@@ -283,7 +287,8 @@ class CryptoBot:
                 snapshot_id=snapshot_id,
                 strategy_params_json=self._get_strategy_params_json(),
             )
-            self._notifier.notify_trade("buy", config.bot.coin, order.price, order.amount, order.total_krw)
+            if self._get_config_bool("slack_trade_notification", True):
+                self._notifier.notify_trade("buy", config.bot.coin, order.price, order.amount, order.total_krw)
 
     def _check_and_sell(self, active_trade: dict, current_price: float, snapshot_id: int, snapshot: dict | None = None) -> None:
         """매도 신호 확인 및 실행."""
@@ -358,8 +363,9 @@ class CryptoBot:
                 strategy_params_json=self._get_strategy_params_json(),
             )
             self._strategy.reset()
-            self._notifier.notify_trade("sell", config.bot.coin, order.price, order.amount, order.total_krw)
-            self._notifier.notify_profit(config.bot.coin, profit_pct, profit_krw, hold_minutes)
+            if self._get_config_bool("slack_trade_notification", True):
+                self._notifier.notify_trade("sell", config.bot.coin, order.price, order.amount, order.total_krw)
+                self._notifier.notify_profit(config.bot.coin, profit_pct, profit_krw, hold_minutes)
 
     def _load_strategies(self) -> None:
         """DB에서 전략 목록을 읽고 레지스트리에 등록."""
@@ -425,11 +431,16 @@ class CryptoBot:
         ).fetchone()
         new_name = row["name"] if row else "volatility_breakout"
 
-        # bot_config에서 리스크 파라미터 실시간 반영
+        # bot_config에서 리스크/전략 파라미터 실시간 반영
         if self._strategy is not None:
             self._strategy.params.stop_loss_pct = float(self._get_config("stop_loss_pct", "-5.0"))
             self._strategy.params.trailing_stop_pct = float(self._get_config("trailing_stop_pct", "-3.0"))
             self._strategy.params.position_size_pct = float(self._get_config("position_size_pct", "100.0"))
+
+        # 리스크 매니저 한도 실시간 반영
+        self._risk.limits.max_daily_trades = int(self._get_config("max_daily_trades", "10"))
+        self._risk.limits.max_daily_loss_pct = float(self._get_config("max_daily_loss_pct", "-10.0"))
+        self._risk.limits.max_consecutive_losses = int(self._get_config("max_consecutive_losses", "3"))
 
         if new_name == self._strategy_name:
             return
@@ -490,6 +501,8 @@ class CryptoBot:
 
             # Slack 알림
             daily_pnl = sum(t.get("profit_pct", 0) or 0 for t in sell_trades)
+            if not self._get_config_bool("slack_daily_report", True):
+                return
             self._notifier.notify_daily_report(
                 date_str=today.isoformat(),
                 daily_return_pct=daily_pnl,

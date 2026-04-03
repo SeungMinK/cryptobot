@@ -11,7 +11,7 @@ import json
 import logging
 import signal
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 
@@ -311,7 +311,7 @@ class CryptoBot:
             profit_pct = (order.price - buy_price) / buy_price * 100
             profit_krw = order.total_krw - active_trade["total_krw"]
             buy_time = datetime.fromisoformat(active_trade["timestamp"])
-            hold_minutes = int((datetime.now() - buy_time).total_seconds() / 60)
+            hold_minutes = int((datetime.now(timezone.utc) - buy_time).total_seconds() / 60)
 
             trade_id = self._recorder.record_trade(
                 coin=config.bot.coin,

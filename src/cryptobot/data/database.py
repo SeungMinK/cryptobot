@@ -14,6 +14,19 @@ logger = logging.getLogger(__name__)
 
 # 테이블 생성 SQL
 _SCHEMA = """
+CREATE TABLE IF NOT EXISTS ohlcv_daily (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    coin TEXT NOT NULL,
+    date DATE NOT NULL,
+    open REAL NOT NULL,
+    high REAL NOT NULL,
+    low REAL NOT NULL,
+    close REAL NOT NULL,
+    volume REAL NOT NULL,
+    collected_at DATETIME NOT NULL,
+    UNIQUE(coin, date)
+);
+
 CREATE TABLE IF NOT EXISTS market_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

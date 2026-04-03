@@ -6,7 +6,7 @@ Admin API에서 사용.
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from cryptobot.data.database import Database
 
@@ -81,7 +81,7 @@ class StrategyRepository:
             logger.warning("전략 '%s' 종료 중 — 전환 대기 필요", switching["name"])
             return False
 
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         # 기존 활성 전략을 shutting_down으로 전환
         current_active = self._db.execute(
@@ -119,7 +119,7 @@ class StrategyRepository:
         ).fetchall()
 
         completed = []
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         for row in rows:
             name = row["name"]
             self._db.execute(
@@ -145,7 +145,7 @@ class StrategyRepository:
 
         self._db.execute(
             "UPDATE strategies SET is_active = FALSE, status = 'inactive', updated_at = ? WHERE name = ?",
-            (datetime.now().isoformat(), name),
+            (datetime.now(timezone.utc).isoformat(), name),
         )
         self._record_activation(name, "deactivate", source, reason)
         self._db.commit()
@@ -198,7 +198,7 @@ class StrategyRepository:
         """전략 기본 파라미터 업데이트."""
         self._db.execute(
             "UPDATE strategies SET default_params_json = ?, updated_at = ? WHERE name = ?",
-            (params_json, datetime.now().isoformat(), name),
+            (params_json, datetime.now(timezone.utc).isoformat(), name),
         )
         self._db.commit()
         return True

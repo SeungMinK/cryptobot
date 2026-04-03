@@ -111,6 +111,13 @@ logger = logging.getLogger(__name__)
 - PR은 관련 이슈에 `Related: #번호`로 연결
 - 상세 컨벤션: `CONVENTIONS.md` 참조
 
+## README.md 로드맵 관리 규칙
+
+- **이슈 추가 시**: `README.md`의 Development Roadmap에 해당 Phase에 `- [ ] #번호 제목` 추가. 작업 순서와 Phase가 적절한지 판단해서 넣을 것.
+- **이슈 Close 시**: 해당 항목을 `- [x]`로 변경.
+- **Phase 완료 시**: 해당 Phase의 모든 이슈가 Close되고 신규 이슈가 없으면, Phase 제목에 `(완료)` 추가. (예: `### Phase 1: MVP — 자동매매 기본 동작 (완료)`)
+- 미진행/진행중 상태는 별도 표기하지 않음. 체크박스로 완료 여부만 관리.
+
 ## 작업 시 주의사항
 
 - 업비트 API Key는 **출금 권한 없이** 발급

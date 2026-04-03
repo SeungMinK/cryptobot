@@ -14,22 +14,10 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
-let isRedirecting = false;
-
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (
-      error.response?.status === 401 &&
-      !error.config?.url?.includes("/auth/login") &&
-      !error.config?.url?.includes("/auth/me")
-    ) {
-      if (!isRedirecting) {
-        isRedirecting = true;
-        localStorage.removeItem("token");
-        window.location.href = "/login";
-      }
-    }
+    // 401/500은 개별 호출자가 처리. 인터셉터에서 강제 로그아웃하지 않음.
     return Promise.reject(error);
   }
 );

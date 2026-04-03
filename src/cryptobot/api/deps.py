@@ -4,6 +4,7 @@ NestJS의 @Inject() + providers와 동일한 역할.
 DB 커넥션, Repository 등을 라우트에 주입한다.
 """
 
+import threading
 from functools import lru_cache
 
 from cryptobot.bot.config import config
@@ -11,16 +12,15 @@ from cryptobot.data.database import Database
 from cryptobot.data.recorder import DataRecorder
 from cryptobot.data.strategy_repository import StrategyRepository
 
-_db: Database | None = None
+_thread_local = threading.local()
 
 
 def get_db() -> Database:
-    """DB 싱글턴. NestJS의 @Global() Module과 동일."""
-    global _db
-    if _db is None:
-        _db = Database(config.bot.db_path)
-        _db.initialize()
-    return _db
+    """스레드별 DB 커넥션. FastAPI 워커 스레드에서 안전하게 사용."""
+    if not hasattr(_thread_local, "db") or _thread_local.db is None:
+        _thread_local.db = Database(config.bot.db_path)
+        _thread_local.db.initialize()
+    return _thread_local.db
 
 
 def get_recorder() -> DataRecorder:

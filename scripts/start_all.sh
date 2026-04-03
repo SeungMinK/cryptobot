@@ -1,9 +1,7 @@
 #!/bin/bash
-"""" 2>/dev/null
 # CryptoBot 전체 실행 스크립트 (봇 + API 서버 + Admin 웹)
 # 사용법: bash scripts/start_all.sh
 # 종료: Ctrl+C (전체 프로세스 종료)
-""""
 
 set -e
 

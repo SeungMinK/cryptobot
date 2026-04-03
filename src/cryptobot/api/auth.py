@@ -69,9 +69,15 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserResponse:
     if row is None:
         raise credentials_exception
 
+    # SQLite 동시 접근 시 row 데이터가 깨질 수 있음 — 방어 처리
+    user_id = row["id"]
+    user_name = row["username"]
+    if user_id is None or user_name is None:
+        raise credentials_exception
+
     return UserResponse(
-        id=row["id"],
-        username=row["username"],
+        id=user_id,
+        username=user_name,
         display_name=row["display_name"],
         is_admin=bool(row["is_admin"]),
     )

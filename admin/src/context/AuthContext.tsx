@@ -18,23 +18,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(localStorage.getItem("token"));
   const [isLoading, setIsLoading] = useState(!!localStorage.getItem("token"));
   const isMounted = useRef(true);
+  const verifyAttempts = useRef(0);
 
-  const verifyToken = useCallback(async (currentToken: string) => {
+  const verifyToken = useCallback(async () => {
+    const savedToken = localStorage.getItem("token");
+    if (!savedToken) {
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const me = await getMe();
       if (isMounted.current) {
         setUser(me);
+        verifyAttempts.current = 0;
       }
     } catch (err: unknown) {
-      if (isMounted.current) {
-        // 401만 로그아웃 처리, 네트워크 오류 등은 유지
-        const status = (err as { response?: { status?: number } })?.response?.status;
-        if (status === 401) {
-          localStorage.removeItem("token");
-          setToken(null);
-          setUser(null);
-        }
+      if (!isMounted.current) return;
+
+      const status = (err as { response?: { status?: number } })?.response?.status;
+
+      if (status === 401) {
+        // 진짜 인증 실패 — 토큰 만료 또는 무효
+        localStorage.removeItem("token");
+        setToken(null);
+        setUser(null);
       }
+      // 500, 네트워크 오류 등은 토큰 유지. 서버 일시 오류일 수 있음.
+      // user가 아직 null이면 이전 로그인 상태를 유지하기 위해 재시도하지 않음
     } finally {
       if (isMounted.current) {
         setIsLoading(false);
@@ -45,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     isMounted.current = true;
     if (token) {
-      verifyToken(token);
+      verifyToken();
     } else {
       setUser(null);
       setIsLoading(false);
@@ -69,8 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  // token이 있으면 인증된 것으로 간주 (user는 서버 일시 오류로 null일 수 있음)
+  const isAuthenticated = !!token;
+
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated: !!token && !!user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

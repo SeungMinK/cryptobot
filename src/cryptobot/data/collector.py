@@ -23,6 +23,12 @@ class DataCollector:
     def __init__(self, db: Database, coin: str = "KRW-BTC") -> None:
         self._db = db
         self._coin = coin
+        self._latest_df: "pd.DataFrame | None" = None  # 최근 OHLCV 캐시 (전략에서 사용)
+
+    @property
+    def latest_df(self) -> "pd.DataFrame | None":
+        """가장 최근 수집한 OHLCV DataFrame."""
+        return self._latest_df
 
     def collect_and_save(self) -> int | None:
         """현재 시장 데이터를 수집하고 DB에 저장.
@@ -45,10 +51,13 @@ class DataCollector:
     def _collect_market_data(self) -> dict | None:
         """업비트 API로 시장 데이터 수집."""
         try:
-            # OHLCV 데이터 조회 (일봉 60개 — 지표 계산에 필요)
-            df = pyupbit.get_ohlcv(self._coin, interval="day", count=60)
+            # OHLCV 데이터 조회 (일봉 120개 — 지표 계산 + 전략에서 사용)
+            df = pyupbit.get_ohlcv(self._coin, interval="day", count=120)
             if df is None or df.empty:
                 raise APIError(f"OHLCV 데이터 없음: {self._coin}")
+
+            # 전략에서 사용할 수 있도록 캐시
+            self._latest_df = df
 
             # 현재가
             current_price = pyupbit.get_current_price(self._coin)

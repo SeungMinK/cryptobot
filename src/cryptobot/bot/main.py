@@ -1,12 +1,13 @@
 """CryptoBot 메인 루프.
 
 NestJS의 main.ts (bootstrap) + AppModule과 동일한 역할.
-스케줄러를 초기화하고, 1분마다 데이터 수집 + 매매 판단을 실행한다.
+스케줄러를 초기화하고, 10초마다 데이터 수집 + 매매 판단을 실행한다.
 
 사용법:
     python -m cryptobot.bot.main
 """
 
+import json
 import logging
 import signal
 import sys
@@ -16,14 +17,37 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 
 from cryptobot.bot.config import config
 from cryptobot.bot.risk import RiskManager
-from cryptobot.bot.strategy import StrategyParams, VolatilityBreakoutStrategy
 from cryptobot.bot.trader import Trader
 from cryptobot.data.collector import DataCollector
 from cryptobot.data.database import Database
 from cryptobot.data.recorder import DataRecorder
 from cryptobot.notifier.slack import SlackNotifier
+from cryptobot.strategies.base import BaseStrategy, StrategyParams
+from cryptobot.strategies.bollinger_bands import BollingerBands
+from cryptobot.strategies.bollinger_squeeze import BollingerSqueeze
+from cryptobot.strategies.breakout_momentum import BreakoutMomentum
+from cryptobot.strategies.grid_trading import GridTrading
+from cryptobot.strategies.ma_crossover import MACrossover
+from cryptobot.strategies.macd_strategy import MACDStrategy
+from cryptobot.strategies.registry import StrategyRegistry
+from cryptobot.strategies.rsi_mean_reversion import RSIMeanReversion
+from cryptobot.strategies.supertrend import Supertrend
+from cryptobot.strategies.volatility_breakout import VolatilityBreakout
 
 logger = logging.getLogger(__name__)
+
+# 전략 이름 → 클래스 매핑
+_STRATEGY_CLASSES: dict[str, type[BaseStrategy]] = {
+    "volatility_breakout": VolatilityBreakout,
+    "ma_crossover": MACrossover,
+    "macd": MACDStrategy,
+    "rsi_mean_reversion": RSIMeanReversion,
+    "bollinger_bands": BollingerBands,
+    "bollinger_squeeze": BollingerSqueeze,
+    "supertrend": Supertrend,
+    "grid_trading": GridTrading,
+    "breakout_momentum": BreakoutMomentum,
+}
 
 
 class CryptoBot:
@@ -40,9 +64,17 @@ class CryptoBot:
         self._notifier = SlackNotifier()
         self._risk = RiskManager(self._db)
 
-        # 전략 파라미터 로딩
-        params = self._load_strategy_params()
-        self._strategy = VolatilityBreakoutStrategy(params)
+        # 전략 레지스트리 초기화
+        self._registry = StrategyRegistry()
+        self._load_strategies()
+
+        # 활성 전략 설정
+        self._strategy: BaseStrategy | None = None
+        self._strategy_name: str = ""
+        self._select_active_strategy()
+
+        # 전략 파라미터 로딩 (리스크 관리용)
+        self._strategy_params = self._load_strategy_params()
 
         self._scheduler = BlockingScheduler()
 
@@ -50,6 +82,8 @@ class CryptoBot:
         """봇 시작."""
         logger.info("=== CryptoBot 시작 ===")
         logger.info("종목: %s", config.bot.coin)
+        logger.info("활성 전략: %s", self._strategy_name or "없음")
+        logger.info("등록 전략: %s", ", ".join(self._registry.list_names()))
         logger.info("API Key 설정: %s", "O" if self._trader.is_ready else "X")
         logger.info("Slack 설정: %s", "O" if self._notifier.is_configured else "X")
         logger.info("DB: %s", config.bot.db_path)
@@ -59,9 +93,11 @@ class CryptoBot:
         # 봇 시작 시 안전 장치
         self._safety_check()
 
-        # 스케줄 등록 — NestJS의 @Cron() 데코레이터와 동일
+        # 스케줄 등록
         self._scheduler.add_job(self._tick, "interval", seconds=10, id="main_tick")
         self._scheduler.add_job(self._daily_report, "cron", hour=0, minute=0, id="daily_report")
+        # 5분마다 전략 변경 확인 (Admin에서 활성화/비활성화 시 반영)
+        self._scheduler.add_job(self._refresh_strategy, "interval", minutes=5, id="strategy_refresh")
 
         # Graceful shutdown
         signal.signal(signal.SIGINT, self._shutdown)
@@ -74,8 +110,11 @@ class CryptoBot:
             self._shutdown()
 
     def _tick(self) -> None:
-        """1분마다 실행되는 메인 로직."""
+        """10초마다 실행되는 메인 로직."""
         try:
+            if self._strategy is None:
+                return
+
             # 1. 시장 데이터 수집
             snapshot_id = self._collector.collect_and_save()
             if snapshot_id is None:
@@ -103,24 +142,22 @@ class CryptoBot:
 
     def _check_and_buy(self, snapshot: dict, current_price: float, snapshot_id: int) -> None:
         """매수 신호 확인 및 실행."""
-        signal_result = self._strategy.check_buy_signal(
-            current_price=current_price,
-            today_open=snapshot.get("btc_open_24h", current_price),
-            yesterday_high=snapshot.get("btc_high_24h", current_price),
-            yesterday_low=snapshot.get("btc_low_24h", current_price),
-        )
+        df = self._collector.latest_df
+        if df is None:
+            return
 
-        if signal_result.signal_type != "buy_signal":
-            # 매수 조건 미달 — 신호만 기록
+        signal_result = self._strategy.check_buy(df, current_price)
+
+        if signal_result.signal_type != "buy":
             self._recorder.record_signal(
                 coin=config.bot.coin,
                 signal_type=signal_result.signal_type,
-                strategy="volatility_breakout",
+                strategy=self._strategy_name,
                 confidence=signal_result.confidence,
-                trigger_reason=signal_result.trigger_reason,
+                trigger_reason=signal_result.reason,
                 current_price=current_price,
                 trigger_value=signal_result.trigger_value,
-                skip_reason=signal_result.trigger_reason,
+                skip_reason=signal_result.reason,
                 snapshot_id=snapshot_id,
             )
             return
@@ -128,10 +165,10 @@ class CryptoBot:
         if not self._trader.is_ready:
             self._recorder.record_signal(
                 coin=config.bot.coin,
-                signal_type="buy_signal",
-                strategy="volatility_breakout",
+                signal_type="buy",
+                strategy=self._strategy_name,
                 confidence=signal_result.confidence,
-                trigger_reason=signal_result.trigger_reason,
+                trigger_reason=signal_result.reason,
                 current_price=current_price,
                 trigger_value=signal_result.trigger_value,
                 skip_reason="api_key_not_configured",
@@ -152,10 +189,10 @@ class CryptoBot:
         if not can_buy:
             self._recorder.record_signal(
                 coin=config.bot.coin,
-                signal_type="buy_signal",
-                strategy="volatility_breakout",
+                signal_type="buy",
+                strategy=self._strategy_name,
                 confidence=signal_result.confidence,
-                trigger_reason=signal_result.trigger_reason,
+                trigger_reason=signal_result.reason,
                 current_price=current_price,
                 trigger_value=signal_result.trigger_value,
                 skip_reason=reason,
@@ -173,10 +210,10 @@ class CryptoBot:
                 amount=order.amount,
                 total_krw=order.total_krw,
                 fee_krw=order.fee_krw,
-                strategy="volatility_breakout",
-                trigger_reason=signal_result.trigger_reason,
+                strategy=self._strategy_name,
+                trigger_reason=signal_result.reason,
                 trigger_value=signal_result.trigger_value,
-                param_k_value=self._strategy.params.k_value,
+                param_k_value=self._strategy.params.extra.get("k_value"),
                 param_stop_loss=self._strategy.params.stop_loss_pct,
                 param_trailing_stop=self._strategy.params.trailing_stop_pct,
                 market_state_at_trade=snapshot.get("market_state"),
@@ -185,10 +222,10 @@ class CryptoBot:
             )
             self._recorder.record_signal(
                 coin=config.bot.coin,
-                signal_type="buy_signal",
-                strategy="volatility_breakout",
+                signal_type="buy",
+                strategy=self._strategy_name,
                 confidence=signal_result.confidence,
-                trigger_reason=signal_result.trigger_reason,
+                trigger_reason=signal_result.reason,
                 current_price=current_price,
                 trigger_value=signal_result.trigger_value,
                 executed=True,
@@ -199,10 +236,14 @@ class CryptoBot:
 
     def _check_and_sell(self, active_trade: dict, current_price: float, snapshot_id: int) -> None:
         """매도 신호 확인 및 실행."""
-        buy_price = active_trade["price"]
-        signal_result = self._strategy.check_sell_signal(current_price, buy_price)
+        df = self._collector.latest_df
+        if df is None:
+            return
 
-        if signal_result.signal_type != "sell_signal":
+        buy_price = active_trade["price"]
+        signal_result = self._strategy.check_sell(df, current_price, buy_price)
+
+        if signal_result.signal_type != "sell":
             return
 
         if not self._trader.is_ready:
@@ -224,10 +265,10 @@ class CryptoBot:
                 amount=order.amount,
                 total_krw=order.total_krw,
                 fee_krw=order.fee_krw,
-                strategy="volatility_breakout",
-                trigger_reason=signal_result.trigger_reason,
+                strategy=self._strategy_name,
+                trigger_reason=signal_result.reason,
                 trigger_value=signal_result.trigger_value,
-                param_k_value=self._strategy.params.k_value,
+                param_k_value=self._strategy.params.extra.get("k_value"),
                 param_stop_loss=self._strategy.params.stop_loss_pct,
                 param_trailing_stop=self._strategy.params.trailing_stop_pct,
                 buy_trade_id=active_trade["id"],
@@ -237,19 +278,96 @@ class CryptoBot:
             )
             self._recorder.record_signal(
                 coin=config.bot.coin,
-                signal_type="sell_signal",
-                strategy="volatility_breakout",
+                signal_type="sell",
+                strategy=self._strategy_name,
                 confidence=signal_result.confidence,
-                trigger_reason=signal_result.trigger_reason,
+                trigger_reason=signal_result.reason,
                 current_price=current_price,
                 trigger_value=signal_result.trigger_value,
                 executed=True,
                 trade_id=trade_id,
                 snapshot_id=snapshot_id,
             )
-            self._strategy.reset_position()
+            self._strategy.reset()
             self._notifier.notify_trade("sell", config.bot.coin, order.price, order.amount, order.total_krw)
             self._notifier.notify_profit(config.bot.coin, profit_pct, profit_krw, hold_minutes)
+
+    def _load_strategies(self) -> None:
+        """DB에서 전략 목록을 읽고 레지스트리에 등록."""
+        rows = self._db.execute("SELECT * FROM strategies WHERE is_available = TRUE").fetchall()
+        strategy_params = self._load_strategy_params()
+
+        for row in rows:
+            name = row["name"]
+            cls = _STRATEGY_CLASSES.get(name)
+            if cls is None:
+                logger.warning("전략 클래스 미등록: %s (스킵)", name)
+                continue
+
+            # DB의 default_params_json을 StrategyParams.extra에 매핑
+            extra = json.loads(row["default_params_json"]) if row["default_params_json"] else {}
+            params = StrategyParams(
+                stop_loss_pct=strategy_params.get("stop_loss_pct", -5.0),
+                trailing_stop_pct=strategy_params.get("trailing_stop_pct", -3.0),
+                position_size_pct=strategy_params.get("position_size_pct", 100.0),
+                extra=extra,
+            )
+
+            try:
+                strategy = cls(params)
+                self._registry.register(strategy)
+            except Exception as e:
+                logger.error("전략 초기화 실패: %s — %s", name, e)
+
+    def _select_active_strategy(self) -> None:
+        """DB에서 is_active=True인 전략을 현재 전략으로 설정."""
+        row = self._db.execute("SELECT name FROM strategies WHERE is_active = TRUE LIMIT 1").fetchone()
+
+        if row is None:
+            logger.warning("활성 전략 없음 — 기본 volatility_breakout 사용")
+            strategy = self._registry.get("volatility_breakout")
+        else:
+            strategy = self._registry.get(row["name"])
+            if strategy is None:
+                logger.warning("활성 전략 '%s' 레지스트리에 없음 — 기본 전략 사용", row["name"])
+                strategy = self._registry.get("volatility_breakout")
+
+        if strategy is not None:
+            self._strategy = strategy
+            self._strategy_name = strategy.info().name
+            logger.info("활성 전략 설정: %s (%s)", self._strategy_name, strategy.info().display_name)
+        else:
+            logger.error("사용 가능한 전략이 없습니다")
+
+    def _refresh_strategy(self) -> None:
+        """Admin에서 전략이 변경되었는지 확인하고 반영."""
+        row = self._db.execute("SELECT name FROM strategies WHERE is_active = TRUE LIMIT 1").fetchone()
+        new_name = row["name"] if row else "volatility_breakout"
+
+        if new_name == self._strategy_name:
+            return
+
+        old_name = self._strategy_name
+        new_strategy = self._registry.get(new_name)
+        if new_strategy is None:
+            logger.warning("전략 전환 실패: '%s' 레지스트리에 없음", new_name)
+            return
+
+        self._strategy = new_strategy
+        self._strategy_name = new_name
+        logger.info("전략 전환: %s → %s", old_name, new_name)
+
+        # strategy_activations에 기록
+        self._db.execute(
+            """
+            INSERT INTO strategy_activations (strategy_name, action, source, reason, previous_strategy)
+            VALUES (?, 'activate', 'bot_refresh', '전략 자동 전환', ?)
+            """,
+            (new_name, old_name),
+        )
+        self._db.commit()
+
+        self._notifier.notify_bot_status(f"전략 전환: {old_name} → {new_name}")
 
     def _daily_report(self) -> None:
         """자정에 실행되는 일일 정산."""
@@ -314,24 +432,23 @@ class CryptoBot:
             if cancelled > 0:
                 logger.info("미체결 주문 %d건 취소", cancelled)
 
-    def _load_strategy_params(self) -> StrategyParams:
+    def _load_strategy_params(self) -> dict:
         """DB에서 최신 전략 파라미터 로딩."""
         row = self._db.execute("SELECT * FROM strategy_params ORDER BY id DESC LIMIT 1").fetchone()
 
         if row is None:
-            logger.warning("전략 파라미터 없음 — 기본값 사용")
-            return StrategyParams()
+            return {
+                "stop_loss_pct": -5.0,
+                "trailing_stop_pct": -3.0,
+                "position_size_pct": 100.0,
+            }
 
-        return StrategyParams(
-            k_value=row["k_value"],
-            stop_loss_pct=row["stop_loss_pct"],
-            trailing_stop_pct=row["trailing_stop_pct"],
-            max_positions=row["max_positions"],
-            position_size_pct=row["position_size_pct"] or 100.0,
-            allow_trading=bool(row["allow_trading"]),
-            market_state=row["market_state"] or "sideways",
-            aggression=row["aggression"] or 0.5,
-        )
+        return {
+            "k_value": row["k_value"],
+            "stop_loss_pct": row["stop_loss_pct"],
+            "trailing_stop_pct": row["trailing_stop_pct"],
+            "position_size_pct": row["position_size_pct"] or 100.0,
+        }
 
     def _shutdown(self, *args) -> None:
         """Graceful shutdown."""

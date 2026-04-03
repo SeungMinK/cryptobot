@@ -96,9 +96,6 @@ class CryptoBot:
         # 스케줄 등록
         self._scheduler.add_job(self._tick, "interval", seconds=10, id="main_tick")
         self._scheduler.add_job(self._daily_report, "cron", hour=0, minute=0, id="daily_report")
-        # 전략 전환 확인 주기 = strategy_switch_delay_seconds (기본 30초)
-        switch_delay = int(self._get_config("strategy_switch_delay_seconds", "30"))
-        self._scheduler.add_job(self._refresh_strategy, "interval", seconds=switch_delay, id="strategy_refresh")
 
         # Graceful shutdown
         signal.signal(signal.SIGINT, self._shutdown)
@@ -146,6 +143,9 @@ class CryptoBot:
     def _tick(self) -> None:
         """10초마다 실행되는 메인 로직."""
         try:
+            # 0. 전략/설정 변경 확인
+            self._refresh_strategy()
+
             if self._strategy is None:
                 return
 

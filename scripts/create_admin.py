@@ -7,7 +7,6 @@
 (쉘 특수문자 문제 방지를 위해 인자 대신 input 사용)
 """
 
-import getpass
 import sys
 from pathlib import Path
 
@@ -18,13 +17,18 @@ from cryptobot.bot.config import config
 from cryptobot.data.database import Database
 
 
+def clean_input(text: str) -> str:
+    """한글 IME 전환 시 끼어드는 surrogate 문자 제거."""
+    return text.encode("utf-8", errors="ignore").decode("utf-8").strip()
+
+
 def main() -> None:
-    username = input("Username: ").strip()
+    username = clean_input(input("Username: "))
     if not username:
         print("Username을 입력하세요.")
         sys.exit(1)
 
-    password = input("Password: ").strip()
+    password = clean_input(input("Password: "))
     if not password:
         print("Password를 입력하세요.")
         sys.exit(1)

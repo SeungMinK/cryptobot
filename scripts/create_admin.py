@@ -1,4 +1,4 @@
-"""Admin 유저 생성 스크립트.
+"""Admin 계정 생성 스크립트.
 
 사용법:
     python scripts/create_admin.py <username> <password>
@@ -22,22 +22,25 @@ def main() -> None:
     username = sys.argv[1]
     password = sys.argv[2]
 
-    with Database(config.bot.db_path) as db:
-        db.initialize()
+    db = Database(config.bot.db_path)
+    db.initialize()
 
-        # 이미 존재하는지 확인
-        existing = db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
-        if existing:
-            print(f"이미 존재하는 유저: {username}")
-            sys.exit(1)
-
-        password_hash = hash_password(password)
+    row = db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+    if row:
+        pw_hash = hash_password(password)
+        db.execute("UPDATE users SET password_hash = ? WHERE username = ?", (pw_hash, username))
+        db.commit()
+        print(f"기존 계정 '{username}' 비밀번호 변경 완료")
+    else:
+        pw_hash = hash_password(password)
         db.execute(
             "INSERT INTO users (username, password_hash, display_name, is_admin) VALUES (?, ?, ?, ?)",
-            (username, password_hash, username, True),
+            (username, pw_hash, "관리자", True),
         )
         db.commit()
-        print(f"Admin 유저 생성 완료: {username}")
+        print(f"Admin 계정 생성 완료: {username}")
+
+    db.close()
 
 
 if __name__ == "__main__":

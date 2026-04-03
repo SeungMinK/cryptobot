@@ -1,6 +1,8 @@
 """Slack 알림 모듈.
 
-Webhook을 통해 매매 알림, 에러 알림, 일일 리포트를 전송한다.
+Bot Token 방식(권장)과 Webhook 방식을 모두 지원한다.
+SLACK_BOT_TOKEN + SLACK_CHANNEL이 설정되어 있으면 Bot Token 방식을 우선 사용하고,
+없으면 SLACK_WEBHOOK_URL로 폴백한다.
 """
 
 import json
@@ -14,17 +16,41 @@ logger = logging.getLogger(__name__)
 
 
 class SlackNotifier:
-    """Slack Webhook 알림 전송기."""
+    """Slack 알림 전송기.
+
+    Bot Token 방식(slack_sdk)을 우선 사용하고,
+    미설정 시 Webhook 방식으로 폴백한다.
+    """
 
     def __init__(self) -> None:
+        self._bot_token = config.slack.bot_token
+        self._channel = config.slack.channel
         self._webhook_url = config.slack.webhook_url
+        self._client = None
+
+        if self._bot_token and self._channel:
+            try:
+                from slack_sdk import WebClient
+
+                self._client = WebClient(token=self._bot_token)
+                logger.info("Slack Bot Token 방식 초기화 완료 (채널: %s)", self._channel)
+            except ImportError:
+                logger.warning("slack_sdk 미설치 — pip install slack_sdk 필요. Webhook으로 폴백합니다.")
+        elif self._webhook_url:
+            logger.info("Slack Webhook 방식 초기화 (deprecated)")
+        else:
+            logger.info("Slack 미설정 — 알림 비활성화")
 
     @property
     def is_configured(self) -> bool:
-        return bool(self._webhook_url)
+        """Slack 알림 전송 가능 여부."""
+        return self._client is not None or bool(self._webhook_url)
 
     def send(self, text: str) -> bool:
         """텍스트 메시지 전송.
+
+        Args:
+            text: 전송할 메시지 (Slack mrkdwn 형식)
 
         Returns:
             전송 성공 여부
@@ -33,6 +59,33 @@ class SlackNotifier:
             logger.debug("Slack 미설정 — 메시지 스킵: %s", text[:50])
             return False
 
+        # Bot Token 방식 우선
+        if self._client is not None:
+            return self._send_bot_token(text)
+
+        # Webhook 폴백
+        return self._send_webhook(text)
+
+    def _send_bot_token(self, text: str) -> bool:
+        """Bot Token 방식으로 메시지 전송."""
+        try:
+            response = self._client.chat_postMessage(
+                channel=self._channel,
+                text=text,
+                mrkdwn=True,
+            )
+            if response["ok"]:
+                logger.debug("Slack 전송 성공 (Bot Token)")
+                return True
+            else:
+                logger.warning("Slack 전송 실패: %s", response.get("error", "unknown"))
+                return False
+        except Exception as e:
+            logger.error("Slack Bot Token 전송 에러: %s", e)
+            return False
+
+    def _send_webhook(self, text: str) -> bool:
+        """[DEPRECATED] Webhook 방식으로 메시지 전송."""
         try:
             response = requests.post(
                 self._webhook_url,
@@ -41,11 +94,11 @@ class SlackNotifier:
                 timeout=10,
             )
             if response.status_code != 200:
-                logger.warning("Slack 전송 실패: %d %s", response.status_code, response.text)
+                logger.warning("Slack Webhook 전송 실패: %d %s", response.status_code, response.text)
                 return False
             return True
         except requests.RequestException as e:
-            logger.error("Slack 전송 에러: %s", e)
+            logger.error("Slack Webhook 전송 에러: %s", e)
             return False
 
     def notify_trade(self, side: str, coin: str, price: float, amount: float, total_krw: float) -> bool:

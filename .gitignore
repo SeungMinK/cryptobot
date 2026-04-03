@@ -19,6 +19,8 @@ build/
 
 # DB 파일
 *.db
+*.db-shm
+*.db-wal
 !data/example/*.db
 
 # IDE

@@ -24,7 +24,7 @@ def main() -> None:
         print("Username을 입력하세요.")
         sys.exit(1)
 
-    password = getpass.getpass("Password: ")
+    password = input("Password: ").strip()
     if not password:
         print("Password를 입력하세요.")
         sys.exit(1)

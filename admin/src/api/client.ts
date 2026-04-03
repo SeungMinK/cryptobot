@@ -17,7 +17,18 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    // 401/500은 개별 호출자가 처리. 인터셉터에서 강제 로그아웃하지 않음.
+    // 500 에러는 서버 로그로 전송
+    if (error.response?.status >= 500) {
+      const url = error.config?.url || "unknown";
+      client
+        .post("/error/report", {
+          message: `API ${error.response.status}: ${url}`,
+          source: "axios-interceptor",
+          stack: JSON.stringify(error.response?.data)?.slice(0, 500),
+          url: window.location.href,
+        })
+        .catch(() => {});
+    }
     return Promise.reject(error);
   }
 );

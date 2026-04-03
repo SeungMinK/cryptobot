@@ -502,11 +502,9 @@ class CryptoBot:
 
 def main() -> None:
     """진입점."""
-    logging.basicConfig(
-        level=getattr(logging, config.bot.log_level),
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    from cryptobot.logging_config import setup_logging
+
+    setup_logging("bot", config.bot.log_level)
 
     bot = CryptoBot()
     bot.start()

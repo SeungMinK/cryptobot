@@ -142,7 +142,11 @@ class CryptoBot:
 
         # 매수 실행 — 리스크 점검 후 진행
         balance = self._trader.get_balance_krw()
-        buy_amount = self._risk.get_safe_position_size(balance)
+        buy_amount = self._risk.get_safe_position_size(
+            balance,
+            confidence=signal_result.confidence,
+            position_size_pct=self._strategy.params.position_size_pct,
+        )
 
         can_buy, reason = self._risk.check_can_buy(config.bot.coin, buy_amount, balance)
         if not can_buy:

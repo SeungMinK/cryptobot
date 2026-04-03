@@ -21,6 +21,7 @@ class RiskLimits:
     max_position_size_krw: float = 1_000_000  # 최대 1회 매수 금액 (원)
     min_balance_krw: float = 10_000  # 최소 유지 잔고 (원)
     max_consecutive_losses: int = 3  # 연속 손실 시 매매 중단
+    min_order_krw: float = 5_000  # 업비트 최소 주문 금액 (원)
 
 
 class RiskManager:
@@ -45,6 +46,10 @@ class RiskManager:
         Returns:
             (가능 여부, 사유)
         """
+        # 0. 업비트 최소 주문 금액 체크
+        if buy_amount_krw < self.limits.min_order_krw:
+            return False, f"최소 주문 금액 미달: {buy_amount_krw:,.0f}원 < {self.limits.min_order_krw:,.0f}원"
+
         # 1. 최소 잔고 유지 체크
         remaining = current_balance_krw - buy_amount_krw
         if remaining < self.limits.min_balance_krw:
@@ -75,11 +80,18 @@ class RiskManager:
         """매도 가능 여부 점검. (현재는 항상 허용 — 손절은 막으면 안 됨)"""
         return True, "매도 허용"
 
-    def get_safe_position_size(self, balance_krw: float) -> float:
-        """안전한 매수 금액 계산.
+    def get_safe_position_size(
+        self, balance_krw: float, confidence: float = 1.0, position_size_pct: float = 100.0
+    ) -> float:
+        """신호 강도 기반 안전한 매수 금액 계산.
+
+        confidence와 position_size_pct를 곱하여 매수 비율을 결정한다.
+        예) confidence=0.7, position_size_pct=50 → 가용 잔고의 35% 매수
 
         Args:
             balance_krw: 현재 잔고
+            confidence: 매수 신호 강도 (0.0 ~ 1.0)
+            position_size_pct: 전략 파라미터의 포지션 비율 (0 ~ 100)
 
         Returns:
             매수 가능 금액 (원)
@@ -88,7 +100,10 @@ class RiskManager:
         if available <= 0:
             return 0
 
-        return min(available, self.limits.max_position_size_krw)
+        ratio = max(0.0, min(confidence, 1.0)) * max(0.0, min(position_size_pct, 100.0)) / 100.0
+        sized_amount = available * ratio
+
+        return min(sized_amount, self.limits.max_position_size_krw)
 
     def _get_today_trade_count(self, coin: str) -> int:
         """오늘 거래 횟수."""

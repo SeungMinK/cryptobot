@@ -112,7 +112,7 @@ def test_block_consecutive_losses():
 
 
 def test_safe_position_size():
-    """안전한 매수 금액 계산."""
+    """안전한 매수 금액 계산 (기본: confidence=1.0, position_size_pct=100)."""
     limits = RiskLimits(min_balance_krw=10_000, max_position_size_krw=500_000)
     rm, _, db = _make_risk_manager(limits)
     try:
@@ -127,6 +127,70 @@ def test_safe_position_size():
         # 잔고 부족
         size = rm.get_safe_position_size(5_000)
         assert size == 0
+    finally:
+        db.close()
+
+
+def test_position_size_with_confidence():
+    """confidence에 비례하여 매수 금액이 조절된다."""
+    limits = RiskLimits(min_balance_krw=10_000, max_position_size_krw=1_000_000)
+    rm, _, db = _make_risk_manager(limits)
+    try:
+        # 잔고 110,000 → 가용 100,000
+        # confidence=0.5 → 50,000
+        size = rm.get_safe_position_size(110_000, confidence=0.5)
+        assert size == 50_000
+
+        # confidence=0.3 → 30,000
+        size = rm.get_safe_position_size(110_000, confidence=0.3)
+        assert size == 30_000
+
+        # confidence=1.0 → 100,000 (전액)
+        size = rm.get_safe_position_size(110_000, confidence=1.0)
+        assert size == 100_000
+
+        # confidence=0.0 → 0
+        size = rm.get_safe_position_size(110_000, confidence=0.0)
+        assert size == 0
+    finally:
+        db.close()
+
+
+def test_position_size_with_pct():
+    """position_size_pct로 최대 비율을 제한한다."""
+    limits = RiskLimits(min_balance_krw=10_000, max_position_size_krw=1_000_000)
+    rm, _, db = _make_risk_manager(limits)
+    try:
+        # 가용 100,000, confidence=1.0, pct=50 → 50,000
+        size = rm.get_safe_position_size(110_000, confidence=1.0, position_size_pct=50.0)
+        assert size == 50_000
+
+        # 가용 100,000, confidence=0.7, pct=50 → 35,000
+        size = rm.get_safe_position_size(110_000, confidence=0.7, position_size_pct=50.0)
+        assert size == 35_000
+    finally:
+        db.close()
+
+
+def test_position_size_capped_by_max():
+    """confidence×pct 적용 후에도 max_position_size_krw로 상한 제한."""
+    limits = RiskLimits(min_balance_krw=10_000, max_position_size_krw=50_000)
+    rm, _, db = _make_risk_manager(limits)
+    try:
+        # 가용 990,000, confidence=1.0 → 990,000이지만 max 50,000
+        size = rm.get_safe_position_size(1_000_000, confidence=1.0)
+        assert size == 50_000
+    finally:
+        db.close()
+
+
+def test_min_order_amount_check():
+    """업비트 최소 주문 금액(5,000원) 미달 시 차단."""
+    rm, _, db = _make_risk_manager()
+    try:
+        can, reason = rm.check_can_buy("KRW-BTC", 3_000, 500_000)
+        assert can is False
+        assert "최소 주문 금액" in reason
     finally:
         db.close()
 

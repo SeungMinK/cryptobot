@@ -15,6 +15,7 @@ build/
 .env
 .env.*
 !.env.example
+!.env.local
 
 # DB 파일
 *.db

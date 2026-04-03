@@ -31,6 +31,7 @@ class DataRecorder:
         trade_id: int | None = None,
         skip_reason: str | None = None,
         snapshot_id: int | None = None,
+        strategy_params_json: str | None = None,
     ) -> int:
         """매매 신호를 기록한다 (실행 여부 관계없이).
 
@@ -42,8 +43,8 @@ class DataRecorder:
             INSERT INTO trade_signals (
                 coin, signal_type, strategy, confidence, trigger_reason,
                 trigger_value, current_price, target_price,
-                executed, trade_id, skip_reason, snapshot_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                executed, trade_id, skip_reason, snapshot_id, strategy_params_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 coin,
@@ -58,6 +59,7 @@ class DataRecorder:
                 trade_id,
                 skip_reason,
                 snapshot_id,
+                strategy_params_json,
             ),
         )
         self._db.commit()

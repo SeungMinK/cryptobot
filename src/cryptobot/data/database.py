@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS trade_signals (
     trade_id INTEGER,
     skip_reason TEXT,
     snapshot_id INTEGER,
+    strategy_params_json TEXT,
     FOREIGN KEY (trade_id) REFERENCES trades(id),
     FOREIGN KEY (snapshot_id) REFERENCES market_snapshots(id)
 );
@@ -464,6 +465,13 @@ class Database:
                 conn.execute("UPDATE strategies SET status = 'active' WHERE is_active = TRUE")
                 conn.execute("UPDATE strategies SET status = 'inactive' WHERE is_active = FALSE")
                 logger.info("strategies 테이블에 status 컬럼 추가 완료")
+
+            # 마이그레이션: trade_signals에 strategy_params_json 컬럼 추가
+            try:
+                conn.execute("SELECT strategy_params_json FROM trade_signals LIMIT 1")
+            except sqlite3.OperationalError:
+                conn.execute("ALTER TABLE trade_signals ADD COLUMN strategy_params_json TEXT")
+                logger.info("trade_signals 테이블에 strategy_params_json 컬럼 추가 완료")
 
             # 마이그레이션: bot_config에 새 설정 추가 (기존 DB 호환)
             existing = conn.execute("SELECT key FROM bot_config WHERE key = 'strategy_switch_delay_seconds'").fetchone()

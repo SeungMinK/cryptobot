@@ -4,6 +4,7 @@ import type { SignalItem, SignalStats } from "../api/signals";
 import StatCard from "../components/StatCard";
 import Pagination from "../components/Pagination";
 import { formatKRW, formatDateTime, formatNumber } from "../utils/format";
+import { getParamDesc } from "../utils/paramDescriptions";
 
 const SIGNAL_FILTERS = [
   { label: "전체", value: "" },
@@ -245,6 +246,23 @@ export default function SignalsPage() {
 
             {selected.trigger_value != null && (
               <DetailItem label="트리거 값" value={formatKRW(selected.trigger_value)} />
+            )}
+
+            {selected.strategy_params_json && (
+              <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0", paddingTop: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>적용된 전략 파라미터</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {Object.entries(JSON.parse(selected.strategy_params_json) as Record<string, number>).map(([key, value]) => {
+                    const desc = getParamDesc(selected.strategy, key);
+                    return (
+                      <div key={key}>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{desc.label}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{value}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </div>
         </div>

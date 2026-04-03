@@ -15,6 +15,7 @@ export interface SignalItem {
   trade_id: number | null;
   skip_reason: string | null;
   snapshot_id: number | null;
+  strategy_params_json: string | null;
   // joined from market_snapshots
   btc_rsi_14: number | null;
   btc_ma_5: number | null;

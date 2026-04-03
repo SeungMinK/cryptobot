@@ -112,6 +112,16 @@ class CryptoBot:
         row = self._db.execute("SELECT value FROM bot_config WHERE key = ?", (key,)).fetchone()
         return row["value"] if row else default
 
+    def _get_strategy_params_json(self) -> str | None:
+        """현재 활성 전략의 파라미터를 JSON 문자열로 반환."""
+        if self._strategy is None:
+            return None
+        row = self._db.execute(
+            "SELECT default_params_json FROM strategies WHERE name = ?",
+            (self._strategy_name,),
+        ).fetchone()
+        return row["default_params_json"] if row else None
+
     def _get_config_bool(self, key: str, default: bool = False) -> bool:
         """봇 설정 bool 값 조회."""
         return self._get_config(key, str(default)).lower() == "true"
@@ -196,6 +206,7 @@ class CryptoBot:
                 trigger_value=signal_result.trigger_value,
                 skip_reason=signal_result.reason,
                 snapshot_id=snapshot_id,
+                strategy_params_json=self._get_strategy_params_json(),
             )
             return
 
@@ -210,6 +221,7 @@ class CryptoBot:
                 trigger_value=signal_result.trigger_value,
                 skip_reason="api_key_not_configured",
                 snapshot_id=snapshot_id,
+                strategy_params_json=self._get_strategy_params_json(),
             )
             logger.info("매수 신호 발생했으나 API Key 미설정 — 스킵")
             return
@@ -234,6 +246,7 @@ class CryptoBot:
                 trigger_value=signal_result.trigger_value,
                 skip_reason=reason,
                 snapshot_id=snapshot_id,
+                strategy_params_json=self._get_strategy_params_json(),
             )
             logger.info("매수 신호 발생했으나 리스크 차단: %s", reason)
             return
@@ -268,6 +281,7 @@ class CryptoBot:
                 executed=True,
                 trade_id=trade_id,
                 snapshot_id=snapshot_id,
+                strategy_params_json=self._get_strategy_params_json(),
             )
             self._notifier.notify_trade("buy", config.bot.coin, order.price, order.amount, order.total_krw)
 
@@ -328,6 +342,7 @@ class CryptoBot:
                 executed=True,
                 trade_id=trade_id,
                 snapshot_id=snapshot_id,
+                strategy_params_json=self._get_strategy_params_json(),
             )
             self._strategy.reset()
             self._notifier.notify_trade("sell", config.bot.coin, order.price, order.amount, order.total_krw)

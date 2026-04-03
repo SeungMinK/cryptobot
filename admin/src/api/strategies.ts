@@ -30,3 +30,19 @@ export async function deactivateStrategy(name: string, reason?: string): Promise
   const { data } = await client.put<ActivateResponse>(`/strategies/${name}/deactivate`, { reason });
   return data;
 }
+
+export async function updateStrategyParams(name: string, paramsJson: string): Promise<{ status: string }> {
+  const { data } = await client.put<{ status: string }>(`/strategies/${name}/params`, { params_json: paramsJson });
+  return data;
+}
+
+export async function getStrategySimulation(name: string, paramsJson: string): Promise<StrategySimulation> {
+  const { data } = await client.post<StrategySimulation>(`/strategies/${name}/simulate`, { params_json: paramsJson });
+  return data;
+}
+
+export interface StrategySimulation {
+  strategy: string;
+  params: Record<string, number | string>;
+  simulation: Record<string, number | string | null>;
+}

@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
-import { getStrategies, getActivationHistory, activateStrategy, deactivateStrategy } from "../api/strategies";
-import type { Strategy, StrategyActivation } from "../types/strategies";
+import { useEffect, useState, useCallback } from "react";
+import { getStrategies, getActivationHistory, activateStrategy, deactivateStrategy, updateStrategyParams, getStrategySimulation } from "../api/strategies";
+import type { Strategy, StrategyActivation, StrategySimulation } from "../types/strategies";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { formatPercent, formatDateTime } from "../utils/format";
+import { formatPercent, formatDateTime, formatKRW } from "../utils/format";
 
 export default function StrategiesPage() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [activations, setActivations] = useState<StrategyActivation[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirm, setConfirm] = useState<{ name: string; action: "activate" | "deactivate" } | null>(null);
+  const [editingStrategy, setEditingStrategy] = useState<Strategy | null>(null);
 
   const fetchData = async () => {
     try {
@@ -50,7 +51,7 @@ export default function StrategiesPage() {
     <div>
       <div className="page-header">
         <h1>전략 관리</h1>
-        <p>매매 전략 조회 및 활성화/비활성화</p>
+        <p>매매 전략 조회 및 활성화/비활성화 — 카드 클릭 시 파라미터 편집</p>
       </div>
 
       {/* Active strategies banner */}
@@ -68,7 +69,12 @@ export default function StrategiesPage() {
       {/* Strategy cards */}
       <div className="strategy-grid">
         {strategies.map((s) => (
-          <div key={s.name} className={`strategy-card ${s.is_active ? "active-strategy" : ""}`}>
+          <div
+            key={s.name}
+            className={`strategy-card ${s.is_active ? "active-strategy" : ""}`}
+            onClick={() => setEditingStrategy(s)}
+            style={{ cursor: "pointer" }}
+          >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <h3>{s.display_name}</h3>
@@ -108,7 +114,7 @@ export default function StrategiesPage() {
               <span className="badge badge-yellow">{s.market_states}</span>
               <span className="badge badge-blue">{s.timeframe}</span>
             </div>
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
               {s.status === "shutting_down" ? (
                 <button className="btn btn-sm" disabled style={{ opacity: 0.5 }}>
                   종료 중...
@@ -182,6 +188,253 @@ export default function StrategiesPage() {
           onCancel={() => setConfirm(null)}
         />
       )}
+
+      {editingStrategy && (
+        <ParamsEditor
+          strategy={editingStrategy}
+          onClose={() => setEditingStrategy(null)}
+          onSaved={fetchData}
+        />
+      )}
+    </div>
+  );
+}
+
+
+// ── 파라미터 편집 모달 ──
+
+function ParamsEditor({ strategy, onClose, onSaved }: {
+  strategy: Strategy;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const currentParams = JSON.parse(strategy.default_params_json || "{}");
+  const [editParams, setEditParams] = useState<Record<string, string>>({});
+  const [simulation, setSimulation] = useState<StrategySimulation | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [simLoading, setSimLoading] = useState(false);
+
+  useEffect(() => {
+    const initial: Record<string, string> = {};
+    Object.entries(currentParams).forEach(([k, v]) => {
+      initial[k] = String(v);
+    });
+    setEditParams(initial);
+  }, [strategy.name]);
+
+  const hasChanges = Object.keys(editParams).some(
+    (k) => editParams[k] !== String(currentParams[k])
+  );
+
+  const runSimulation = useCallback(async () => {
+    setSimLoading(true);
+    try {
+      const newParams: Record<string, number> = {};
+      Object.entries(editParams).forEach(([k, v]) => {
+        newParams[k] = parseFloat(v) || 0;
+      });
+      const result = await getStrategySimulation(strategy.name, JSON.stringify(newParams));
+      setSimulation(result);
+    } catch {
+      // ignore
+    } finally {
+      setSimLoading(false);
+    }
+  }, [editParams, strategy.name]);
+
+  // 파라미터 변경 시 자동 시뮬레이션
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      runSimulation();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [editParams, runSimulation]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const newParams: Record<string, number> = {};
+      Object.entries(editParams).forEach(([k, v]) => {
+        newParams[k] = parseFloat(v) || 0;
+      });
+      await updateStrategyParams(strategy.name, JSON.stringify(newParams));
+      onSaved();
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const sim = simulation?.simulation || {};
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700, width: "90%" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>{strategy.display_name} — 파라미터 설정</h3>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{strategy.description}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-secondary)", fontSize: 18, cursor: "pointer" }}>x</button>
+        </div>
+
+        {/* AS-IS vs TO-BE 파라미터 */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 8 }}>현재 (AS-IS)</div>
+            {Object.entries(currentParams).map(([key, value]) => (
+              <div key={key} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+                <span style={{ fontSize: 13 }}>{key}</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{String(value)}</span>
+              </div>
+            ))}
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#4a9eff", marginBottom: 8 }}>변경 (TO-BE)</div>
+            {Object.entries(editParams).map(([key, value]) => (
+              <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
+                <span style={{ fontSize: 13 }}>{key}</span>
+                <input
+                  type="number"
+                  step="0.05"
+                  value={value}
+                  onChange={(e) => setEditParams((prev) => ({ ...prev, [key]: e.target.value }))}
+                  style={{
+                    width: 80,
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                    border: value !== String(currentParams[key]) ? "2px solid #4a9eff" : "1px solid var(--border)",
+                    background: "var(--bg-secondary)",
+                    color: "var(--text-primary)",
+                    fontSize: 13,
+                    textAlign: "right",
+                    fontWeight: 600,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 시뮬레이션 결과 */}
+        {simLoading ? (
+          <div style={{ textAlign: "center", padding: 16, color: "var(--text-muted)" }}>시뮬레이션 중...</div>
+        ) : Object.keys(sim).length > 0 ? (
+          <div style={{ background: "var(--bg-secondary)", borderRadius: 8, padding: 16, marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>
+              현재 시장 기반 시뮬레이션
+            </div>
+            <SimulationResult strategyName={strategy.name} sim={sim} hasChanges={hasChanges} />
+          </div>
+        ) : null}
+
+        {/* 저장 버튼 */}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button onClick={onClose} className="btn btn-sm" style={{ background: "#2a2d3e" }}>취소</button>
+          <button
+            onClick={handleSave}
+            disabled={!hasChanges || saving}
+            className="btn btn-primary btn-sm"
+            style={{ opacity: hasChanges ? 1 : 0.4 }}
+          >
+            {saving ? "저장 중..." : "파라미터 적용"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function SimulationResult({ strategyName, sim, hasChanges }: {
+  strategyName: string;
+  sim: Record<string, number | string | null>;
+  hasChanges: boolean;
+}) {
+  if (strategyName === "bollinger_bands" || strategyName === "bollinger_squeeze") {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 13 }}>
+        <SimRow label="현재 BTC" value={formatKRW(Number(sim.current_price))} />
+        <SimRow label="MA(20)" value={formatKRW(Number(sim.ma_20))} />
+        <SimRow label="현재 상단" value={formatKRW(Number(sim.current_upper))} changed={hasChanges} />
+        <SimRow label="변경 상단" value={formatKRW(Number(sim.new_upper))} highlight={hasChanges} />
+        <SimRow label="현재 하단" value={formatKRW(Number(sim.current_lower))} changed={hasChanges} />
+        <SimRow label="변경 하단" value={formatKRW(Number(sim.new_lower))} highlight={hasChanges} />
+        <SimRow label="현재 밴드폭" value={formatKRW(Number(sim.current_band_width))} changed={hasChanges} />
+        <SimRow label="변경 밴드폭" value={formatKRW(Number(sim.new_band_width))} highlight={hasChanges} />
+        <SimRow
+          label="현재 하단까지"
+          value={`${formatKRW(Number(sim.current_distance_to_lower))} (${sim.current_distance_to_lower_pct}%)`}
+          changed={hasChanges}
+        />
+        <SimRow
+          label="변경 하단까지"
+          value={`${formatKRW(Number(sim.new_distance_to_lower))} (${sim.new_distance_to_lower_pct}%)`}
+          highlight={hasChanges}
+        />
+      </div>
+    );
+  }
+
+  if (strategyName === "volatility_breakout") {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 13 }}>
+        <SimRow label="현재 BTC" value={formatKRW(Number(sim.current_price))} />
+        <SimRow label="금일 시가" value={formatKRW(Number(sim.today_open))} />
+        <SimRow label="전일 변동폭" value={formatKRW(Number(sim.price_range))} />
+        <div />
+        <SimRow label="현재 돌파선" value={formatKRW(Number(sim.current_breakout))} changed={hasChanges} />
+        <SimRow label="변경 돌파선" value={formatKRW(Number(sim.new_breakout))} highlight={hasChanges} />
+        <SimRow label="현재 거리" value={formatKRW(Number(sim.current_distance))} changed={hasChanges} />
+        <SimRow label="변경 거리" value={formatKRW(Number(sim.new_distance))} highlight={hasChanges} />
+      </div>
+    );
+  }
+
+  if (strategyName === "rsi_mean_reversion") {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 13 }}>
+        <SimRow label="현재 RSI" value={String(sim.current_rsi)} />
+        <div />
+        <SimRow label="현재 과매도" value={String(sim.current_oversold)} changed={hasChanges} />
+        <SimRow label="변경 과매도" value={String(sim.new_oversold)} highlight={hasChanges} />
+        <SimRow label="현재 과매수" value={String(sim.current_overbought)} changed={hasChanges} />
+        <SimRow label="변경 과매수" value={String(sim.new_overbought)} highlight={hasChanges} />
+        <SimRow label="현재 매수까지" value={`RSI ${sim.current_buy_distance} 남음`} changed={hasChanges} />
+        <SimRow label="변경 매수까지" value={`RSI ${sim.new_buy_distance} 남음`} highlight={hasChanges} />
+      </div>
+    );
+  }
+
+  // 기본: key-value 나열
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 13 }}>
+      {Object.entries(sim).map(([key, value]) => (
+        <SimRow key={key} label={key} value={value != null ? String(typeof value === "number" ? value.toLocaleString() : value) : "-"} />
+      ))}
+    </div>
+  );
+}
+
+
+function SimRow({ label, value, changed, highlight }: {
+  label: string;
+  value: string;
+  changed?: boolean;
+  highlight?: boolean;
+}) {
+  return (
+    <div style={{
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "4px 8px",
+      borderRadius: 4,
+      background: highlight ? "rgba(74, 158, 255, 0.1)" : "transparent",
+      opacity: changed ? 0.5 : 1,
+      textDecoration: changed ? "line-through" : "none",
+    }}>
+      <span style={{ color: "var(--text-muted)" }}>{label}</span>
+      <span style={{ fontWeight: 600, color: highlight ? "#4a9eff" : "var(--text-primary)" }}>{value}</span>
     </div>
   );
 }

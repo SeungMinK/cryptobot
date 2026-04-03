@@ -1,11 +1,12 @@
 """시장 데이터 수집기.
 
-1분 간격으로 업비트에서 시세/거래량 데이터를 수집하고
+10초 간격으로 업비트에서 시세/거래량 데이터를 수집하고
 기술적 지표를 계산하여 market_snapshots에 저장한다.
+OHLCV 일봉 데이터는 ohlcv_daily 테이블에 별도 저장 (백테스팅/LLM용).
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pyupbit
 
@@ -17,13 +18,19 @@ from cryptobot.exceptions import APIError
 logger = logging.getLogger(__name__)
 
 
+def _utcnow() -> str:
+    """UTC ISO 포맷 타임스탬프."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
 class DataCollector:
     """시장 데이터 수집 및 저장."""
 
     def __init__(self, db: Database, coin: str = "KRW-BTC") -> None:
         self._db = db
         self._coin = coin
-        self._latest_df: "pd.DataFrame | None" = None  # 최근 OHLCV 캐시 (전략에서 사용)
+        self._latest_df: "pd.DataFrame | None" = None
+        self._last_ohlcv_save_date: str = ""  # 일봉 저장 중복 방지
 
     @property
     def latest_df(self) -> "pd.DataFrame | None":
@@ -42,6 +49,10 @@ class DataCollector:
                 return None
 
             snapshot_id = self._save_snapshot(snapshot)
+
+            # OHLCV 일봉 데이터 저장 (하루 1회)
+            self._save_ohlcv_daily()
+
             logger.debug("스냅샷 저장: id=%d, price=%s", snapshot_id, f"{snapshot['btc_price']:,.0f}")
             return snapshot_id
         except Exception as e:
@@ -74,7 +85,7 @@ class DataCollector:
             today = df.iloc[-1]
 
             return {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": _utcnow(),
                 "btc_price": current_price,
                 "btc_open_24h": today["open"],
                 "btc_high_24h": today["high"],
@@ -125,6 +136,40 @@ class DataCollector:
         )
         self._db.commit()
         return cursor.lastrowid
+
+    def _save_ohlcv_daily(self) -> None:
+        """OHLCV 일봉 데이터를 ohlcv_daily 테이블에 저장.
+
+        매 틱마다 호출되지만 날짜 기준으로 중복 방지.
+        120일 캔들 전체를 upsert (과거 데이터도 보정).
+        """
+        if self._latest_df is None:
+            return
+
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if today_str == self._last_ohlcv_save_date:
+            return  # 오늘 이미 저장함
+
+        now = _utcnow()
+        rows = []
+        for idx, row in self._latest_df.iterrows():
+            date_str = idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx)[:10]
+            rows.append((
+                self._coin, date_str,
+                row["open"], row["high"], row["low"], row["close"], row["volume"],
+                now,
+            ))
+
+        self._db.executemany(
+            """
+            INSERT OR REPLACE INTO ohlcv_daily (coin, date, open, high, low, close, volume, collected_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
+        self._db.commit()
+        self._last_ohlcv_save_date = today_str
+        logger.info("OHLCV 일봉 저장: %s %d일치", self._coin, len(rows))
 
     def get_latest_snapshot(self) -> dict | None:
         """가장 최근 스냅샷 조회."""

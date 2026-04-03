@@ -3,7 +3,7 @@
 NestJS의 AuthController와 동일.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -35,7 +35,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     # 마지막 로그인 시간 업데이트
     db.execute(
         "UPDATE users SET last_login_at = ? WHERE id = ?",
-        (datetime.now().isoformat(), row["id"]),
+        (datetime.now(timezone.utc).isoformat(), row["id"]),
     )
     db.commit()
 

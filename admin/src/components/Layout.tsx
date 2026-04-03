@@ -18,6 +18,9 @@ export default function Layout() {
           <NavLink to="/strategies" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
             Strategies
           </NavLink>
+          <NavLink to="/signals" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
+            Signals
+          </NavLink>
           <NavLink to="/profit" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
             Profit Analysis
           </NavLink>

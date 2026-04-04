@@ -58,7 +58,7 @@ def update_coin_strategy(
         WHERE category = ?""",
         (body.strategy_name, body.stop_loss_pct, body.trailing_stop_pct,
          body.position_size_pct, body.strategy_params_json,
-         datetime.now(timezone.utc).isoformat(), category),
+         datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), category),
     )
     db.commit()
 

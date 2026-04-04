@@ -35,7 +35,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     # 마지막 로그인 시간 업데이트
     db.execute(
         "UPDATE users SET last_login_at = ? WHERE id = ?",
-        (datetime.now(timezone.utc).isoformat(), row["id"]),
+        (datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), row["id"]),
     )
     db.commit()
 

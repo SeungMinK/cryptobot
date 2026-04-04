@@ -59,7 +59,7 @@ def update_config(
 
     db.execute(
         "UPDATE bot_config SET value = ?, updated_at = ? WHERE key = ?",
-        (body.value, datetime.now(timezone.utc).isoformat(), key),
+        (body.value, datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), key),
     )
     db.commit()
 

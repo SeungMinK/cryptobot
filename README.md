@@ -192,11 +192,19 @@ AI 분석 (4시간) → llm_decisions + prompt_versions
 
 FastAPI + React Admin 8페이지, 멀티코인, 볼린저+RSI 복합, 수수료 가드, 뉴스 수집, Claude AI 시장분석, 프롬프트 버전 관리, 통합 테스트 90건
 
+### Phase 2.5: 수익률 개선 (진행 중)
+
+[Freqtrade](https://github.com/freqtrade/freqtrade) · [Hummingbot](https://github.com/hummingbot/hummingbot) 벤치마킹
+
+- [ ] #81 시간 기반 ROI 테이블 — 보유 시간별 목표 수익 자동 조절
+- [ ] #82 코인별 쿨다운 + 손실 코인 잠금 — 연속 손실 방지
+- [ ] #83 스프레드 필터 — 호가 차이 큰 코인 자동 제외
+
 ### Phase 3: 인프라 (예정)
 
-- [ ] Docker 컨테이너화
-- [ ] SQLite → PostgreSQL 마이그레이션
-- [ ] 워치독 서비스
+- [ ] #20 Docker 컨테이너화
+- [ ] #21 SQLite → PostgreSQL 마이그레이션
+- [ ] #80 워치독 서비스
 
 ### Phase 4: 고도화 (예정)
 
@@ -206,13 +214,13 @@ FastAPI + React Admin 8페이지, 멀티코인, 볼린저+RSI 복합, 수수료 
 - [ ] #78 데이터 분석 파이프라인
 - [ ] #79 자체 LLM 파인튜닝
 
-### Phase 5: 벤치마킹 개선 (예정)
+### Phase 5: 벤치마킹 고도화 (예정)
 
 [Freqtrade](https://github.com/freqtrade/freqtrade) · [Hummingbot](https://github.com/hummingbot/hummingbot) 참고
 
-- [ ] #84 단계별 동적 손절
-- [ ] #85 DCA 안전 주문
-- [ ] #86 Optuna 하이퍼파라미터 최적화
+- [ ] #84 단계별 동적 손절 (Freqtrade custom_stoploss)
+- [ ] #85 DCA 안전 주문 (Freqtrade adjust_trade_position)
+- [ ] #86 Optuna 하이퍼파라미터 최적화 (Freqtrade Hyperopt)
 
 ---
 

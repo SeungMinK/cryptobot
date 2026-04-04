@@ -123,7 +123,12 @@
       "WebFetch(domain:stoic.ai)",
       "WebFetch(domain:papers.ssrn.com)",
       "Bash(sed -i '' -e 's/timestamp, coin, btc_price, btc_open_24h, btc_high_24h, btc_low_24h,/timestamp, coin, price, open_24h, high_24h, low_24h,/g' -e 's/btc_change_pct_24h, btc_volume_24h, btc_rsi_14,/change_pct_24h, volume_24h, rsi_14,/g' -e 's/btc_ma_5, btc_ma_20, btc_ma_60,/ma_5, ma_20, ma_60,/g' -e 's/btc_bb_upper, btc_bb_lower, btc_atr_14, market_state/bb_upper, bb_lower, atr_14, market_state/g' -e 's/snapshot\\\\['\\\\''btc_price'\\\\''\\\\]/snapshot['\\\\''price'\\\\'']/g' src/cryptobot/data/collector.py)",
-      "Bash(sed -i '' -e 's/coin, btc_price, open_24h/coin, price, open_24h/g' src/cryptobot/data/database.py)"
+      "Bash(sed -i '' -e 's/coin, btc_price, open_24h/coin, price, open_24h/g' src/cryptobot/data/database.py)",
+      "Bash(sed -i '' '/# 틱 단위 배치 commit/,+3 s/except Exception:/except Exception as e:\\\\n                logger.warning\\(\"틱 commit 실패: %s\", e\\)/' src/cryptobot/bot/main.py)",
+      "Bash(sed -i '' 's/        except Exception:$/        except Exception as e:\\\\n            logger.warning\\(\"잔고 조회 실패: %s\", e\\)/' src/cryptobot/api/routes/balance.py)",
+      "Bash(sed -i '' 's/        except Exception:$/        except Exception as e:\\\\n            logger.warning\\(\"코인 가격 조회 실패: %s\", e\\)/' src/cryptobot/api/routes/trades.py)",
+      "Bash(sed -i '' '1s/^/import logging\\\\nlogger = logging.getLogger\\(__name__\\)\\\\n/' src/cryptobot/api/routes/balance.py)",
+      "Bash(sed -i '' '1s/^/import logging\\\\nlogger = logging.getLogger\\(__name__\\)\\\\n/' src/cryptobot/api/routes/trades.py)"
     ]
   }
 }

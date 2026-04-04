@@ -97,6 +97,31 @@ def get_trade_stats(
     ).fetchone()
 
     sells = (row["wins"] or 0) + (row["losses"] or 0)
+    realized_profit = round(row["total_profit_krw"] or 0, 0)
+
+    # 미실현 손익 계산 (보유 중인 코인)
+    unrealized_profit = 0
+    held = db.execute(
+        """
+        SELECT t.coin, t.price, t.amount, t.total_krw, t.fee_krw
+        FROM trades t WHERE t.side = 'buy'
+        AND NOT EXISTS (SELECT 1 FROM trades s WHERE s.buy_trade_id = t.id AND s.side = 'sell')
+        """
+    ).fetchall()
+
+    if held:
+        import pyupbit
+        for h in held:
+            try:
+                current_price = pyupbit.get_current_price(h["coin"])
+                if current_price:
+                    cost = h["total_krw"] + (h["fee_krw"] or 0)
+                    value = h["amount"] * current_price
+                    unrealized_profit += value - cost
+            except Exception:
+                pass
+    unrealized_profit = round(unrealized_profit, 0)
+
     return {
         "period_days": days,
         "total_trades": row["total_trades"] or 0,
@@ -106,7 +131,9 @@ def get_trade_stats(
         "losses": row["losses"] or 0,
         "win_rate": round((row["wins"] or 0) / sells * 100, 1) if sells > 0 else 0,
         "avg_profit_pct": round(row["avg_profit_pct"] or 0, 2),
-        "total_profit_krw": round(row["total_profit_krw"] or 0, 0),
+        "total_profit_krw": realized_profit,
+        "unrealized_profit_krw": unrealized_profit,
+        "total_pnl_krw": realized_profit + unrealized_profit,
         "total_fees": round(row["total_fees"] or 0, 0),
     }
 

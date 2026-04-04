@@ -110,7 +110,8 @@
       "Bash(curl -s http://localhost:8000/api/auth/login -X POST -d \"username=ksm8138&password=tmdals8797!\" -H \"Content-Type: application/x-www-form-urlencoded\")",
       "Bash(python3 -c \"import sys,json; print\\(json.load\\(sys.stdin\\)['access_token']\\)\")",
       "Bash(curl -s http://localhost:8000/api/coin-strategy/alt -X PUT -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJrc204MTM4IiwiZXhwIjoxNzc1Mzc4MDQ3fQ.IORFBJnkLJ8v6B-dpg0JrQQHEBM_s4f30HJVCf7ms8U' -H 'Content-Type: application/json' -d '{\"strategy_name\":\"volatility_breakout\",\"stop_loss_pct\":-5.0,\"trailing_stop_pct\":-3.0,\"position_size_pct\":100,\"strategy_params_json\":\"{\\\\\"k_value\\\\\":0.5}\"}')",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(ls:*)"
     ]
   }
 }

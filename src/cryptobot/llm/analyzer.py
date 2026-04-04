@@ -72,10 +72,43 @@ class LLMAnalyzer:
     def is_configured(self) -> bool:
         return bool(self._api_key)
 
+    # Haiku 4.5 가격 (2026-04 기준)
+    PRICE_INPUT_PER_M = 0.80   # $0.80 / 1M 입력 토큰
+    PRICE_OUTPUT_PER_M = 4.00  # $4.00 / 1M 출력 토큰
+    MIN_INTERVAL_HOURS = 4
+
+    def _should_run(self) -> bool:
+        """마지막 분석으로부터 4시간 이상 지났는지 확인."""
+        row = self._db.execute(
+            "SELECT timestamp FROM llm_decisions ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if row is None:
+            return True
+
+        last = datetime.fromisoformat(dict(row)["timestamp"])
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        elapsed = (datetime.now(timezone.utc) - last).total_seconds() / 3600
+        if elapsed < self.MIN_INTERVAL_HOURS:
+            logger.info("LLM 분석 스킵: 마지막 분석 %.1f시간 전 (최소 %d시간)", elapsed, self.MIN_INTERVAL_HOURS)
+            return False
+        return True
+
+    def _calc_cost(self, input_tokens: int, output_tokens: int) -> float:
+        """토큰 → USD 비용 계산."""
+        return round(
+            input_tokens / 1_000_000 * self.PRICE_INPUT_PER_M +
+            output_tokens / 1_000_000 * self.PRICE_OUTPUT_PER_M,
+            6,
+        )
+
     def analyze(self) -> dict | None:
         """시장 분석 실행. 뉴스 + 시장 데이터 → LLM → 결과 저장."""
         if not self.is_configured:
             logger.warning("LLM API 키 미설정 — 분석 스킵")
+            return None
+
+        if not self._should_run():
             return None
 
         try:
@@ -235,6 +268,10 @@ class LLMAnalyzer:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         params = result.get("recommended_params", {})
 
+        input_tokens = result.get("_input_tokens", 0)
+        output_tokens = result.get("_output_tokens", 0)
+        cost = self._calc_cost(input_tokens, output_tokens)
+
         self._db.execute(
             """
             INSERT INTO llm_decisions (
@@ -242,8 +279,8 @@ class LLMAnalyzer:
                 output_market_state, output_aggression, output_allow_trading,
                 output_k_value, output_stop_loss, output_trailing_stop,
                 output_reasoning,
-                input_tokens, output_tokens
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                input_tokens, output_tokens, cost_usd
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 now,
@@ -255,18 +292,64 @@ class LLMAnalyzer:
                 params.get("stop_loss_pct"),
                 params.get("trailing_stop_pct"),
                 result.get("market_summary_kr", "") + "\n\n" + result.get("reasoning", ""),
-                result.get("_input_tokens", 0),
-                result.get("_output_tokens", 0),
+                input_tokens,
+                output_tokens,
+                cost,
             ),
         )
         self._db.commit()
+        logger.info("LLM 비용: $%.4f (입력 %d + 출력 %d 토큰)", cost, input_tokens, output_tokens)
+
+    def _evaluate_previous(self) -> None:
+        """이전 LLM 분석의 성과를 평가하여 기록."""
+        prev = self._db.execute(
+            "SELECT id, timestamp FROM llm_decisions ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if prev is None:
+            return
+
+        prev = dict(prev)
+        # 이전 분석 이후 매매 성과
+        row = self._db.execute(
+            """
+            SELECT
+                COUNT(*) as trades,
+                SUM(CASE WHEN profit_krw > 0 THEN 1 ELSE 0 END) as wins,
+                SUM(profit_krw) as total_pnl
+            FROM trades WHERE side = 'sell' AND timestamp >= ?
+            """,
+            (prev["timestamp"],),
+        ).fetchone()
+        r = dict(row)
+
+        if r["trades"] and r["trades"] > 0:
+            pnl = r["total_pnl"] or 0
+            was_good = pnl > 0
+            self._db.execute(
+                "UPDATE llm_decisions SET evaluation_period_pnl_pct = ?, evaluation_was_good = ? WHERE id = ?",
+                (round(pnl, 2), was_good, prev["id"]),
+            )
+            self._db.commit()
+            logger.info("이전 LLM 성과: %d건 매매, PnL %+,.0f원, 판단 %s",
+                        r["trades"], pnl, "good" if was_good else "bad")
 
     def _apply_recommendations(self, result: dict) -> None:
-        """LLM 권고를 bot_config에 반영."""
+        """LLM 권고를 bot_config에 반영. before/after 스냅샷 기록."""
         params = result.get("recommended_params", {})
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
-        # 파라미터 적용 (존재하는 키만)
+        # 이전 성과 평가
+        self._evaluate_previous()
+
+        # before 스냅샷
+        before = {}
+        config_keys = ["stop_loss_pct", "trailing_stop_pct", "k_value", "allow_trading"]
+        for key in config_keys:
+            row = self._db.execute("SELECT value FROM bot_config WHERE key = ?", (key,)).fetchone()
+            if row:
+                before[key] = dict(row)["value"]
+
+        # 파라미터 적용
         config_map = {
             "stop_loss_pct": params.get("stop_loss_pct"),
             "trailing_stop_pct": params.get("trailing_stop_pct"),
@@ -280,17 +363,15 @@ class LLMAnalyzer:
                     (str(value), now, key),
                 )
 
-        # allow_trading
         if result.get("allow_trading") is not None:
             self._db.execute(
                 "UPDATE bot_config SET value = ?, updated_at = ? WHERE key = 'allow_trading'",
                 (str(result["allow_trading"]).lower(), now),
             )
 
-        # 추천 전략을 전략 테이블에 반영
+        # 전략 파라미터 반영
         strategy = result.get("recommended_strategy")
         if strategy:
-            # bb_rsi_combined 파라미터 업데이트
             strategy_params = {}
             if params.get("bb_std"):
                 strategy_params["bb_std"] = params["bb_std"]
@@ -308,5 +389,21 @@ class LLMAnalyzer:
                     (json.dumps(strategy_params), now, strategy),
                 )
 
+        # after 스냅샷
+        after = {k: str(v) for k, v in config_map.items() if v is not None}
+        if result.get("allow_trading") is not None:
+            after["allow_trading"] = str(result["allow_trading"]).lower()
+
+        # before/after를 최신 llm_decisions에 기록
+        self._db.execute(
+            """
+            UPDATE llm_decisions SET
+                input_news_summary = ?
+            WHERE id = (SELECT MAX(id) FROM llm_decisions)
+            """,
+            (json.dumps({"before": before, "after": after, "strategy": strategy}, ensure_ascii=False),),
+        )
+
         self._db.commit()
-        logger.info("LLM 권고 적용: %s", {k: v for k, v in config_map.items() if v is not None})
+        changes = {k: f"{before.get(k, '?')} → {v}" for k, v in after.items()}
+        logger.info("LLM 권고 적용: %s", changes)

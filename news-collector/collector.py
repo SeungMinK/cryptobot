@@ -93,10 +93,11 @@ def collect_all() -> None:
     rss_saved = save_articles(rss_articles) if rss_articles else 0
     logger.info("RSS 뉴스: %d건 수집, %d건 신규 저장", len(rss_articles), rss_saved)
 
-    # 2. 업비트 공지
-    upbit_articles = fetch_upbit_notices()
-    upbit_saved = save_articles(upbit_articles) if upbit_articles else 0
-    logger.info("업비트 공지: %d건 수집, %d건 신규 저장", len(upbit_articles), upbit_saved)
+    # 2. 업비트 공지 (API 폐쇄로 일시 비활성화 — 웹 크롤링으로 전환 예정)
+    # upbit_articles = fetch_upbit_notices()
+    # upbit_saved = save_articles(upbit_articles) if upbit_articles else 0
+    # logger.info("업비트 공지: %d건 수집, %d건 신규 저장", len(upbit_articles), upbit_saved)
+    upbit_saved = 0
 
     # 3. Fear & Greed Index
     fg = fetch_fear_greed()

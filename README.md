@@ -129,20 +129,27 @@ cryptobot/
 ohlcv_daily (매일 120일치 upsert)
     → 일봉 OHLCV 데이터 (백테스팅/LLM 학습용)
 
-market_snapshots (10초 간격)
-    → 시세, 거래량, 기술적 지표, 시장 상태 판단
+market_snapshots (60초 간격, 멀티코인)
+    → 코인별 시세, 거래량, 기술적 지표 (RSI, MA, 볼린저, ATR), 시장 상태
 
-trade_signals (매 틱마다)
+trade_signals (매 틱마다, 코인별)
     → 실행 여부 관계없이 모든 신호 기록 + 적용된 전략 파라미터 JSON
 
 trades (체결 시)
-    → 매매 시점의 파라미터 + 시장 상태 + 수익률 + 보유시간
+    → 매매 시점의 파라미터 + 시장 상태 + 수익률(수수료 포함) + 보유시간
+
+news_articles (30분 주기)
+    → RSS 뉴스 (CoinDesk, CoinTelegraph) + 업비트 공지
+    → 코인 태깅, 감성 분류, 카테고리 자동 분류
+
+fear_greed_index (1시간 주기)
+    → 공포/탐욕 지수 (0~100) — LLM 시장 심리 판단에 사용
 
 bot_config (변경 시)
-    → 봇/알림/리스크/전략 설정 (Admin에서 실시간 변경)
+    → 봇/알림/리스크/코인 설정 (Admin에서 실시간 변경)
 
 strategy_activations (전환 시)
-    → 전략 활성화/비활성화/종료중 이력
+    → 전략 전환 이력 (LLM 학습 데이터)
 
 daily_reports (자정)
     → 일일 정산 (승률, 수익률, 잔고)
@@ -172,13 +179,13 @@ python scripts/create_admin.py
 ### 바로 실행
 
 ```bash
-# 전체 한번에 실행 (봇 + API 서버 + Admin 웹)
+# 전체 한번에 실행 (봇 + API + 뉴스 수집기 + Admin 웹)
 make start
 # 또는
 bash scripts/start_all.sh
 ```
 
-Ctrl+C로 전체 종료. 로그에 `[BOT]`, `[API]`, `[WEB]` 태그로 구분됨.
+Ctrl+C로 전체 종료. 로그에 `[BOT]`, `[API]`, `[NEWS]`, `[WEB]` 태그로 구분됨.
 
 - API 서버: http://localhost:8000
 - Admin 대시보드: http://localhost:5173
@@ -187,10 +194,11 @@ Ctrl+C로 전체 종료. 로그에 `[BOT]`, `[API]`, `[WEB]` 태그로 구분됨
 ### 개별 실행
 
 ```bash
-make bot      # 봇만
-make api      # API 서버만
-make web      # Admin 웹만
-make test     # 테스트
+make bot      # 트레이딩 봇
+make api      # API 서버
+make web      # Admin 대시보드
+make news     # 뉴스 수집기
+make test     # 테스트 (90건)
 make lint     # 린트
 ```
 
@@ -244,9 +252,14 @@ make lint     # 린트
 - [x] #52 봇 설정 관리 + 틱별 Slack 리포트
 - [x] #55 전략 단일 활성화 + 종료중 상태
 - [x] #57 타임스탬프 UTC 통일 + OHLCV 히스토리
+- [x] #59 멀티코인 자동 선별 + 신뢰도 기반 자산 배분
+- [x] #62 코인별 시장 상태 기반 전략 자동 선택
+- [x] #65 코드 최적화 (API 캐시, DB 배치, 인덱스)
+- [x] #67 볼린저+RSI 복합 전략 (60%+ 승률)
+- [x] #63 실제 매매 데이터 기반 통합 테스트 25건
 
-**LLM 연동**
-- [ ] #16 뉴스 수집기 (RSS)
+**뉴스 수집 + LLM 연동**
+- [x] #16 뉴스 수집기 (RSS + Fear & Greed Index)
 - [ ] #17 Claude Haiku 연동 — 시장분석
 - [ ] #18 LLM 파라미터 튜닝 — 매매 결과 피드백
 - [ ] #19 백테스트 엔진

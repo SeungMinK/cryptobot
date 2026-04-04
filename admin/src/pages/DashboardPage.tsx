@@ -186,7 +186,7 @@ export default function DashboardPage() {
               <table>
                 <thead>
                   <tr>
-                    <th>시간</th>
+                    <th>시간(KST)</th>
                     <th>종목</th>
                     <th>방향</th>
                     <th>금액</th>
@@ -196,7 +196,7 @@ export default function DashboardPage() {
                 <tbody>
                   {recentTrades.map((t) => (
                     <tr key={t.id}>
-                      <td style={{ fontSize: 10 }}>{t.timestamp?.slice(5, 16)}</td>
+                      <td style={{ fontSize: 10 }}>{formatDateTime(t.timestamp).replace(/\d{4}\. /, "").replace(/:(\d{2})$/, "")}</td>
                       <td style={{ fontSize: 12 }}>{t.coin?.replace("KRW-", "")}</td>
                       <td>
                         <span className={`badge ${t.side === "buy" ? "badge-green" : "badge-red"}`} style={{ fontSize: 10 }}>

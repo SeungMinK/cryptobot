@@ -2,6 +2,14 @@
 
 AI 기반 코인 자동매매 시스템. 10개 매매 전략 + Claude AI 시장분석을 결합하여 매매 파라미터를 자동 조절하는 개인용 트레이딩 봇.
 
+<p align="center">
+  <img src="docs/images/dashboard.png" alt="Dashboard" width="100%" />
+</p>
+
+<p align="center">
+  <img src="docs/images/strategies.png" alt="Strategies" width="100%" />
+</p>
+
 ## Overview
 
 업비트 API를 통해 멀티코인을 자동으로 매수/매도하고, 뉴스 수집 + AI 분석으로 전략을 지속 개선하는 시스템입니다. 데이터 수집 → 변환 → AI 분석 → 자동 매매를 아우르는 데이터 파이프라인으로 설계되었습니다.

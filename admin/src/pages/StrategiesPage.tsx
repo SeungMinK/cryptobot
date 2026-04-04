@@ -77,27 +77,6 @@ export default function StrategiesPage() {
         <p>매매 전략 및 코인별 전략 설정</p>
       </div>
 
-      {/* 탭 바 */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 20 }}>
-        {([["strategies", "전략 목록"], ["coin-config", "코인별 전략 설정"]] as const).map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            style={{
-              padding: "8px 20px", fontSize: 14, fontWeight: 600, borderRadius: 8,
-              border: "none", cursor: "pointer",
-              background: tab === key ? "#4a9eff" : "#2a2d3e",
-              color: tab === key ? "#fff" : "#8b8fa3",
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {tab === "coin-config" ? (
-        <CoinStrategyTab configs={coinConfigs} strategies={strategies} onSaved={fetchData} />
-      ) : (
       <>
 
       {/* 코인별 전략 현황 */}
@@ -184,7 +163,6 @@ export default function StrategiesPage() {
       )}
 
       </>
-      )}
 
       {editingStrategy && (
         <ParamsEditor
@@ -403,15 +381,6 @@ function StrategyCard({ strategy: s, hasSwitching, activeCoins, onEdit, onActiva
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <span className="badge badge-blue">{s.timeframe}</span>
-      </div>
-      <div style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
-        {s.status === "shutting_down" ? (
-          <button className="btn btn-sm" disabled style={{ opacity: 0.5 }}>종료 중...</button>
-        ) : s.status === "active" ? (
-          <button className="btn btn-danger btn-sm" onClick={onDeactivate}>비활성화</button>
-        ) : (
-          <button className="btn btn-primary btn-sm" disabled={!s.is_available || hasSwitching} onClick={onActivate}>활성화</button>
-        )}
       </div>
     </div>
   );

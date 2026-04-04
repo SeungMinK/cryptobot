@@ -424,6 +424,54 @@ _DEFAULT_BOT_CONFIG = [
         "description": "새 전략 활성화 시 기존 전략이 종료되기까지 대기하는 시간",
     },
     {
+        "key": "multi_coin_enabled",
+        "value": "true",
+        "value_type": "bool",
+        "category": "coin",
+        "display_name": "멀티코인 모드",
+        "description": "여러 코인을 동시에 모니터링하고 매매. false면 BTC만 매매.",
+    },
+    {
+        "key": "max_coins",
+        "value": "5",
+        "value_type": "int",
+        "category": "coin",
+        "display_name": "동시 모니터링 코인 수",
+        "description": "자동 선별할 최대 코인 수. 거래량 상위 N개 선정.",
+    },
+    {
+        "key": "max_position_per_coin_pct",
+        "value": "50",
+        "value_type": "float",
+        "category": "coin",
+        "display_name": "1종목당 최대 포지션 (%)",
+        "description": "전체 잔고 대비 1종목에 투자할 수 있는 최대 비율.",
+    },
+    {
+        "key": "coin_refresh_interval_minutes",
+        "value": "30",
+        "value_type": "int",
+        "category": "coin",
+        "display_name": "코인 목록 갱신 주기 (분)",
+        "description": "자동 선별 코인 목록을 갱신하는 주기.",
+    },
+    {
+        "key": "min_volume_krw",
+        "value": "10000000000",
+        "value_type": "float",
+        "category": "coin",
+        "display_name": "최소 거래대금 (원)",
+        "description": "24시간 거래대금이 이 값 이상인 코인만 선별. 기본 100억원.",
+    },
+    {
+        "key": "min_price_krw",
+        "value": "1000",
+        "value_type": "float",
+        "category": "coin",
+        "display_name": "최소 가격 (원)",
+        "description": "현재가가 이 값 이상인 코인만 선별.",
+    },
+    {
         "key": "k_value",
         "value": "0.5",
         "value_type": "float",
@@ -494,6 +542,17 @@ class Database:
                     ("strategy_switch_delay_seconds", "30", "int", "bot", "전략 전환 대기 시간 (초)", "새 전략 활성화 시 기존 전략이 종료되기까지 대기하는 시간"),
                 )
                 logger.info("bot_config에 strategy_switch_delay_seconds 추가")
+
+            # 마이그레이션: 멀티코인 설정 추가
+            multi_coin = conn.execute("SELECT key FROM bot_config WHERE key = 'multi_coin_enabled'").fetchone()
+            if multi_coin is None:
+                for cfg in _DEFAULT_BOT_CONFIG:
+                    if cfg["category"] == "coin":
+                        conn.execute(
+                            "INSERT OR IGNORE INTO bot_config (key, value, value_type, category, display_name, description) VALUES (?, ?, ?, ?, ?, ?)",
+                            (cfg["key"], cfg["value"], cfg["value_type"], cfg["category"], cfg["display_name"], cfg["description"]),
+                        )
+                logger.info("bot_config에 멀티코인 설정 추가")
 
             # 기본 파라미터가 없으면 삽입
             row = conn.execute("SELECT COUNT(*) FROM strategy_params").fetchone()

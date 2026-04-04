@@ -3,13 +3,14 @@ import { getAllConfig, updateConfig } from "../api/config";
 import type { ConfigItem } from "../api/config";
 
 const CATEGORY_LABELS: Record<string, string> = {
+  coin: "코인 선별",
   notification: "알림 설정",
   bot: "봇 설정",
   risk: "리스크 관리",
   strategy: "전략 파라미터",
 };
 
-const CATEGORY_ORDER = ["bot", "notification", "risk", "strategy"];
+const CATEGORY_ORDER = ["coin", "bot", "notification", "risk", "strategy"];
 
 export default function ConfigPage() {
   const [configs, setConfigs] = useState<ConfigItem[]>([]);

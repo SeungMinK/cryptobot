@@ -40,8 +40,14 @@ echo -e "${CYAN}[2/3] 트레이딩 봇 시작${NC}"
 
 sleep 1
 
-# 3. Admin 웹 (port 5173)
-echo -e "${CYAN}[3/3] Admin 웹서버 시작 (port 5173)${NC}"
+# 3. 뉴스 수집기
+echo -e "${CYAN}[3/4] 뉴스 수집기 시작${NC}"
+.venv/bin/python news-collector/collector.py 2>&1 | sed 's/^/  [NEWS] /' &
+
+sleep 1
+
+# 4. Admin 웹 (port 5173)
+echo -e "${CYAN}[4/4] Admin 웹서버 시작 (port 5173)${NC}"
 cd admin && npm run dev 2>&1 | sed 's/^/  [WEB] /' &
 
 cd "$PROJECT_ROOT"

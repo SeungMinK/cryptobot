@@ -206,6 +206,28 @@ CREATE TABLE IF NOT EXISTS llm_decisions (
     FOREIGN KEY (input_market_snapshot_id) REFERENCES market_snapshots(id)
 );
 
+CREATE TABLE IF NOT EXISTS news_articles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT,
+    url TEXT,
+    published_at DATETIME,
+    collected_at DATETIME NOT NULL,
+    category TEXT,
+    coins_mentioned TEXT,
+    sentiment_keyword TEXT,
+    is_processed BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS fear_greed_index (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME NOT NULL,
+    value INTEGER NOT NULL,
+    classification TEXT,
+    collected_at DATETIME NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS bot_config (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,

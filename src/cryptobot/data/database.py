@@ -66,9 +66,7 @@ CREATE TABLE IF NOT EXISTS trade_signals (
     trade_id INTEGER,
     skip_reason TEXT,
     snapshot_id INTEGER,
-    strategy_params_json TEXT,
-    FOREIGN KEY (trade_id) REFERENCES trades(id),
-    FOREIGN KEY (snapshot_id) REFERENCES market_snapshots(id)
+    strategy_params_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS trades (
@@ -542,7 +540,7 @@ class Database:
             self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
             self._conn.row_factory = sqlite3.Row  # dict처럼 접근 가능
             self._conn.execute("PRAGMA journal_mode=WAL")  # 동시 읽기 성능 향상
-            self._conn.execute("PRAGMA foreign_keys=ON")
+            self._conn.execute("PRAGMA foreign_keys=OFF")
         return self._conn
 
     def initialize(self) -> None:

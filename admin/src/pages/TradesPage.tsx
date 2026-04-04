@@ -96,25 +96,18 @@ export default function TradesPage() {
       {/* Stats */}
       {stats && (
         <div className="kpi-grid">
-          <StatCard label="총 거래" value={stats.total_trades.toString()} sub={`${stats.period_days}일`} />
-          <StatCard label="승률" value={formatPercent(stats.win_rate).replace("+", "")} valueClass={stats.win_rate >= 50 ? "positive" : "negative"} />
+          <StatCard label="총 거래" value={stats.total_trades.toString()} sub={`매수 ${stats.buys} / 매도 ${stats.sells}`} />
+          <StatCard label="승률" value={formatPercent(stats.win_rate).replace("+", "")} valueClass={stats.win_rate >= 50 ? "positive" : "negative"} sub={`승 ${stats.wins} / 패 ${stats.losses}`} />
           <StatCard
-            label="실현 수익"
+            label="매도 수익 합계"
             value={formatKRW(stats.total_profit_krw)}
             valueClass={stats.total_profit_krw >= 0 ? "positive" : "negative"}
-            sub="매도 완료 건"
+            sub="매도 완료 건 (수수료 포함)"
           />
           <StatCard
-            label="미실현 손익"
-            value={formatKRW((stats as any).unrealized_profit_krw || 0)}
-            valueClass={((stats as any).unrealized_profit_krw || 0) >= 0 ? "positive" : "negative"}
-            sub="보유 중"
-          />
-          <StatCard
-            label="총 손익"
-            value={formatKRW((stats as any).total_pnl_krw || stats.total_profit_krw)}
-            valueClass={((stats as any).total_pnl_krw || stats.total_profit_krw) >= 0 ? "positive" : "negative"}
-            sub="실현 + 미실현"
+            label="총 수수료"
+            value={formatKRW(stats.total_fees)}
+            sub="매수+매도 수수료 합계"
           />
         </div>
       )}

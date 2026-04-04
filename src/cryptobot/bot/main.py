@@ -64,8 +64,10 @@ class CryptoBot:
         self._risk = RiskManager(self._db)
 
         # 멀티코인: 코인별 collector 관리
+        # BTC, ETH, XRP는 항상 모니터링
+        self._core_coins = ["KRW-BTC", "KRW-ETH", "KRW-XRP"]
         self._collectors: dict[str, DataCollector] = {}
-        self._active_coins: list[str] = [config.bot.coin]  # 기본: BTC만
+        self._active_coins: list[str] = list(self._core_coins)
         self._last_coin_refresh: str = ""
         self._init_collectors()
 
@@ -100,7 +102,7 @@ class CryptoBot:
             return
 
         if not self._get_config_bool("multi_coin_enabled", True):
-            self._active_coins = [config.bot.coin]
+            self._active_coins = list(self._core_coins)
             self._init_collectors()
             return
 
@@ -119,9 +121,10 @@ class CryptoBot:
 
             if top_coins:
                 new_coins = [c["ticker"] for c in top_coins]
-                # BTC는 항상 포함
-                if config.bot.coin not in new_coins:
-                    new_coins.insert(0, config.bot.coin)
+                # 코어 코인(BTC, ETH, XRP)은 항상 포함
+                for core in reversed(self._core_coins):
+                    if core not in new_coins:
+                        new_coins.insert(0, core)
 
                 if set(new_coins) != set(self._active_coins):
                     logger.info("코인 목록 갱신: %s → %s", self._active_coins, new_coins)

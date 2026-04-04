@@ -4,14 +4,20 @@ import { getBalance, getPositions, getBalanceHistory } from "../api/balance";
 import client from "../api/client";
 import { getCurrentMarket } from "../api/market";
 import { getTrades } from "../api/trades";
-import { getActiveStrategies } from "../api/strategies";
 import type { BalanceResponse, PositionsResponse, BalanceHistory } from "../types/balance";
 import type { MarketSnapshot } from "../types/market";
 import type { Trade } from "../types/trades";
-import type { Strategy } from "../types/strategies";
 import StatCard from "../components/StatCard";
 import { formatKRW, formatPercent, formatNumber, formatDateTime } from "../utils/format";
 import { getMarketStateKR } from "../utils/indicatorDescriptions";
+
+interface LLMDecision {
+  id: number;
+  timestamp: string;
+  output_market_state: string;
+  output_reasoning: string;
+  cost_usd: number;
+}
 
 export default function DashboardPage() {
   const [balance, setBalance] = useState<BalanceResponse | null>(null);
@@ -19,8 +25,10 @@ export default function DashboardPage() {
   const [history, setHistory] = useState<BalanceHistory[]>([]);
   const [market, setMarket] = useState<MarketSnapshot | null>(null);
   const [recentTrades, setRecentTrades] = useState<Trade[]>([]);
-  const [activeStrategies, setActiveStrategies] = useState<Strategy[]>([]);
   const [monitoredCoins, setMonitoredCoins] = useState<any[]>([]);
+  const [newsStats, setNewsStats] = useState<any>(null);
+  const [llmDecisions, setLlmDecisions] = useState<LLMDecision[]>([]);
+  const [llmTab, setLlmTab] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(() => {
@@ -29,31 +37,33 @@ export default function DashboardPage() {
       getPositions().catch(() => null),
       getBalanceHistory(30).catch(() => []),
       getCurrentMarket().catch(() => null),
-      getTrades({ limit: 5 }).catch(() => ({ items: [] })),
-      getActiveStrategies().catch(() => []),
+      getTrades({ limit: 10 }).catch(() => ({ items: [] })),
       client.get("/market/coins").then((r) => r.data).catch(() => []),
-    ]).then(([bal, pos, hist, mkt, trades, strats, coins]) => {
+      client.get("/news/stats", { params: { hours: 24 } }).then((r) => r.data).catch(() => null),
+      client.get("/api/llm/decisions?limit=4").then((r) => r.data).catch(() => []),
+    ]).then(([bal, pos, hist, mkt, trades, coins, nStats, llm]) => {
       setBalance(bal);
       setPositions(pos as PositionsResponse | null);
       setHistory(hist as BalanceHistory[]);
       setMarket(mkt as MarketSnapshot | null);
       setRecentTrades((trades as { items: Trade[] }).items);
-      setActiveStrategies(strats as Strategy[]);
       setMonitoredCoins(coins as any[]);
+      setNewsStats(nStats);
+      setLlmDecisions(llm as LLMDecision[]);
       setLoading(false);
     });
   }, []);
 
   useEffect(() => {
     fetchAll();
-    const interval = setInterval(fetchAll, 60000); // 60초 자동 갱신
+    const interval = setInterval(fetchAll, 60000);
     return () => clearInterval(interval);
   }, [fetchAll]);
-
 
   if (loading) return <div className="loading">로딩 중...</div>;
 
   const marketState = market && "market_state" in market ? market.market_state : null;
+  const fg = newsStats?.fear_greed;
 
   return (
     <div>
@@ -62,13 +72,7 @@ export default function DashboardPage() {
           <h1>대시보드</h1>
           <p>전체 현황 요약 (60초 자동 갱신)</p>
         </div>
-        <button
-          onClick={fetchAll}
-          style={{
-            padding: "8px 16px", borderRadius: 8, border: "none",
-            background: "#4a9eff", color: "#fff", cursor: "pointer", fontSize: 13,
-          }}
-        >
+        <button onClick={fetchAll} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#4a9eff", color: "#fff", cursor: "pointer", fontSize: 13 }}>
           새로고침
         </button>
       </div>
@@ -79,158 +83,99 @@ export default function DashboardPage() {
         const totalCost = pos.reduce((s: number, p: any) => s + (p.total_krw || 0), 0);
         const totalValue = pos.reduce((s: number, p: any) => s + (p.amount || 0) * (p.current_price || 0), 0);
         const totalAsset = (balance?.krw_balance || 0) + totalValue;
-        const STARTING_BALANCE = 100000; // TODO: bot_config에서 가져오기
+        const STARTING_BALANCE = 100000;
         const totalPnl = totalAsset - STARTING_BALANCE;
         return (
           <div className="kpi-grid">
-            <StatCard
-              label="총 보유 자산"
-              value={balance ? formatKRW(totalAsset) : "-"}
-              sub={`KRW ${formatKRW(balance?.krw_balance || 0)} + 코인 ${formatKRW(totalValue)}`}
-            />
-            <StatCard
-              label="총 손익"
-              value={formatKRW(totalPnl)}
-              valueClass={totalPnl >= 0 ? "positive" : "negative"}
-              sub={`시작 ₩${STARTING_BALANCE.toLocaleString()} 기준`}
-            />
-            <StatCard
-              label="매수 금액"
-              value={formatKRW(totalCost)}
-              sub={`${pos.length}종목 보유`}
-            />
-            <StatCard
-              label="평가 금액"
-              value={formatKRW(totalValue)}
-              valueClass={totalValue >= totalCost ? "positive" : "negative"}
-              sub={totalCost > 0 ? `${formatPercent((totalValue - totalCost) / totalCost * 100)} 수익률` : ""}
-            />
+            <StatCard label="총 보유 자산" value={balance ? formatKRW(totalAsset) : "-"} sub={`KRW ${formatKRW(balance?.krw_balance || 0)} + 코인 ${formatKRW(totalValue)}`} />
+            <StatCard label="총 손익" value={formatKRW(totalPnl)} valueClass={totalPnl >= 0 ? "positive" : "negative"} sub={`시작 ₩${STARTING_BALANCE.toLocaleString()} 기준`} />
+            <StatCard label="매수 금액" value={formatKRW(totalCost)} sub={`${pos.length}종목 보유`} />
+            <StatCard label="평가 금액" value={formatKRW(totalValue)} valueClass={totalValue >= totalCost ? "positive" : "negative"} sub={totalCost > 0 ? `${formatPercent((totalValue - totalCost) / totalCost * 100)} 수익률` : ""} />
           </div>
         );
       })()}
 
+      {/* 시장 현황 (넓게) + 최근 매매 */}
       <div className="grid-2">
-        {/* Position Card */}
-        <div className="card">
-          <div className="card-title">현재 포지션</div>
-          {positions?.has_position && (positions as any).positions?.length > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {((positions as any).positions || []).map((p: any) => (
-                <div key={p.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontWeight: 600 }}>{p.coin?.replace("KRW-", "")}</span>
-                      {p.strategy && <span className="badge badge-purple" style={{ fontSize: 10 }}>{p.strategy}</span>}
-                    </div>
-                    <span className={p.unrealized_pnl_pct >= 0 ? "positive" : "negative"} style={{ fontWeight: 600 }}>
-                      {formatPercent(p.unrealized_pnl_pct)} ({formatKRW(p.unrealized_pnl_krw)})
-                    </span>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 12 }}>
-                    <div><span style={{ color: "var(--text-muted)" }}>투자 </span>{formatKRW(p.total_krw)}</div>
-                    <div><span style={{ color: "var(--text-muted)" }}>현재 </span>{formatKRW(p.amount * p.current_price)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">보유 포지션 없음</div>
-          )}
-        </div>
-
-        {/* Market Status */}
-        <div className="card">
+        {/* 시장 현황 — 넓게 */}
+        <div className="card" style={{ gridColumn: market && !recentTrades.length ? "1 / -1" : undefined }}>
           <div className="card-title">시장 현황</div>
-          {market && marketState ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
             <div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>BTC 가격</div>
-                  <div style={{ fontSize: 18, fontWeight: 600 }}>{formatKRW(market.price)}</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>BTC</div>
+              <div style={{ fontSize: 18, fontWeight: 600 }}>{market ? formatKRW(market.price) : "-"}</div>
+              {market && (
+                <div className={market.change_pct_24h >= 0 ? "positive" : "negative"} style={{ fontSize: 12 }}>
+                  {formatPercent(market.change_pct_24h)} (24h)
                 </div>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>24h 변동</div>
-                  <div className={market.change_pct_24h >= 0 ? "positive" : "negative"} style={{ fontSize: 18, fontWeight: 600 }}>
-                    {formatPercent(market.change_pct_24h)}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>RSI (14)</div>
-                  <div>{market.rsi_14?.toFixed(1) ?? "-"}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>시장 상태</div>
-                  <span className={`badge ${marketState === "bullish" ? "badge-green" : marketState === "bearish" ? "badge-red" : "badge-yellow"}`}>
-                    {getMarketStateKR(marketState)}
-                  </span>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>변동성</div>
-                  <span className={`badge ${market.volatility_level === "high" ? "badge-red" : market.volatility_level === "medium" ? "badge-yellow" : "badge-green"}`}>
-                    {market.volatility_level}
-                  </span>
-                </div>
+              )}
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>공포/탐욕</div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: fg && fg.value <= 25 ? "#ef4444" : fg && fg.value >= 75 ? "#22c55e" : "var(--text-primary)" }}>
+                {fg ? fg.value : "-"}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                {fg ? (fg.classification === "Extreme Fear" ? "극도 공포" : fg.classification === "Fear" ? "공포" : fg.classification === "Neutral" ? "중립" : fg.classification === "Greed" ? "탐욕" : "극도 탐욕") : ""}
               </div>
             </div>
-          ) : (
-            <div className="empty-state">시장 데이터 없음</div>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>시장 심리</div>
+              {newsStats && (
+                <>
+                  <div style={{ fontSize: 14, fontWeight: 600 }} className={newsStats.negative > newsStats.positive ? "negative" : newsStats.positive > newsStats.negative ? "positive" : ""}>
+                    {newsStats.negative > newsStats.positive ? "부정적" : newsStats.positive > newsStats.negative ? "긍정적" : "중립"}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    긍정 {newsStats.positive} / 부정 {newsStats.negative}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* LLM 시장 요약 */}
+          {llmDecisions.length > 0 && (
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>AI 시장 분석</div>
+                <div style={{ display: "flex", gap: 2 }}>
+                  {llmDecisions.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setLlmTab(i)}
+                      style={{
+                        width: 24, height: 24, borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11,
+                        background: llmTab === i ? "#4a9eff" : "#2a2d3e",
+                        color: llmTab === i ? "#fff" : "#8b8fa3",
+                      }}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {(() => {
+                const d = llmDecisions[llmTab];
+                if (!d) return null;
+                const parts = (d.output_reasoning || "").split("\n\n");
+                const summary = parts[0] || "";
+                const reasoning = parts[1] || "";
+                return (
+                  <div>
+                    <div style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 8 }}>{summary}</div>
+                    {reasoning && <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>{reasoning}</div>}
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 6 }}>
+                      {formatDateTime(d.timestamp)} · {getMarketStateKR(d.output_market_state || "")} · ${d.cost_usd?.toFixed(4) || "0"}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           )}
         </div>
-      </div>
 
-      {/* 모니터링 코인 종합 현황 */}
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div className="card-title">모니터링 코인 현황</div>
-        {monitoredCoins.length > 0 ? (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>코인</th>
-                  <th>현재가</th>
-                  <th>전략</th>
-                  <th>최근 신호</th>
-                  <th>시장</th>
-                  <th>보유</th>
-                  <th>미실현 손익</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monitoredCoins.map((c: any) => (
-                  <tr key={c.coin}>
-                    <td style={{ fontWeight: 600 }}>{c.coin?.replace("KRW-", "")}</td>
-                    <td>{formatKRW(c.current_price || 0)}</td>
-                    <td><span className="badge badge-purple">{c.strategy}</span></td>
-                    <td>
-                      <span className={`badge ${c.signal_type === "buy" ? "badge-green" : c.signal_type === "sell" ? "badge-red" : "badge-yellow"}`}>
-                        {c.signal_type === "buy" ? "매수" : c.signal_type === "sell" ? "매도" : "HOLD"}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`badge ${c.market_state === "bullish" ? "badge-green" : c.market_state === "bearish" ? "badge-red" : "badge-yellow"}`}>
-                        {getMarketStateKR(c.market_state || "")}
-                      </span>
-                    </td>
-                    <td>
-                      {c.holding ? (
-                        <span className="badge badge-green">보유중</span>
-                      ) : "-"}
-                    </td>
-                    <td className={c.unrealized_pnl_pct > 0 ? "positive" : c.unrealized_pnl_pct < 0 ? "negative" : ""}>
-                      {c.holding ? formatPercent(c.unrealized_pnl_pct || 0) : "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty-state">모니터링 중인 코인 없음 (봇 실행 후 표시)</div>
-        )}
-      </div>
-
-      <div className="grid-2">
-        {/* Recent Trades */}
+        {/* 최근 매매 */}
         <div className="card">
           <div className="card-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span>최근 매매</span>
@@ -250,14 +195,14 @@ export default function DashboardPage() {
                 <tbody>
                   {recentTrades.map((t) => (
                     <tr key={t.id}>
-                      <td style={{ fontSize: 12 }}>{formatDateTime(t.timestamp)}</td>
-                      <td>{t.coin}</td>
+                      <td style={{ fontSize: 11 }}>{formatDateTime(t.timestamp)}</td>
+                      <td>{t.coin?.replace("KRW-", "")}</td>
                       <td>
                         <span className={`badge ${t.side === "buy" ? "badge-green" : "badge-red"}`}>
                           {t.side === "buy" ? "매수" : "매도"}
                         </span>
                       </td>
-                      <td>{formatKRW(t.total_krw)}</td>
+                      <td style={{ fontSize: 12 }}>{formatKRW(t.total_krw)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -268,6 +213,75 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* 현재 포지션 */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-title">현재 포지션</div>
+        {positions?.has_position && (positions as any).positions?.length > 0 ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: 12 }}>
+            {((positions as any).positions || []).map((p: any) => (
+              <div key={p.id} style={{ padding: 12, borderRadius: 8, background: "var(--bg-secondary)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontWeight: 600, fontSize: 15 }}>{p.coin?.replace("KRW-", "")}</span>
+                    {p.strategy && <span className="badge badge-purple" style={{ fontSize: 9 }}>{p.strategy}</span>}
+                  </div>
+                  <span className={p.unrealized_pnl_pct >= 0 ? "positive" : "negative"} style={{ fontWeight: 600 }}>
+                    {formatPercent(p.unrealized_pnl_pct)}
+                  </span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 12 }}>
+                  <div><span style={{ color: "var(--text-muted)" }}>투자 </span>{formatKRW(p.total_krw)}</div>
+                  <div><span style={{ color: "var(--text-muted)" }}>현재 </span>{formatKRW(p.amount * p.current_price)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">보유 포지션 없음</div>
+        )}
+      </div>
+
+      {/* 모니터링 코인 현황 (맨 아래) */}
+      {monitoredCoins.length > 0 && (
+        <div className="card">
+          <div className="card-title">모니터링 코인 현황</div>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>코인</th>
+                  <th>현재가</th>
+                  <th>전략</th>
+                  <th>최근 신호</th>
+                  <th>시장</th>
+                  <th>보유</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monitoredCoins.map((c: any) => (
+                  <tr key={c.coin}>
+                    <td style={{ fontWeight: 600 }}>{c.coin?.replace("KRW-", "")}</td>
+                    <td>{formatKRW(c.current_price || 0)}</td>
+                    <td><span className="badge badge-purple" style={{ fontSize: 10 }}>{c.strategy}</span></td>
+                    <td>
+                      <span className={`badge ${c.signal_type === "buy" ? "badge-green" : c.signal_type === "sell" ? "badge-red" : "badge-yellow"}`}>
+                        {c.signal_type === "buy" ? "매수" : c.signal_type === "sell" ? "매도" : "HOLD"}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`badge ${c.market_state === "bullish" ? "badge-green" : c.market_state === "bearish" ? "badge-red" : "badge-yellow"}`}>
+                        {getMarketStateKR(c.market_state || "")}
+                      </span>
+                    </td>
+                    <td>{c.holding ? <span className="badge badge-green">보유중</span> : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

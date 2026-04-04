@@ -48,6 +48,19 @@ app.include_router(news.router)
 app.include_router(coin_strategy.router)
 
 
+from cryptobot.api.auth import UserResponse, get_current_user
+from cryptobot.api.deps import get_db as _get_db
+from fastapi import Query as _Query, Depends as _Depends
+
+
+@app.get("/api/llm/decisions", tags=["llm"])
+def get_llm_decisions(limit: int = _Query(4, ge=1, le=50), _: UserResponse = _Depends(get_current_user)):
+    """LLM 분석 이력."""
+    db = _get_db()
+    rows = db.execute("SELECT * FROM llm_decisions ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    return [dict(r) for r in rows]
+
+
 @app.get("/api/health", tags=["system"])
 def health_check():
     """헬스체크. 서버가 살아있는지 확인."""

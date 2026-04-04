@@ -190,19 +190,23 @@ export default function DashboardPage() {
                     <th>종목</th>
                     <th>방향</th>
                     <th>금액</th>
+                    <th>사유</th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentTrades.map((t) => (
                     <tr key={t.id}>
-                      <td style={{ fontSize: 11 }}>{formatDateTime(t.timestamp)}</td>
-                      <td>{t.coin?.replace("KRW-", "")}</td>
+                      <td style={{ fontSize: 10 }}>{t.timestamp?.slice(5, 16)}</td>
+                      <td style={{ fontSize: 12 }}>{t.coin?.replace("KRW-", "")}</td>
                       <td>
-                        <span className={`badge ${t.side === "buy" ? "badge-green" : "badge-red"}`}>
+                        <span className={`badge ${t.side === "buy" ? "badge-green" : "badge-red"}`} style={{ fontSize: 10 }}>
                           {t.side === "buy" ? "매수" : "매도"}
                         </span>
                       </td>
-                      <td style={{ fontSize: 12 }}>{formatKRW(t.total_krw)}</td>
+                      <td style={{ fontSize: 11 }}>{formatKRW(t.total_krw)}</td>
+                      <td style={{ fontSize: 10, color: "var(--text-muted)", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {t.trigger_reason || "-"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

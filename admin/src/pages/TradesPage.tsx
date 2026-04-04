@@ -159,7 +159,7 @@ export default function TradesPage() {
                     <th>전략</th>
                     <th>신뢰도</th>
                     <th>수익률</th>
-                    <th>수익금</th>
+                    <th>순수익</th>
                   </tr>
                 </thead>
                 <tbody>

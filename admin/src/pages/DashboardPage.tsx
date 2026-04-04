@@ -266,8 +266,6 @@ export default function DashboardPage() {
             <div className="empty-state">매매 내역 없음</div>
           )}
         </div>
-
-        </div>
       </div>
     </div>
   );

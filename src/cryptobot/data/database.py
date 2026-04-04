@@ -457,11 +457,11 @@ _DEFAULT_BOT_CONFIG = [
     },
     {
         "key": "min_volume_krw",
-        "value": "10000000000",
+        "value": "1000000000",
         "value_type": "float",
         "category": "coin",
         "display_name": "최소 거래대금 (원)",
-        "description": "24시간 거래대금이 이 값 이상인 코인만 선별. 기본 100억원.",
+        "description": "24시간 거래대금이 이 값 이상인 코인만 선별. 기본 10억원.",
     },
     {
         "key": "min_price_krw",

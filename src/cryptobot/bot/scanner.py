@@ -19,6 +19,12 @@ class CoinScanner:
     거래량/변동성 기준으로 유망 종목을 선별한다.
     """
 
+    # 스테이블코인 + 매매 부적합 종목 제외
+    EXCLUDED_COINS = {
+        "KRW-USDT", "KRW-USDC", "KRW-DAI", "KRW-BUSD",
+        "KRW-TUSD", "KRW-PAXG",
+    }
+
     def __init__(
         self,
         min_volume_krw: float = 10_000_000_000,  # 최소 24시간 거래대금 100억
@@ -61,6 +67,9 @@ class CoinScanner:
 
             results = []
             for ticker in tickers:
+                if ticker in self.EXCLUDED_COINS:
+                    continue
+
                 price = all_prices.get(ticker, 0)
                 if price < self._min_price_krw:
                     continue

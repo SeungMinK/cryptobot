@@ -53,6 +53,13 @@ from cryptobot.api.deps import get_db as _get_db
 from fastapi import Query as _Query, Depends as _Depends
 
 
+@app.get("/api/llm/hard-limits", tags=["llm"])
+def get_hard_limits(_: UserResponse = _Depends(get_current_user)):
+    """LLM 하드 리밋 조회 (읽기 전용)."""
+    from cryptobot.llm.analyzer import HARD_LIMITS
+    return {k: {"min": v[0], "max": v[1]} for k, v in HARD_LIMITS.items()}
+
+
 @app.get("/api/llm/decisions", tags=["llm"])
 def get_llm_decisions(limit: int = _Query(4, ge=1, le=50), _: UserResponse = _Depends(get_current_user)):
     """LLM 분석 이력."""

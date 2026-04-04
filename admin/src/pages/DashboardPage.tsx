@@ -40,7 +40,7 @@ export default function DashboardPage() {
       getTrades({ limit: 10 }).catch(() => ({ items: [] })),
       client.get("/market/coins").then((r) => r.data).catch(() => []),
       client.get("/news/stats", { params: { hours: 24 } }).then((r) => r.data).catch(() => null),
-      client.get("/api/llm/decisions?limit=4").then((r) => r.data).catch(() => []),
+      client.get("/llm/decisions?limit=4").then((r) => r.data).catch(() => []),
     ]).then(([bal, pos, hist, mkt, trades, coins, nStats, llm]) => {
       setBalance(bal);
       setPositions(pos as PositionsResponse | null);

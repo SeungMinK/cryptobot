@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { getAllConfig, updateConfig } from "../api/config";
 import type { ConfigItem } from "../api/config";
+import client from "../api/client";
 
 const CATEGORY_LABELS: Record<string, string> = {
   coin: "코인 선별",
@@ -12,15 +13,32 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_ORDER = ["coin", "bot", "risk", "notification"];
 
+const LIMIT_LABELS: Record<string, string> = {
+  stop_loss_pct: "손절률 (%)",
+  trailing_stop_pct: "트레일링 스탑 (%)",
+  max_position_per_coin_pct: "종목당 최대 포지션 (%)",
+  max_coins: "동시 모니터링 코인 수",
+  min_balance_pct: "최소 유지 잔고 (원금 대비 %)",
+  k_value: "K 값 (변동성 돌파)",
+  bb_std: "볼린저 밴드 폭",
+  rsi_oversold: "RSI 과매도 기준",
+  aggression: "공격성",
+};
+
 export default function ConfigPage() {
   const [configs, setConfigs] = useState<ConfigItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const [hardLimits, setHardLimits] = useState<Record<string, { min: number; max: number }>>({});
   const loadConfigs = useCallback(async () => {
     try {
-      const data = await getAllConfig();
+      const [data, limits] = await Promise.all([
+        getAllConfig(),
+        client.get("/llm/hard-limits").then((r) => r.data).catch(() => ({})),
+      ]);
       setConfigs(data);
+      setHardLimits(limits);
       const values: Record<string, string> = {};
       data.forEach((c) => (values[c.key] = c.value));
       setEditValues(values);
@@ -165,6 +183,23 @@ export default function ConfigPage() {
           </div>
         </div>
 
+        {/* risk 카테고리 아래 하드 리밋 */}
+        {category === "risk" && Object.keys(hardLimits).length > 0 && (
+          <div className="card" style={{ marginTop: 12, marginBottom: 0 }}>
+            <div className="card-title">LLM 하드 리밋 (읽기 전용)</div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
+              LLM이 파라미터를 조절할 수 있는 최소/최대 범위. 코드에서 고정됨.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {Object.entries(hardLimits).map(([key, { min, max }]) => (
+                <div key={key} style={{ padding: "8px 12px", borderRadius: 6, background: "var(--bg-secondary)" }}>
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>{LIMIT_LABELS[key] || key}</div>
+                  <div style={{ fontSize: 14, color: "#4a9eff" }}>{min} ~ {max}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         </div>
       ))}
     </div>

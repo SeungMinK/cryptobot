@@ -43,8 +43,8 @@ export default function LLMPage() {
   const fetchData = useCallback(async () => {
     try {
       const [dec, prm] = await Promise.all([
-        client.get("/api/llm/decisions?limit=20").then((r) => r.data),
-        client.get("/api/llm/prompts").then((r) => r.data),
+        client.get("/llm/decisions?limit=20").then((r) => r.data),
+        client.get("/llm/prompts").then((r) => r.data),
       ]);
       setDecisions(dec);
       setPrompts(prm);
@@ -180,7 +180,7 @@ export default function LLMPage() {
                     <td>
                       <button
                         onClick={async () => {
-                          const res = await client.get(`/api/llm/prompts/${p.id}`);
+                          const res = await client.get(`/llm/prompts/${p.id}`);
                           setSelectedPrompt(p);
                           setPromptText(res.data.prompt_text);
                         }}

@@ -467,43 +467,117 @@ class LLMAnalyzer:
         win_rate = (r["wins"] or 0) / r["total"] * 100 if r["total"] > 0 else 0
         return f"24시간: {r['total']}건 (승률 {win_rate:.0f}%, 손익 {r['total_pnl'] or 0:+,.0f}원)"
 
+    # 필수 응답 필드
+    REQUIRED_FIELDS = ["market_summary_kr", "market_state", "recommended_strategy"]
+    MAX_RETRIES = 2
+
     def _call_claude(self, prompt: str) -> dict | None:
-        """Claude API 호출."""
+        """Claude API 호출 (최대 2회 재시도 + 응답 검증)."""
         import anthropic
+        import time as _time
 
-        try:
-            client = anthropic.Anthropic(api_key=self._api_key)
-            response = client.messages.create(
-                model=self._model,
-                max_tokens=1024,
-                messages=[{"role": "user", "content": prompt}],
-            )
+        total_input = 0
+        total_output = 0
 
-            content = response.content[0].text.strip()
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            try:
+                client = anthropic.Anthropic(api_key=self._api_key)
+                response = client.messages.create(
+                    model=self._model,
+                    max_tokens=1024,
+                    messages=[{"role": "user", "content": prompt}],
+                )
 
-            # JSON 파싱 (```json ... ``` 형태도 처리)
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0].strip()
+                total_input += response.usage.input_tokens
+                total_output += response.usage.output_tokens
 
-            result = json.loads(content)
+                content = response.content[0].text.strip()
 
-            # 토큰 사용량 기록
-            result["_input_tokens"] = response.usage.input_tokens
-            result["_output_tokens"] = response.usage.output_tokens
-            result["_model"] = self._model
+                # JSON 파싱
+                if "```json" in content:
+                    content = content.split("```json")[1].split("```")[0].strip()
+                elif "```" in content:
+                    content = content.split("```")[1].split("```")[0].strip()
 
-            logger.info(
-                "Claude 응답: %d input + %d output 토큰",
-                response.usage.input_tokens,
-                response.usage.output_tokens,
-            )
-            return result
+                result = json.loads(content)
 
-        except Exception as e:
-            logger.error("Claude API 호출 실패: %s", e)
-            return None
+                # 필수 필드 검증
+                missing = [f for f in self.REQUIRED_FIELDS if f not in result]
+                if missing:
+                    logger.warning("LLM 응답 필수 필드 누락 (시도 %d/%d): %s", attempt, self.MAX_RETRIES, missing)
+                    if attempt < self.MAX_RETRIES:
+                        _time.sleep(2)
+                        continue
+                    # 마지막 시도 — 누락 필드에 기본값 채우기
+                    result = self._fill_defaults(result)
+
+                # 파라미터 누락 시 과거 값으로 채우기
+                result["recommended_params"] = self._fill_param_defaults(
+                    result.get("recommended_params", {})
+                )
+
+                result["_input_tokens"] = total_input
+                result["_output_tokens"] = total_output
+                result["_model"] = self._model
+
+                logger.info(
+                    "Claude 응답 (시도 %d): %d input + %d output 토큰",
+                    attempt, total_input, total_output,
+                )
+                return result
+
+            except json.JSONDecodeError as e:
+                logger.warning("LLM JSON 파싱 실패 (시도 %d/%d): %s", attempt, self.MAX_RETRIES, e)
+                if attempt < self.MAX_RETRIES:
+                    _time.sleep(2)
+                    continue
+
+            except Exception as e:
+                logger.error("Claude API 호출 실패 (시도 %d/%d): %s", attempt, self.MAX_RETRIES, e)
+                if attempt < self.MAX_RETRIES:
+                    _time.sleep(3)
+                    continue
+
+        logger.error("LLM 분석 최종 실패 (%d회 시도) — 과거 데이터 유지", self.MAX_RETRIES)
+        return None
+
+    def _fill_defaults(self, result: dict) -> dict:
+        """필수 필드 누락 시 기본값 채우기."""
+        defaults = {
+            "market_summary_kr": "LLM 응답 불완전 — 기존 설정 유지",
+            "market_state": "sideways",
+            "confidence": 0.5,
+            "aggression": 0.3,
+            "should_alert_stop": False,
+            "recommended_strategy": "bb_rsi_combined",
+            "reasoning": "LLM 응답 불완전으로 보수적 기본값 적용",
+        }
+        for key, default in defaults.items():
+            if key not in result:
+                result[key] = default
+                logger.warning("기본값 적용: %s = %s", key, default)
+        return result
+
+    def _fill_param_defaults(self, params: dict) -> dict:
+        """파라미터 누락 시 현재 bot_config에서 가져와 채우기."""
+        param_keys = {
+            "stop_loss_pct": "stop_loss_pct",
+            "trailing_stop_pct": "trailing_stop_pct",
+            "k_value": "k_value",
+            "max_position_per_coin_pct": "max_position_per_coin_pct",
+            "max_coins": "max_coins",
+        }
+        for param_key, config_key in param_keys.items():
+            if param_key not in params:
+                row = self._db.execute(
+                    "SELECT value FROM bot_config WHERE key = ?", (config_key,)
+                ).fetchone()
+                if row:
+                    try:
+                        params[param_key] = float(dict(row)["value"])
+                    except (ValueError, TypeError):
+                        pass
+        return params
 
     def _save_decision(self, result: dict) -> None:
         """분석 결과를 llm_decisions 테이블에 저장."""

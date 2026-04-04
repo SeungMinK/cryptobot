@@ -361,7 +361,7 @@ _DEFAULT_BOT_CONFIG = [
     },
     {
         "key": "tick_interval_seconds",
-        "value": "10",
+        "value": "30",
         "value_type": "int",
         "category": "bot",
         "display_name": "판단 주기 (초)",

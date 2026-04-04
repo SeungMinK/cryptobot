@@ -94,14 +94,15 @@ class CryptoBot:
         self._safety_check()
 
         # 스케줄 등록
-        self._scheduler.add_job(self._tick, "interval", seconds=10, id="main_tick")
+        self._tick_interval = int(self._get_config("tick_interval_seconds", "30"))
+        self._scheduler.add_job(self._tick, "interval", seconds=self._tick_interval, id="main_tick")
         self._scheduler.add_job(self._daily_report, "cron", hour=0, minute=0, id="daily_report")
 
         # Graceful shutdown
         signal.signal(signal.SIGINT, self._shutdown)
         signal.signal(signal.SIGTERM, self._shutdown)
 
-        logger.info("스케줄러 시작 (10초 간격)")
+        logger.info("스케줄러 시작 (%d초 간격)", self._tick_interval)
         try:
             self._scheduler.start()
         except (KeyboardInterrupt, SystemExit):
@@ -439,6 +440,13 @@ class CryptoBot:
 
         # 리스크 매니저 한도 실시간 반영
         self._risk.limits.max_daily_trades = int(self._get_config("max_daily_trades", "10"))
+
+        # 틱 간격 변경 감지
+        new_interval = int(self._get_config("tick_interval_seconds", "30"))
+        if new_interval != self._tick_interval:
+            self._scheduler.reschedule_job("main_tick", trigger="interval", seconds=new_interval)
+            logger.info("틱 간격 변경: %d초 → %d초", self._tick_interval, new_interval)
+            self._tick_interval = new_interval
         self._risk.limits.max_daily_loss_pct = float(self._get_config("max_daily_loss_pct", "-10.0"))
         self._risk.limits.max_consecutive_losses = int(self._get_config("max_consecutive_losses", "3"))
 

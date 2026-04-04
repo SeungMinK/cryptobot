@@ -27,6 +27,9 @@ export default function Layout() {
           <NavLink to="/profit" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
             수익률 분석
           </NavLink>
+          <NavLink to="/llm" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
+            LLM 관리
+          </NavLink>
           <NavLink to="/config" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
             설정
           </NavLink>

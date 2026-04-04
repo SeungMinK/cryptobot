@@ -61,6 +61,24 @@ def get_llm_decisions(limit: int = _Query(4, ge=1, le=50), _: UserResponse = _De
     return [dict(r) for r in rows]
 
 
+@app.get("/api/llm/prompts", tags=["llm"])
+def get_llm_prompts(_: UserResponse = _Depends(get_current_user)):
+    """프롬프트 버전 목록."""
+    db = _get_db()
+    rows = db.execute("SELECT id, version, description, is_active, created_at, activated_at FROM prompt_versions ORDER BY id DESC").fetchall()
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/llm/prompts/{prompt_id}", tags=["llm"])
+def get_llm_prompt_detail(prompt_id: int, _: UserResponse = _Depends(get_current_user)):
+    """프롬프트 상세 (전문 포함)."""
+    db = _get_db()
+    row = db.execute("SELECT * FROM prompt_versions WHERE id = ?", (prompt_id,)).fetchone()
+    if row is None:
+        return {"detail": "프롬프트 없음"}
+    return dict(row)
+
+
 @app.get("/api/health", tags=["system"])
 def health_check():
     """헬스체크. 서버가 살아있는지 확인."""

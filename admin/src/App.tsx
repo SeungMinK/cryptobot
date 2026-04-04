@@ -9,6 +9,7 @@ import StrategiesPage from "./pages/StrategiesPage";
 import ProfitAnalysisPage from "./pages/ProfitAnalysisPage";
 import ConfigPage from "./pages/ConfigPage";
 import SignalsPage from "./pages/SignalsPage";
+import LLMPage from "./pages/LLMPage";
 import NewsPage from "./pages/NewsPage";
 
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/profit" element={<ProfitAnalysisPage />} />
             <Route path="/signals" element={<SignalsPage />} />
             <Route path="/news" element={<NewsPage />} />
+            <Route path="/llm" element={<LLMPage />} />
             <Route path="/config" element={<ConfigPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

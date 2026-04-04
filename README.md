@@ -145,7 +145,7 @@ make start
 | `make api` | API 서버 (localhost:8000) |
 | `make web` | Admin (localhost:5173) |
 | `make news` | 뉴스 수집기 |
-| `make test` | 테스트 (90건) |
+| `make test` | 테스트 (101건) |
 
 ---
 
@@ -161,7 +161,7 @@ make start
 | Frontend | React 18 + TypeScript + Vite |
 | News | RSS + Fear & Greed API |
 | Notification | Slack Bot Token |
-| Tests | pytest (90건) |
+| Tests | pytest (101건) |
 
 ---
 
@@ -203,11 +203,17 @@ FastAPI + React Admin 8페이지, 멀티코인, 볼린저+RSI 복합, 수수료 
 - [x] #82 코인별 쿨다운 + 손실 코인 잠금 — 연속 손실 방지
 - [x] #83 스프레드 필터 — 호가 차이 큰 코인 자동 제외
 
-### Phase 3: 인프라 (예정)
+### Phase 3: 인프라 + 운영 안정화 (예정)
 
+- [ ] #100 스케줄러 — 일일 헬스체크 (매매 정합성 + 뉴스 수집 + 미체결 정리)
+- [ ] #101 스케줄러 — 주간 리포트 (전략 성과 + DB 최적화 + 파라미터 추이)
+- [ ] #102 스케줄러 — 월간 감사 (거래 감사 + DB 백업 + 비용 정산)
+- [ ] #103 daily_report 개선 — 멀티코인 대응 + 포지션 가치 반영
+- [ ] #80 워치독 서비스
+- [ ] #99 전략 객체 상태 공유 문제 (병렬화 대비)
+- [ ] #98 JWT_SECRET 프로덕션 환경 강제 검증
 - [ ] #20 Docker 컨테이너화
 - [ ] #21 SQLite → PostgreSQL 마이그레이션
-- [ ] #80 워치독 서비스
 
 ### Phase 4: 고도화 (예정)
 

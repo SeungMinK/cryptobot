@@ -177,6 +177,7 @@ class CryptoBot:
         self._tick_interval = int(self._get_config("tick_interval_seconds", "30"))
         self._scheduler.add_job(self._tick, "interval", seconds=self._tick_interval, id="main_tick")
         self._scheduler.add_job(self._daily_report, "cron", hour=0, minute=0, id="daily_report")
+        self._scheduler.add_job(self._llm_analyze, "interval", hours=4, id="llm_analyze")
 
         # Graceful shutdown
         signal.signal(signal.SIGINT, self._shutdown)
@@ -699,6 +700,24 @@ class CryptoBot:
         logger.info("전략 전환: %s → %s", old_name, new_name)
 
         self._notifier.notify_bot_status(f"전략 전환: {old_name} → {new_name}")
+
+    def _llm_analyze(self) -> None:
+        """4시간마다 LLM 시장 분석 실행."""
+        try:
+            from cryptobot.llm.analyzer import LLMAnalyzer
+            analyzer = LLMAnalyzer(self._db)
+            if not analyzer.is_configured:
+                return
+
+            result = analyzer.analyze()
+            if result:
+                summary = result.get("market_summary_kr", "")[:100]
+                self._notifier.send(f"📊 *LLM 시장 분석*\n{summary}")
+                # 캐시 갱신 (LLM이 config를 변경했으므로)
+                self._refresh_config_cache()
+                self._refresh_strategy_params_cache()
+        except Exception as e:
+            logger.error("LLM 분석 에러: %s", e, exc_info=True)
 
     def _daily_report(self) -> None:
         """자정에 실행되는 일일 정산."""

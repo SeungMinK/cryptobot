@@ -16,6 +16,7 @@ dependencies = [
     "bcrypt>=4.0",
     "python-multipart>=0.0.9",
     "slack_sdk>=3.27",
+    "anthropic>=0.40",
 ]
 
 [project.optional-dependencies]

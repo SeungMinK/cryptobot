@@ -1,0 +1,39 @@
+# tistory-autoposter 프로젝트별 설정
+# 이슈 close → AI 판단 → 배치 묶어서 개발일지 발행
+
+mode: batch
+
+trigger:
+  on: close
+
+prefilter:
+  skipLabels: [no-blog, duplicate, invalid, wontfix]
+  minBodyLength: 50
+  skipBots: true
+
+judge:
+  additionalCriteria: |
+    - 암호화폐 트레이딩/전략 관련 기술적 내용을 높게 평가
+    - 새로운 전략 추가, 성능 개선, 아키텍처 변경은 높은 가치
+    - API 연동, 리스크 관리, 백테스트 관련 내용도 가치 있음
+    - 단순 설정 변경, 린트 수정, 의존성 업데이트는 스킵
+
+writer:
+  tone: "실용적이고 경험 기반, 트레이딩 봇 개발 여정을 공유하는 개발일지 스타일"
+  targetLength: "2000-3500"
+  language: ko
+  structureHint: "여러 이슈를 하나의 개발일지로 묶어 작성. 각 변경사항을 섹션으로 나누되 전체 맥락을 연결. 코드 예시 포함."
+
+publish:
+  categoryId: 0
+  visibility: 3
+  extraTags: [crypto, trading-bot, upbit, 개발일지, python]
+
+batch:
+  minIssues: 2
+  maxIntervalDays: 3
+  titleTemplate: "CryptoBot 개발일지 — {date}"
+  labels:
+    worthy: blog-적합
+    notWorthy: blog-부적합
+    published: blog-완료

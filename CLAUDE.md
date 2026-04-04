@@ -118,6 +118,39 @@ logger = logging.getLogger(__name__)
 - **Phase 완료 시**: 해당 Phase의 모든 이슈가 Close되고 신규 이슈가 없으면, Phase 제목에 `(완료)` 추가. (예: `### Phase 1: MVP — 자동매매 기본 동작 (완료)`)
 - 미진행/진행중 상태는 별도 표기하지 않음. 체크박스로 완료 여부만 관리.
 
+## 티스토리 자동 포스팅 (tistory-autoposter 연동)
+
+이 프로젝트는 [tistory-autoposter](https://github.com/SeungMinK/tistory-autoposter)와 연동되어 있다.
+이슈가 close되면 자동으로 AI가 블로그 글 작성 여부를 판단하고, 적합한 이슈를 묶어 개발일지를 발행한다.
+
+### 동작 흐름
+
+1. 이슈 close → GitHub Actions가 autoposter에 dispatch
+2. AI Judge가 이슈를 판단 → `blog-적합` / `blog-부적합` 라벨 자동 부착
+3. `blog-적합` 이슈가 2개 이상 쌓이면 → 묶어서 하나의 개발일지 작성
+4. 글 간격은 1~3일 (하루 최대 1개, 3일을 넘기지 않음)
+5. 이미 당일 발행된 글이 있으면 다음 날로 예약 발행
+6. 발행 완료된 이슈에는 `blog-완료` 라벨 부착 + 코멘트
+
+### 설정 파일
+
+- `.autoposter.yml`: 프로젝트별 설정 (프리필터 규칙, AI 프롬프트, 발행 옵션 등)
+- `.github/workflows/tistory-dispatch.yml`: dispatch 워크플로우
+
+### 이슈 라벨
+
+| 라벨 | 의미 |
+|---|---|
+| `blog-적합` | AI가 블로그 글로 작성할 가치 있다고 판단 |
+| `blog-부적합` | AI가 블로그 글로 부적합하다고 판단 |
+| `blog-완료` | 블로그 글에 포함되어 발행 완료 |
+
+### 주의사항
+
+- `blog-적합` 라벨이 달린 이슈를 수동으로 삭제하면 해당 이슈는 배치에서 빠진다
+- 설정 변경은 `.autoposter.yml` 수정으로 가능 (커밋 필요)
+- Secrets 필요: `AUTOPOSTER_PAT` (repo 스코프 PAT)
+
 ## 작업 시 주의사항
 
 - 업비트 API Key는 **출금 권한 없이** 발급

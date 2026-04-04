@@ -1,0 +1,61 @@
+# 이슈 close 시 tistory-autoposter에 dispatch 이벤트 전송
+# .autoposter.yml 설정이 있으면 함께 전달
+
+name: Tistory Blog Dispatch
+
+on:
+  issues:
+    types: [closed, labeled]
+
+jobs:
+  dispatch:
+    if: >
+      (github.event.action == 'closed' && github.event.issue.state_reason == 'completed') ||
+      (github.event.action == 'labeled' && github.event.label.name == 'blog-worthy')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .autoposter.yml
+          sparse-checkout-cone-mode: false
+
+      - name: Read project config
+        id: config
+        run: |
+          if [ -f .autoposter.yml ]; then
+            CONFIG=$(base64 -w 0 < .autoposter.yml)
+            echo "config=$CONFIG" >> "$GITHUB_OUTPUT"
+            echo "프로젝트 설정 발견: .autoposter.yml"
+          else
+            echo "config=" >> "$GITHUB_OUTPUT"
+            echo "프로젝트 설정 없음 (기본값 사용)"
+          fi
+
+      - name: Dispatch to autoposter
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.AUTOPOSTER_PAT }}
+          repository: SeungMinK/tistory-autoposter
+          event-type: blog-post
+          client-payload: |
+            {
+              "action": "${{ github.event.action }}",
+              "config": "${{ steps.config.outputs.config }}",
+              "issue": {
+                "number": ${{ github.event.issue.number }},
+                "title": ${{ toJSON(github.event.issue.title) }},
+                "body": ${{ toJSON(github.event.issue.body) }},
+                "html_url": "${{ github.event.issue.html_url }}",
+                "labels": ${{ toJSON(github.event.issue.labels) }},
+                "user": {
+                  "login": "${{ github.event.issue.user.login }}"
+                }
+              },
+              "repository": {
+                "full_name": "${{ github.repository }}",
+                "html_url": "${{ github.event.repository.html_url }}"
+              }
+            }

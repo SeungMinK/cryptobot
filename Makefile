@@ -1,4 +1,4 @@
-.PHONY: start bot api web install test lint
+.PHONY: start bot api web news install test lint
 
 # 전체 실행 (봇 + API + Admin)
 start:
@@ -13,6 +13,9 @@ api:
 
 web:
 	cd admin && npm run dev
+
+news:
+	.venv/bin/python news-collector/collector.py
 
 # 개발
 install:

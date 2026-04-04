@@ -11,6 +11,7 @@ import json
 import logging
 import signal
 import sys
+import time as _time
 from datetime import date, datetime, timezone
 
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -83,6 +84,12 @@ class CryptoBot:
         # 전략 파라미터 로딩 (리스크 관리용)
         self._strategy_params = self._load_strategy_params()
 
+        # 캐시 초기화
+        self._config_cache: dict[str, str] = {}
+        self._strategy_params_cache: dict[str, str | None] = {}
+        self._refresh_config_cache()
+        self._refresh_strategy_params_cache()
+
         self._scheduler = BlockingScheduler()
 
     def _init_collectors(self) -> None:
@@ -93,7 +100,6 @@ class CryptoBot:
 
     def _refresh_coins(self) -> None:
         """멀티코인 목록 갱신 (30분 주기)."""
-        import time as _time
         interval = int(self._get_config("coin_refresh_interval_minutes", "30"))
 
         # 타임스탬프 기반 정확한 간격 체크
@@ -174,20 +180,25 @@ class CryptoBot:
         except (KeyboardInterrupt, SystemExit):
             self._shutdown()
 
+    def _refresh_config_cache(self) -> None:
+        """bot_config 전체를 메모리에 캐시. 틱 시작 시 1회 호출."""
+        rows = self._db.execute("SELECT key, value FROM bot_config").fetchall()
+        self._config_cache = {r["key"]: r["value"] for r in rows}
+
     def _get_config(self, key: str, default: str = "") -> str:
-        """DB에서 봇 설정 값 조회."""
-        row = self._db.execute("SELECT value FROM bot_config WHERE key = ?", (key,)).fetchone()
-        return row["value"] if row else default
+        """캐시에서 봇 설정 값 조회."""
+        return self._config_cache.get(key, default)
 
     def _get_strategy_params_json(self) -> str | None:
-        """현재 활성 전략의 파라미터를 JSON 문자열로 반환."""
+        """현재 활성 전략의 파라미터를 JSON 문자열로 반환 (캐시)."""
         if self._strategy is None:
             return None
-        row = self._db.execute(
-            "SELECT default_params_json FROM strategies WHERE name = ?",
-            (self._strategy_name,),
-        ).fetchone()
-        return row["default_params_json"] if row else None
+        return self._strategy_params_cache.get(self._strategy_name)
+
+    def _refresh_strategy_params_cache(self) -> None:
+        """전략 파라미터 캐시 갱신."""
+        rows = self._db.execute("SELECT name, default_params_json FROM strategies").fetchall()
+        self._strategy_params_cache = {r["name"]: r["default_params_json"] for r in rows}
 
     def _get_config_bool(self, key: str, default: bool = False) -> bool:
         """봇 설정 bool 값 조회."""
@@ -220,7 +231,9 @@ class CryptoBot:
     def _tick(self) -> None:
         """매 틱마다 실행되는 메인 로직. 멀티코인 순회."""
         try:
-            # 0. 전략/설정 변경 확인 + 코인 목록 갱신
+            # 0. 캐시 갱신 + 전략/설정 변경 확인 + 코인 목록 갱신
+            self._refresh_config_cache()
+            self._refresh_strategy_params_cache()
             self._refresh_strategy()
             self._refresh_coins()
 
@@ -231,7 +244,6 @@ class CryptoBot:
                 return
 
             # 코인별 순회 (API rate limit 방지: 코인 간 0.5초 대기)
-            import time as _time
             for i, coin in enumerate(self._active_coins):
                 try:
                     if i > 0:
@@ -243,6 +255,12 @@ class CryptoBot:
         except Exception as e:
             logger.error("틱 실행 에러: %s", e, exc_info=True)
             self._notifier.notify_error(str(e))
+        finally:
+            # 틱 단위 배치 commit (signal 등)
+            try:
+                self._db.commit()
+            except Exception:
+                pass
 
     def _get_held_coins(self) -> list[str]:
         """현재 보유 중인 코인 목록 (미매도 매수 건)."""

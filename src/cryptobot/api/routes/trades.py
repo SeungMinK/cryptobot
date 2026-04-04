@@ -111,15 +111,19 @@ def get_trade_stats(
 
     if held:
         import pyupbit
-        for h in held:
-            try:
-                current_price = pyupbit.get_current_price(h["coin"])
+        # 배치 API 호출 (N개 → 1개)
+        coins = list(set(h["coin"] for h in held))
+        try:
+            prices = pyupbit.get_current_price(coins) if len(coins) > 1 else {coins[0]: pyupbit.get_current_price(coins[0])}
+        except Exception:
+            prices = {}
+        if prices:
+            for h in held:
+                current_price = prices.get(h["coin"])
                 if current_price:
                     cost = h["total_krw"] + (h["fee_krw"] or 0)
                     value = h["amount"] * current_price
                     unrealized_profit += value - cost
-            except Exception:
-                pass
     unrealized_profit = round(unrealized_profit, 0)
 
     return {

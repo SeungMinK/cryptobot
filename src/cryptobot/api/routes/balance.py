@@ -52,15 +52,22 @@ def get_positions(_: UserResponse = Depends(get_current_user)):
 
     trader = Trader()
     positions = []
+    # 배치 가격 조회 (N개 코인 → 1 API)
+    import pyupbit
+    coins = list(set(dict(r)["coin"] for r in rows))
+    try:
+        prices = pyupbit.get_current_price(coins) if len(coins) > 1 else {coins[0]: pyupbit.get_current_price(coins[0])}
+    except Exception:
+        prices = {}
+
     for row in rows:
         trade = dict(row)
         coin = trade["coin"]
-        try:
-            current_price = trader.get_current_price(coin)
+        current_price = (prices or {}).get(coin, 0) or 0
+        if current_price and trade["price"]:
             unrealized_pnl_pct = (current_price - trade["price"]) / trade["price"] * 100
             unrealized_pnl_krw = (current_price - trade["price"]) * trade["amount"]
-        except Exception:
-            current_price = 0
+        else:
             unrealized_pnl_pct = 0
             unrealized_pnl_krw = 0
 

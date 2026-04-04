@@ -66,7 +66,7 @@ class DataRecorder:
                 strategy_params_json,
             ),
         )
-        self._db.commit()
+        # commit은 틱 단위로 배치 처리 (main.py에서 호출)
         return cursor.lastrowid
 
     def record_trade(

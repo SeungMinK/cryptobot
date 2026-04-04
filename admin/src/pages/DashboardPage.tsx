@@ -23,7 +23,7 @@ export default function DashboardPage() {
   const [monitoredCoins, setMonitoredCoins] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchAll = useCallback(() => {
     Promise.all([
       getBalance().catch(() => null),
       getPositions().catch(() => null),
@@ -44,6 +44,12 @@ export default function DashboardPage() {
     });
   }, []);
 
+  useEffect(() => {
+    fetchAll();
+    const interval = setInterval(fetchAll, 60000); // 60초 자동 갱신
+    return () => clearInterval(interval);
+  }, [fetchAll]);
+
 
   if (loading) return <div className="loading">로딩 중...</div>;
 
@@ -51,9 +57,20 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1>Dashboard</h1>
-        <p>전체 현황 요약</p>
+      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <h1>대시보드</h1>
+          <p>전체 현황 요약 (60초 자동 갱신)</p>
+        </div>
+        <button
+          onClick={fetchAll}
+          style={{
+            padding: "8px 16px", borderRadius: 8, border: "none",
+            background: "#4a9eff", color: "#fff", cursor: "pointer", fontSize: 13,
+          }}
+        >
+          새로고침
+        </button>
       </div>
 
       {/* KPI Cards */}

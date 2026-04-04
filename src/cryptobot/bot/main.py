@@ -258,7 +258,12 @@ class CryptoBot:
         return "core" if coin in self._core_coins else "alt"
 
     def _get_coin_strategy(self, coin: str) -> tuple["BaseStrategy | None", str, dict]:
-        """코인 카테고리에 맞는 전략 + 파라미터 반환.
+        """코인의 시장 상태에 맞는 전략 자동 선택 + 카테고리 리스크 파라미터.
+
+        흐름:
+        1. 코인의 최신 스냅샷에서 market_state 확인
+        2. 해당 시장에 적합한 전략을 StrategyRegistry에서 선택
+        3. 카테고리(core/alt)의 리스크 파라미터 적용
 
         Returns:
             (전략 인스턴스, 전략 이름, 카테고리 설정 dict)
@@ -268,25 +273,29 @@ class CryptoBot:
             "SELECT * FROM coin_strategy_config WHERE category = ?", (category,)
         ).fetchone()
 
-        if row is None:
-            return self._strategy, self._strategy_name, {}
+        # 코인의 시장 상태 확인
+        collector = self._collectors.get(coin)
+        snapshot = collector.get_latest_snapshot() if collector else None
+        market_state = snapshot.get("market_state", "sideways") if snapshot else "sideways"
 
-        strategy_name = row["strategy_name"]
-        strategy = self._registry.get(strategy_name)
+        # 시장 상태에 맞는 전략 자동 선택
+        strategy = self._registry.select_by_market(market_state)
+        if strategy is None:
+            strategy = self._registry.get("bollinger_bands")  # 기본 폴백
         if strategy is None:
             return self._strategy, self._strategy_name, {}
 
+        strategy_name = strategy.info().name
+
         # 카테고리별 리스크 파라미터 적용
-        strategy.params.stop_loss_pct = row["stop_loss_pct"]
-        strategy.params.trailing_stop_pct = row["trailing_stop_pct"]
-        strategy.params.position_size_pct = row["position_size_pct"]
+        if row:
+            strategy.params.stop_loss_pct = row["stop_loss_pct"]
+            strategy.params.trailing_stop_pct = row["trailing_stop_pct"]
+            strategy.params.position_size_pct = row["position_size_pct"]
 
-        # 전략별 extra 파라미터 적용
-        if row["strategy_params_json"]:
-            import json as _json
-            strategy.params.extra = _json.loads(row["strategy_params_json"])
-
-        cat_config = dict(row)
+        cat_config = dict(row) if row else {}
+        cat_config["market_state"] = market_state
+        cat_config["auto_strategy"] = strategy_name
         return strategy, strategy_name, cat_config
 
     def _tick_coin(self, coin: str) -> None:

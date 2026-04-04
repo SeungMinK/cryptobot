@@ -6,6 +6,8 @@ import type { Strategy, StrategyActivation, StrategySimulation } from "../types/
 import ConfirmDialog from "../components/ConfirmDialog";
 import { formatPercent, formatDateTime, formatKRW } from "../utils/format";
 import { getParamDesc } from "../utils/paramDescriptions";
+import { getMarketStateKR } from "../utils/indicatorDescriptions";
+import client from "../api/client";
 
 const MARKET_SECTIONS = [
   { state: "sideways", label: "횡보장 전략", emoji: "➡️", desc: "변동이 적은 박스권에서 유리" },
@@ -23,20 +25,23 @@ export default function StrategiesPage() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [activations, setActivations] = useState<StrategyActivation[]>([]);
   const [coinConfigs, setCoinConfigs] = useState<CoinStrategyConfig[]>([]);
+  const [coinStrategies, setCoinStrategies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirm, setConfirm] = useState<{ name: string; action: "activate" | "deactivate" } | null>(null);
   const [editingStrategy, setEditingStrategy] = useState<Strategy | null>(null);
 
   const fetchData = async () => {
     try {
-      const [strats, hist, coinCfg] = await Promise.all([
+      const [strats, hist, coinCfg, coinStrats] = await Promise.all([
         getStrategies(),
         getActivationHistory(20),
         getAllCoinStrategies().catch(() => []),
+        client.get("/market/coin-strategies").then(r => r.data).catch(() => []),
       ]);
       setStrategies(strats);
       setActivations(hist);
       setCoinConfigs(coinCfg);
+      setCoinStrategies(coinStrats);
     } finally {
       setLoading(false);
     }
@@ -95,14 +100,41 @@ export default function StrategiesPage() {
       ) : (
       <>
 
-      {/* Active strategies banner */}
-      {activeStrategies.length > 0 && (
-        <div className="card" style={{ marginBottom: 24, borderColor: "var(--accent-green)" }}>
-          <div className="card-title">활성 전략</div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {activeStrategies.map((s) => (
-              <span key={s.name} className="badge badge-green">{s.display_name}</span>
-            ))}
+      {/* 코인별 전략 현황 */}
+      {coinStrategies.length > 0 && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card-title">코인별 적용 전략 (시장 상태 기반 자동 선택)</div>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>코인</th>
+                  <th>시장 상태</th>
+                  <th>적용 전략</th>
+                  <th>최근 신호</th>
+                  <th>보유</th>
+                </tr>
+              </thead>
+              <tbody>
+                {coinStrategies.map((cs: any) => (
+                  <tr key={cs.coin} style={{ background: cs.holding ? "rgba(34, 197, 94, 0.05)" : "transparent" }}>
+                    <td style={{ fontWeight: 600 }}>{cs.coin?.replace("KRW-", "")}</td>
+                    <td>
+                      <span className={`badge ${cs.market_state === "bullish" ? "badge-green" : cs.market_state === "bearish" ? "badge-red" : "badge-yellow"}`}>
+                        {getMarketStateKR(cs.market_state || "")}
+                      </span>
+                    </td>
+                    <td><span className="badge badge-purple">{cs.strategy}</span></td>
+                    <td>
+                      <span className={`badge ${cs.signal_type === "buy" ? "badge-green" : cs.signal_type === "sell" ? "badge-red" : "badge-yellow"}`}>
+                        {cs.signal_type === "buy" ? "매수" : cs.signal_type === "sell" ? "매도" : "HOLD"}
+                      </span>
+                    </td>
+                    <td>{cs.holding ? <span className="badge badge-green">보유중</span> : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

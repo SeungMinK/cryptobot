@@ -160,3 +160,50 @@ def scan_coins_current(_: UserResponse = Depends(get_current_user)):
         max_coins=int(_get("max_coins", "5")),
     )
     return scanner.scan_top_coins()
+
+
+@router.get("/coin-strategies")
+def get_coin_strategies(_: UserResponse = Depends(get_current_user)):
+    """각 코인별 현재 적용 전략 + 시장 상태."""
+    db = get_db()
+
+    # 최근 신호에서 코인별 전략/시장 확인
+    rows = db.execute(
+        """
+        SELECT ts.coin, ts.strategy, ms.market_state,
+               ts.current_price, ts.confidence, ts.signal_type
+        FROM trade_signals ts
+        LEFT JOIN market_snapshots ms ON ts.snapshot_id = ms.id
+        WHERE ts.id IN (
+            SELECT MAX(id) FROM trade_signals
+            WHERE timestamp >= datetime('now', '-1 hour')
+            GROUP BY coin
+        )
+        ORDER BY ts.coin
+        """
+    ).fetchall()
+
+    # 보유 여부도 확인
+    result = []
+    for r in rows:
+        coin = r["coin"]
+        held = db.execute(
+            """
+            SELECT 1 FROM trades t WHERE t.coin = ? AND t.side = 'buy'
+            AND NOT EXISTS (SELECT 1 FROM trades s WHERE s.buy_trade_id = t.id AND s.side = 'sell')
+            LIMIT 1
+            """,
+            (coin,),
+        ).fetchone()
+
+        result.append({
+            "coin": coin,
+            "strategy": r["strategy"],
+            "market_state": r["market_state"],
+            "current_price": r["current_price"],
+            "signal_type": r["signal_type"],
+            "confidence": r["confidence"],
+            "holding": held is not None,
+        })
+
+    return result

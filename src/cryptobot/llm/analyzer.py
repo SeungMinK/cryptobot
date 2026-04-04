@@ -270,7 +270,7 @@ class LLMAnalyzer:
                     val = h["amount"] * cp if cp else h["total_krw"]
                     total_coin += val
                     lines.append(f"  {h['coin'].replace('KRW-','')}: 투자 {h['total_krw']:,.0f} → 평가 {val:,.0f}")
-                except Exception:
+                except Exception as e:
                     total_coin += h["total_krw"]
 
             lines.append(f"총 자산: {krw + total_coin:,.0f}원")
@@ -308,8 +308,8 @@ class LLMAnalyzer:
                 ba = json.loads(news_summary)
                 if "before" in ba:
                     lines.append(f"이전 변경: {ba.get('before', {})} → {ba.get('after', {})}")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("파라미터 변환 실패 %s: %s", param_key, e)
 
         return "\n".join(lines)
 

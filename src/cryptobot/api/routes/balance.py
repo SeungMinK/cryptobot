@@ -60,7 +60,7 @@ def get_positions(_: UserResponse = Depends(get_current_user)):
     coins = list(set(dict(r)["coin"] for r in rows))
     try:
         prices = pyupbit.get_current_price(coins) if len(coins) > 1 else {coins[0]: pyupbit.get_current_price(coins[0])}
-    except Exception:
+    except Exception as e:
         prices = {}
 
     for row in rows:

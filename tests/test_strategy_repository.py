@@ -19,7 +19,7 @@ def test_get_all_strategies():
     repo, db = _make_repo()
     try:
         strategies = repo.get_all()
-        assert len(strategies) == 9
+        assert len(strategies) == 10
         names = [s["name"] for s in strategies]
         assert "volatility_breakout" in names
         assert "rsi_mean_reversion" in names

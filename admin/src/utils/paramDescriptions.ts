@@ -166,6 +166,40 @@ const PARAM_DESCRIPTIONS: Record<string, Record<string, ParamDesc>> = {
       min: 3, max: 30, step: 1, unit: "일",
     },
   },
+
+  // ── 볼린저+RSI 복합 ──
+  bb_rsi_combined: {
+    bb_period: {
+      label: "밴드 기준 기간",
+      description: "볼린저밴드 계산에 사용하는 이동평균 기간.",
+      tip: "20이 표준.",
+      min: 5, max: 50, step: 1, unit: "일",
+    },
+    bb_std: {
+      label: "밴드 폭 (표준편차 배수)",
+      description: "밴드의 넓이. 매수 조건에 사용 (가격 < 하단 밴드).",
+      tip: "2.0이 표준. 낮추면 매수 기회 증가, 높이면 강한 이탈만 포착.",
+      min: 0.5, max: 3.0, step: 0.1,
+    },
+    rsi_period: {
+      label: "RSI 계산 기간",
+      description: "RSI 지표 계산 기간.",
+      tip: "14가 표준.",
+      min: 5, max: 30, step: 1, unit: "일",
+    },
+    rsi_oversold: {
+      label: "RSI 매수 기준 (과매도)",
+      description: "RSI가 이 값 이하이고 볼린저 하단도 이탈해야 매수. 두 조건 동시 충족.",
+      tip: "30이 표준. 낮추면(25) 더 확실한 매수만, 높이면(35) 매수 기회 증가.",
+      min: 15, max: 40, step: 1,
+    },
+    rsi_overbought: {
+      label: "RSI 매도 기준 (정상 복귀)",
+      description: "RSI가 이 값 이상이면 매도. 볼린저 중간선 도달 시에도 매도.",
+      tip: "50이 표준 (70보다 낮게 설정하여 빠른 익절). 높이면 더 오래 보유.",
+      min: 40, max: 70, step: 1,
+    },
+  },
 };
 
 /**

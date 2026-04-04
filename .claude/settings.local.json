@@ -115,7 +115,13 @@
       "Bash(git merge:*)",
       "Bash(grep -n \"for.*in\\\\|for.*range\" /Users/seungminkim/worksapce/cryptobot/admin/src/pages/*.tsx)",
       "Bash(grep -n \"useMemo\\\\|useCallback\\\\|React.memo\" /Users/seungminkim/worksapce/cryptobot/admin/src/pages/*.tsx)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.quantvps.com)",
+      "WebFetch(domain:www.quantifiedstrategies.com)",
+      "WebFetch(domain:stoic.ai)",
+      "WebFetch(domain:papers.ssrn.com)"
     ]
   }
 }

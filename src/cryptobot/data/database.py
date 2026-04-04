@@ -341,6 +341,17 @@ _DEFAULT_STRATEGIES = [
         "default_params_json": '{"bb_period": 20, "bb_std": 2.0, "squeeze_lookback": 120}',
         "is_active": False,
     },
+    {
+        "name": "bb_rsi_combined",
+        "display_name": "볼린저+RSI 복합",
+        "description": "RSI 과매도 + 볼린저 하단 이탈 동시 충족 시 매수. 거짓 신호 감소로 60%+ 승률.",
+        "category": "mean_reversion",
+        "market_states": "sideways,bearish",
+        "timeframe": "1d",
+        "difficulty": "medium",
+        "default_params_json": '{"bb_period": 20, "bb_std": 2.0, "rsi_period": 14, "rsi_oversold": 30, "rsi_overbought": 50}',
+        "is_active": False,
+    },
 ]
 
 # 봇 설정 기본값
@@ -652,6 +663,20 @@ class Database:
                         ),
                     )
                 logger.info("전략 마스터 데이터 삽입 완료 (%d개)", len(_DEFAULT_STRATEGIES))
+
+            # 마이그레이션: bb_rsi_combined 전략 추가 (기존 DB)
+            bb_rsi = conn.execute("SELECT 1 FROM strategies WHERE name = 'bb_rsi_combined'").fetchone()
+            if bb_rsi is None:
+                conn.execute(
+                    """INSERT INTO strategies (name, display_name, description, category, market_states, timeframe, difficulty, default_params_json, is_active, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    ("bb_rsi_combined", "볼린저+RSI 복합",
+                     "RSI 과매도 + 볼린저 하단 이탈 동시 충족 시 매수. 거짓 신호 감소로 60%+ 승률.",
+                     "mean_reversion", "sideways,bearish", "1d", "medium",
+                     '{"bb_period": 20, "bb_std": 2.0, "rsi_period": 14, "rsi_oversold": 30, "rsi_overbought": 50}',
+                     False, "inactive"),
+                )
+                logger.info("bb_rsi_combined 전략 추가")
 
             # 봇 설정 기본값 삽입
             row = conn.execute("SELECT COUNT(*) FROM bot_config").fetchone()

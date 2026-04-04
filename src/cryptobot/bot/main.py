@@ -34,6 +34,7 @@ from cryptobot.strategies.registry import StrategyRegistry
 from cryptobot.strategies.rsi_mean_reversion import RSIMeanReversion
 from cryptobot.strategies.supertrend import Supertrend
 from cryptobot.strategies.volatility_breakout import VolatilityBreakout
+from cryptobot.strategies.bb_rsi_combined import BBRSICombined
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,7 @@ _STRATEGY_CLASSES: dict[str, type[BaseStrategy]] = {
     "supertrend": Supertrend,
     "grid_trading": GridTrading,
     "breakout_momentum": BreakoutMomentum,
+    "bb_rsi_combined": BBRSICombined,
 }
 
 
@@ -298,10 +300,13 @@ class CryptoBot:
         snapshot = collector.get_latest_snapshot() if collector else None
         market_state = snapshot.get("market_state", "sideways") if snapshot else "sideways"
 
-        # 시장 상태에 맞는 전략 자동 선택
-        strategy = self._registry.select_by_market(market_state)
+        # 시장 상태에 맞는 전략 자동 선택 — bb_rsi_combined 우선
+        if market_state in ("sideways", "bearish"):
+            strategy = self._registry.get("bb_rsi_combined")
+        else:
+            strategy = self._registry.select_by_market(market_state)
         if strategy is None:
-            strategy = self._registry.get("bollinger_bands")  # 기본 폴백
+            strategy = self._registry.get("bb_rsi_combined")  # 기본 폴백
         if strategy is None:
             return self._strategy, self._strategy_name, {}
 

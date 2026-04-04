@@ -72,6 +72,12 @@ class CryptoBot:
         self._last_coin_refresh: str = ""  # 타임스탬프 (epoch)
         self._init_collectors()
 
+        # 캐시 초기화 (전략 로딩보다 먼저)
+        self._config_cache: dict[str, str] = {}
+        self._strategy_params_cache: dict[str, str | None] = {}
+        self._refresh_config_cache()
+        self._refresh_strategy_params_cache()
+
         # 전략 레지스트리 초기화
         self._registry = StrategyRegistry()
         self._load_strategies()
@@ -83,12 +89,6 @@ class CryptoBot:
 
         # 전략 파라미터 로딩 (리스크 관리용)
         self._strategy_params = self._load_strategy_params()
-
-        # 캐시 초기화
-        self._config_cache: dict[str, str] = {}
-        self._strategy_params_cache: dict[str, str | None] = {}
-        self._refresh_config_cache()
-        self._refresh_strategy_params_cache()
 
         self._scheduler = BlockingScheduler()
 

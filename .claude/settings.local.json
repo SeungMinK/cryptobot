@@ -114,7 +114,8 @@
       "Bash(ls:*)",
       "Bash(git merge:*)",
       "Bash(grep -n \"for.*in\\\\|for.*range\" /Users/seungminkim/worksapce/cryptobot/admin/src/pages/*.tsx)",
-      "Bash(grep -n \"useMemo\\\\|useCallback\\\\|React.memo\" /Users/seungminkim/worksapce/cryptobot/admin/src/pages/*.tsx)"
+      "Bash(grep -n \"useMemo\\\\|useCallback\\\\|React.memo\" /Users/seungminkim/worksapce/cryptobot/admin/src/pages/*.tsx)",
+      "Bash(git reset:*)"
     ]
   }
 }

@@ -569,10 +569,11 @@ class Database:
                 conn.execute("UPDATE strategies SET status = 'inactive' WHERE is_active = FALSE")
                 logger.info("strategies 테이블에 status 컬럼 추가 완료")
 
-            # 마이그레이션: market_snapshots AUTOINCREMENT 복원
+            # 마이그레이션: market_snapshots AUTOINCREMENT 확인
             try:
                 idx = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='market_snapshots'").fetchone()
                 if idx and "AUTOINCREMENT" not in (idx[0] or ""):
+                    # 컬럼을 명시적으로 매핑하여 재생성 (SELECT * 사용 금지 — 컬럼 밀림 방지)
                     conn.executescript("""
                         CREATE TABLE IF NOT EXISTS market_snapshots_new (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -587,7 +588,19 @@ class Database:
                             total_market_volume_krw REAL, top10_avg_change_pct REAL,
                             market_state TEXT, volatility_level TEXT
                         );
-                        INSERT INTO market_snapshots_new SELECT * FROM market_snapshots;
+                        INSERT INTO market_snapshots_new (
+                            id, timestamp, coin, btc_price, btc_open_24h, btc_high_24h, btc_low_24h,
+                            btc_change_pct_24h, btc_volume_24h, btc_trade_count_24h,
+                            btc_rsi_14, btc_ma_5, btc_ma_20, btc_ma_60,
+                            btc_bb_upper, btc_bb_lower, btc_atr_14,
+                            total_market_volume_krw, top10_avg_change_pct, market_state, volatility_level
+                        ) SELECT
+                            id, timestamp, coin, btc_price, btc_open_24h, btc_high_24h, btc_low_24h,
+                            btc_change_pct_24h, btc_volume_24h, btc_trade_count_24h,
+                            btc_rsi_14, btc_ma_5, btc_ma_20, btc_ma_60,
+                            btc_bb_upper, btc_bb_lower, btc_atr_14,
+                            total_market_volume_krw, top10_avg_change_pct, market_state, volatility_level
+                        FROM market_snapshots;
                         DROP TABLE market_snapshots;
                         ALTER TABLE market_snapshots_new RENAME TO market_snapshots;
                     """)

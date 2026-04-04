@@ -340,7 +340,7 @@ function StrategyCard({ strategy: s, hasSwitching, activeCoins, onEdit, onActiva
 }) {
   return (
     <div
-      className={`strategy-card ${s.is_active ? "active-strategy" : ""}`}
+      className="strategy-card"
       onClick={onEdit}
       style={{ cursor: "pointer" }}
     >

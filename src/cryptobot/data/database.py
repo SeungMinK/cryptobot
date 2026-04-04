@@ -217,6 +217,18 @@ CREATE TABLE IF NOT EXISTS bot_config (
     description TEXT,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS coin_strategy_config (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL UNIQUE,
+    strategy_name TEXT NOT NULL,
+    stop_loss_pct REAL NOT NULL DEFAULT -5.0,
+    trailing_stop_pct REAL NOT NULL DEFAULT -3.0,
+    position_size_pct REAL NOT NULL DEFAULT 100.0,
+    strategy_params_json TEXT,
+    description TEXT,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 # 기본 전략 파라미터 (최초 1회 삽입)
@@ -334,6 +346,27 @@ _DEFAULT_STRATEGIES = [
 ]
 
 # 봇 설정 기본값
+_DEFAULT_COIN_STRATEGY = [
+    {
+        "category": "core",
+        "strategy_name": "rsi_mean_reversion",
+        "stop_loss_pct": -5.0,
+        "trailing_stop_pct": -3.0,
+        "position_size_pct": 50.0,
+        "strategy_params_json": '{"rsi_period": 14, "oversold": 35, "overbought": 70}',
+        "description": "대형코인 (BTC/ETH/XRP) — 변동 적으므로 RSI 과매도 반등 전략. 보수적 운용.",
+    },
+    {
+        "category": "alt",
+        "strategy_name": "volatility_breakout",
+        "stop_loss_pct": -3.0,
+        "trailing_stop_pct": -2.0,
+        "position_size_pct": 100.0,
+        "strategy_params_json": '{"k_value": 0.3}',
+        "description": "알트코인 — 변동 크므로 변동성 돌파 전략. 공격적 진입 + 빡빡한 스탑.",
+    },
+]
+
 _DEFAULT_BOT_CONFIG = [
     {
         "key": "slack_tick_report",
@@ -553,6 +586,20 @@ class Database:
                             (cfg["key"], cfg["value"], cfg["value_type"], cfg["category"], cfg["display_name"], cfg["description"]),
                         )
                 logger.info("bot_config에 멀티코인 설정 추가")
+
+            # 코인 카테고리별 전략 기본값
+            row = conn.execute("SELECT COUNT(*) FROM coin_strategy_config").fetchone()
+            if row[0] == 0:
+                for cat_cfg in _DEFAULT_COIN_STRATEGY:
+                    conn.execute(
+                        """INSERT INTO coin_strategy_config
+                        (category, strategy_name, stop_loss_pct, trailing_stop_pct, position_size_pct, strategy_params_json, description)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                        (cat_cfg["category"], cat_cfg["strategy_name"], cat_cfg["stop_loss_pct"],
+                         cat_cfg["trailing_stop_pct"], cat_cfg["position_size_pct"],
+                         cat_cfg["strategy_params_json"], cat_cfg["description"]),
+                    )
+                logger.info("코인 카테고리별 전략 기본값 삽입 완료")
 
             # 기본 파라미터가 없으면 삽입
             row = conn.execute("SELECT COUNT(*) FROM strategy_params").fetchone()

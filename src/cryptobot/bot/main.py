@@ -236,6 +236,42 @@ class CryptoBot:
             logger.error("틱 실행 에러: %s", e, exc_info=True)
             self._notifier.notify_error(str(e))
 
+    def _get_coin_category(self, coin: str) -> str:
+        """코인의 카테고리 반환 (core / alt)."""
+        return "core" if coin in self._core_coins else "alt"
+
+    def _get_coin_strategy(self, coin: str) -> tuple["BaseStrategy | None", str, dict]:
+        """코인 카테고리에 맞는 전략 + 파라미터 반환.
+
+        Returns:
+            (전략 인스턴스, 전략 이름, 카테고리 설정 dict)
+        """
+        category = self._get_coin_category(coin)
+        row = self._db.execute(
+            "SELECT * FROM coin_strategy_config WHERE category = ?", (category,)
+        ).fetchone()
+
+        if row is None:
+            return self._strategy, self._strategy_name, {}
+
+        strategy_name = row["strategy_name"]
+        strategy = self._registry.get(strategy_name)
+        if strategy is None:
+            return self._strategy, self._strategy_name, {}
+
+        # 카테고리별 리스크 파라미터 적용
+        strategy.params.stop_loss_pct = row["stop_loss_pct"]
+        strategy.params.trailing_stop_pct = row["trailing_stop_pct"]
+        strategy.params.position_size_pct = row["position_size_pct"]
+
+        # 전략별 extra 파라미터 적용
+        if row["strategy_params_json"]:
+            import json as _json
+            strategy.params.extra = _json.loads(row["strategy_params_json"])
+
+        cat_config = dict(row)
+        return strategy, strategy_name, cat_config
+
     def _tick_coin(self, coin: str) -> None:
         """개별 코인에 대한 매매 판단."""
         collector = self._collectors.get(coin)
@@ -253,13 +289,29 @@ class CryptoBot:
 
         current_price = snapshot["btc_price"]
 
-        # 2. 보유 중인 포지션 확인
-        active_trade = self._recorder.get_active_buy_trade(coin)
+        # 2. 코인 카테고리에 맞는 전략 선택
+        coin_strategy, coin_strategy_name, _ = self._get_coin_strategy(coin)
+        if coin_strategy is None:
+            return
 
-        if active_trade:
-            self._check_and_sell(active_trade, current_price, snapshot_id, snapshot, coin)
-        else:
-            self._check_and_buy(snapshot, current_price, snapshot_id, coin)
+        # 임시로 현재 전략을 코인별 전략으로 교체
+        orig_strategy = self._strategy
+        orig_name = self._strategy_name
+        self._strategy = coin_strategy
+        self._strategy_name = coin_strategy_name
+
+        try:
+            # 3. 보유 중인 포지션 확인
+            active_trade = self._recorder.get_active_buy_trade(coin)
+
+            if active_trade:
+                self._check_and_sell(active_trade, current_price, snapshot_id, snapshot, coin)
+            else:
+                self._check_and_buy(snapshot, current_price, snapshot_id, coin)
+        finally:
+            # 원래 전략 복원
+            self._strategy = orig_strategy
+            self._strategy_name = orig_name
 
     def _get_coin_buy_amount(self, coin: str, confidence: float) -> float:
         """코인별 매수 금액 계산 (신뢰도 + 최대 포지션 비율 적용).

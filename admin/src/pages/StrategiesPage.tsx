@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { getStrategies, getActivationHistory, activateStrategy, deactivateStrategy, updateStrategyParams, getStrategySimulation } from "../api/strategies";
+import { getAllCoinStrategies, updateCoinStrategy } from "../api/coinStrategy";
+import type { CoinStrategyConfig } from "../api/coinStrategy";
 import type { Strategy, StrategyActivation, StrategySimulation } from "../types/strategies";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { formatPercent, formatDateTime, formatKRW } from "../utils/format";
@@ -11,21 +13,30 @@ const MARKET_SECTIONS = [
   { state: "bearish", label: "하락장 전략", emoji: "📉", desc: "하락 추세에서 유리" },
 ] as const;
 
+const CATEGORY_INFO: Record<string, { label: string; emoji: string; desc: string }> = {
+  core: { label: "대형코인", emoji: "🏦", desc: "BTC, ETH, XRP — 변동 적음, 보수적 운용" },
+  alt: { label: "알트코인", emoji: "🚀", desc: "자동 선별 알트코인 — 변동 큼, 공격적 운용" },
+};
+
 export default function StrategiesPage() {
+  const [tab, setTab] = useState<"strategies" | "coin-config">("strategies");
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [activations, setActivations] = useState<StrategyActivation[]>([]);
+  const [coinConfigs, setCoinConfigs] = useState<CoinStrategyConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirm, setConfirm] = useState<{ name: string; action: "activate" | "deactivate" } | null>(null);
   const [editingStrategy, setEditingStrategy] = useState<Strategy | null>(null);
 
   const fetchData = async () => {
     try {
-      const [strats, hist] = await Promise.all([
+      const [strats, hist, coinCfg] = await Promise.all([
         getStrategies(),
         getActivationHistory(20),
+        getAllCoinStrategies().catch(() => []),
       ]);
       setStrategies(strats);
       setActivations(hist);
+      setCoinConfigs(coinCfg);
     } finally {
       setLoading(false);
     }
@@ -58,8 +69,31 @@ export default function StrategiesPage() {
     <div>
       <div className="page-header">
         <h1>전략 관리</h1>
-        <p>매매 전략 조회 및 활성화/비활성화 — 카드 클릭 시 파라미터 편집</p>
+        <p>매매 전략 및 코인별 전략 설정</p>
       </div>
+
+      {/* 탭 바 */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 20 }}>
+        {([["strategies", "전략 목록"], ["coin-config", "코인별 전략 설정"]] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            style={{
+              padding: "8px 20px", fontSize: 14, fontWeight: 600, borderRadius: 8,
+              border: "none", cursor: "pointer",
+              background: tab === key ? "#4a9eff" : "#2a2d3e",
+              color: tab === key ? "#fff" : "#8b8fa3",
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "coin-config" ? (
+        <CoinStrategyTab configs={coinConfigs} strategies={strategies} onSaved={fetchData} />
+      ) : (
+      <>
 
       {/* Active strategies banner */}
       {activeStrategies.length > 0 && (
@@ -155,6 +189,9 @@ export default function StrategiesPage() {
         />
       )}
 
+      </>
+      )}
+
       {editingStrategy && (
         <ParamsEditor
           strategy={editingStrategy}
@@ -162,6 +199,158 @@ export default function StrategiesPage() {
           onSaved={fetchData}
         />
       )}
+    </div>
+  );
+}
+
+
+// ── 코인별 전략 설정 탭 ──
+
+function CoinStrategyTab({ configs, strategies, onSaved }: {
+  configs: CoinStrategyConfig[];
+  strategies: Strategy[];
+  onSaved: () => void;
+}) {
+  const [saving, setSaving] = useState<string | null>(null);
+  const [editState, setEditState] = useState<Record<string, {
+    strategy_name: string;
+    stop_loss_pct: string;
+    trailing_stop_pct: string;
+    position_size_pct: string;
+    strategy_params_json: string;
+  }>>({});
+
+  useEffect(() => {
+    const state: typeof editState = {};
+    configs.forEach((c) => {
+      state[c.category] = {
+        strategy_name: c.strategy_name,
+        stop_loss_pct: String(c.stop_loss_pct),
+        trailing_stop_pct: String(c.trailing_stop_pct),
+        position_size_pct: String(c.position_size_pct),
+        strategy_params_json: c.strategy_params_json || "{}",
+      };
+    });
+    setEditState(state);
+  }, [configs]);
+
+  const handleSave = async (category: string) => {
+    const edit = editState[category];
+    if (!edit) return;
+    setSaving(category);
+    try {
+      await updateCoinStrategy(category, {
+        strategy_name: edit.strategy_name,
+        stop_loss_pct: parseFloat(edit.stop_loss_pct),
+        trailing_stop_pct: parseFloat(edit.trailing_stop_pct),
+        position_size_pct: parseFloat(edit.position_size_pct),
+        strategy_params_json: edit.strategy_params_json,
+      });
+      onSaved();
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const strategyNames = strategies.map((s) => s.name);
+
+  return (
+    <div>
+      {configs.map((cfg) => {
+        const info = CATEGORY_INFO[cfg.category] || { label: cfg.category, emoji: "📦", desc: "" };
+        const edit = editState[cfg.category];
+        if (!edit) return null;
+
+        return (
+          <div key={cfg.category} className="card" style={{ marginBottom: 20 }}>
+            <div className="card-title">
+              <span style={{ marginRight: 8 }}>{info.emoji}</span>
+              {info.label}
+              <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 8 }}>{info.desc}</span>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {/* 전략 선택 */}
+              <div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>매매 전략</div>
+                <select
+                  value={edit.strategy_name}
+                  onChange={(e) => setEditState((prev) => ({ ...prev, [cfg.category]: { ...edit, strategy_name: e.target.value } }))}
+                  style={{
+                    width: "100%", padding: "8px", borderRadius: 6,
+                    border: "1px solid var(--border)", background: "var(--bg-secondary)",
+                    color: "var(--text-primary)", fontSize: 13,
+                  }}
+                >
+                  {strategyNames.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 포지션 크기 */}
+              <EditField label="포지션 크기 (%)" caption="잔고 대비 투자 비율" value={edit.position_size_pct}
+                onChange={(v) => setEditState((prev) => ({ ...prev, [cfg.category]: { ...edit, position_size_pct: v } }))} />
+
+              {/* 손절 */}
+              <EditField label="손절률 (%)" caption="매수가 대비 이 비율 하락 시 자동 매도" value={edit.stop_loss_pct}
+                onChange={(v) => setEditState((prev) => ({ ...prev, [cfg.category]: { ...edit, stop_loss_pct: v } }))} />
+
+              {/* 트레일링 */}
+              <EditField label="트레일링 스탑 (%)" caption="최고가 대비 이 비율 하락 시 자동 매도" value={edit.trailing_stop_pct}
+                onChange={(v) => setEditState((prev) => ({ ...prev, [cfg.category]: { ...edit, trailing_stop_pct: v } }))} />
+
+              {/* 전략 파라미터 */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>전략 파라미터 (JSON)</div>
+                <input
+                  value={edit.strategy_params_json}
+                  onChange={(e) => setEditState((prev) => ({ ...prev, [cfg.category]: { ...edit, strategy_params_json: e.target.value } }))}
+                  style={{
+                    width: "100%", padding: "8px", borderRadius: 6, fontFamily: "monospace",
+                    border: "1px solid var(--border)", background: "var(--bg-secondary)",
+                    color: "var(--text-primary)", fontSize: 12,
+                  }}
+                />
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                  {cfg.description}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => handleSave(cfg.category)}
+                disabled={saving === cfg.category}
+                className="btn btn-primary btn-sm"
+                style={{ opacity: saving === cfg.category ? 0.6 : 1 }}
+              >
+                {saving === cfg.category ? "저장 중..." : "설정 저장"}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function EditField({ label, caption, value, onChange }: {
+  label: string; caption: string; value: string; onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{label}</div>
+      <input
+        type="number" step="0.5" value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          width: "100%", padding: "8px", borderRadius: 6,
+          border: "1px solid var(--border)", background: "var(--bg-secondary)",
+          color: "var(--text-primary)", fontSize: 13,
+        }}
+      />
+      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{caption}</div>
     </div>
   );
 }

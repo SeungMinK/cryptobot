@@ -146,11 +146,12 @@ export default function SignalsPage() {
               <thead>
                 <tr>
                   <th>시간</th>
+                  <th>코인</th>
                   <th>신호</th>
                   <th>전략</th>
                   <th>판단 근거</th>
                   <th>신뢰도</th>
-                  <th>BTC 가격</th>
+                  <th>가격</th>
                   <th>시장</th>
                   <th>실행</th>
                 </tr>
@@ -163,6 +164,7 @@ export default function SignalsPage() {
                     style={{ cursor: "pointer" }}
                   >
                     <td style={{ fontSize: 11, whiteSpace: "nowrap" }}>{formatDateTime(s.timestamp)}</td>
+                    <td style={{ fontWeight: 600, fontSize: 12 }}>{s.coin?.replace("KRW-", "")}</td>
                     <td>
                       <span className={`badge ${s.signal_type === "buy" ? "badge-green" : s.signal_type === "sell" ? "badge-red" : "badge-yellow"}`}>
                         {s.signal_type === "buy" ? "매수" : s.signal_type === "sell" ? "매도" : "HOLD"}
@@ -224,7 +226,7 @@ export default function SignalsPage() {
               <DetailItem label="신호" value={selected.signal_type === "buy" ? "매수" : selected.signal_type === "sell" ? "매도" : "HOLD"} />
               <DetailItem label="전략" value={selected.strategy} />
               <DetailItem label="신뢰도" value={`${(selected.confidence * 100).toFixed(1)}%`} caption="매수/매도 신호의 확신 정도. HOLD일 때는 항상 0%." />
-              <DetailItem label="BTC 가격" value={formatKRW(selected.current_price)} />
+              <DetailItem label={`${selected.coin?.replace("KRW-", "") || "BTC"} 가격`} value={formatKRW(selected.current_price)} />
               <DetailItem
                 label="시장 상태"
                 value={selected.market_state ? getMarketStateKR(selected.market_state) : "-"}

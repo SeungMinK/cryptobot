@@ -86,6 +86,7 @@ class DataCollector:
 
             return {
                 "timestamp": _utcnow(),
+                "coin": self._coin,
                 "btc_price": current_price,
                 "btc_open_24h": today["open"],
                 "btc_high_24h": today["high"],
@@ -110,14 +111,15 @@ class DataCollector:
         cursor = self._db.execute(
             """
             INSERT INTO market_snapshots (
-                timestamp, btc_price, btc_open_24h, btc_high_24h, btc_low_24h,
+                timestamp, coin, btc_price, btc_open_24h, btc_high_24h, btc_low_24h,
                 btc_change_pct_24h, btc_volume_24h, btc_rsi_14,
                 btc_ma_5, btc_ma_20, btc_ma_60,
                 btc_bb_upper, btc_bb_lower, btc_atr_14, market_state
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 data["timestamp"],
+                data["coin"],
                 data["btc_price"],
                 data["btc_open_24h"],
                 data["btc_high_24h"],

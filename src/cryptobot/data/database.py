@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS ohlcv_daily (
 CREATE TABLE IF NOT EXISTS market_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    coin TEXT NOT NULL DEFAULT 'KRW-BTC',
     btc_price REAL NOT NULL,
     btc_open_24h REAL,
     btc_high_24h REAL,
@@ -559,6 +560,13 @@ class Database:
                 conn.execute("UPDATE strategies SET status = 'active' WHERE is_active = TRUE")
                 conn.execute("UPDATE strategies SET status = 'inactive' WHERE is_active = FALSE")
                 logger.info("strategies 테이블에 status 컬럼 추가 완료")
+
+            # 마이그레이션: market_snapshots에 coin 컬럼 추가
+            try:
+                conn.execute("SELECT coin FROM market_snapshots LIMIT 1")
+            except sqlite3.OperationalError:
+                conn.execute("ALTER TABLE market_snapshots ADD COLUMN coin TEXT NOT NULL DEFAULT 'KRW-BTC'")
+                logger.info("market_snapshots 테이블에 coin 컬럼 추가 완료")
 
             # 마이그레이션: trade_signals에 strategy_params_json 컬럼 추가
             try:

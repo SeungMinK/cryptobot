@@ -51,7 +51,7 @@ export default function DashboardPage() {
       setNewsStats(nStats);
       setLlmDecisions(llm as LLMDecision[]);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -79,7 +79,7 @@ export default function DashboardPage() {
 
       {/* KPI Cards */}
       {(() => {
-        const pos = ((positions as any)?.positions || []) as any[];
+        const pos = positions?.positions || [];
         const totalCost = pos.reduce((s: number, p: any) => s + (p.total_krw || 0), 0);
         const totalValue = pos.reduce((s: number, p: any) => s + (p.amount || 0) * (p.current_price || 0), 0);
         const totalAsset = (balance?.krw_balance || 0) + totalValue;
@@ -221,9 +221,9 @@ export default function DashboardPage() {
       {/* 현재 포지션 */}
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-title">현재 포지션</div>
-        {positions?.has_position && (positions as any).positions?.length > 0 ? (
+        {positions?.has_position && positions.positions?.length > 0 ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: 12 }}>
-            {((positions as any).positions || []).map((p: any) => (
+            {positions.positions.map((p) => (
               <div key={p.id} style={{ padding: 12, borderRadius: 8, background: "var(--bg-secondary)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

@@ -21,7 +21,7 @@ export default function ParamsEditor({ strategy, onClose, onSaved }: {
       initial[k] = String(v);
     });
     setEditParams(initial);
-  }, [strategy.name]);
+  }, [strategy.name, strategy.default_params_json]);
 
   const hasChanges = Object.keys(editParams).some(
     (k) => editParams[k] !== String(currentParams[k])

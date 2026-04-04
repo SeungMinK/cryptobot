@@ -26,13 +26,12 @@ def _test_db():
     )
     db.commit()
 
-    # deps 모듈의 DB를 테스트 DB로 교체
-    old_db = deps._db
-    deps._db = db
+    # 테스트 DB 오버라이드
+    deps._test_db_override = db
 
     yield db
 
-    deps._db = old_db
+    deps._test_db_override = None
     db.close()
 
 
@@ -80,7 +79,7 @@ def test_unauthorized(client):
 def test_get_strategies(client, auth_header):
     response = client.get("/api/strategies", headers=auth_header)
     assert response.status_code == 200
-    assert len(response.json()) == 9
+    assert len(response.json()) == 10
 
 
 def test_get_active_strategies(client, auth_header):

@@ -13,10 +13,13 @@ from cryptobot.data.recorder import DataRecorder
 from cryptobot.data.strategy_repository import StrategyRepository
 
 _thread_local = threading.local()
+_test_db_override: Database | None = None
 
 
 def get_db() -> Database:
     """스레드별 DB 커넥션. FastAPI 워커 스레드에서 안전하게 사용."""
+    if _test_db_override is not None:
+        return _test_db_override
     if not hasattr(_thread_local, "db") or _thread_local.db is None:
         _thread_local.db = Database(config.bot.db_path)
         _thread_local.db.initialize()

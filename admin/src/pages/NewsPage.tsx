@@ -218,7 +218,7 @@ export default function NewsPage() {
 
       {totalPages > 1 && (
         <div style={{ marginTop: 16 }}>
-          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          <Pagination page={page} pages={totalPages} onPageChange={setPage} />
         </div>
       )}
     </div>

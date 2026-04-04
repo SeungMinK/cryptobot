@@ -196,9 +196,9 @@ FastAPI + React Admin 8페이지, 멀티코인, 볼린저+RSI 복합, 수수료 
 
 [Freqtrade](https://github.com/freqtrade/freqtrade) · [Hummingbot](https://github.com/hummingbot/hummingbot) 벤치마킹
 
-- [ ] #81 시간 기반 ROI 테이블 — 보유 시간별 목표 수익 자동 조절
-- [ ] #82 코인별 쿨다운 + 손실 코인 잠금 — 연속 손실 방지
-- [ ] #83 스프레드 필터 — 호가 차이 큰 코인 자동 제외
+- [x] #81 시간 기반 ROI 테이블 — 보유 시간별 목표 수익 자동 조절
+- [x] #82 코인별 쿨다운 + 손실 코인 잠금 — 연속 손실 방지
+- [x] #83 스프레드 필터 — 호가 차이 큰 코인 자동 제외
 
 ### Phase 3: 인프라 (예정)
 

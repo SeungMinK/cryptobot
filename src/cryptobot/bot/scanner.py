@@ -75,8 +75,13 @@ class CoinScanner:
             candidates = candidates[:30]
 
             results = []
-            for ticker in candidates:
+            import time as _time
+            for idx, ticker in enumerate(candidates):
                 price = all_prices.get(ticker, 0)
+
+                # API rate limit 방지
+                if idx > 0:
+                    _time.sleep(0.3)
 
                 # OHLCV로 거래대금 + 변동성 확인
                 df = pyupbit.get_ohlcv(ticker, interval="day", count=14)

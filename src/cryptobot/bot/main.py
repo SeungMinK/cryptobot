@@ -68,7 +68,7 @@ class CryptoBot:
         self._core_coins = ["KRW-BTC", "KRW-ETH", "KRW-XRP"]
         self._collectors: dict[str, DataCollector] = {}
         self._active_coins: list[str] = list(self._core_coins)
-        self._last_coin_refresh: str = ""
+        self._last_coin_refresh: str = ""  # 타임스탬프 (epoch)
         self._init_collectors()
 
         # 전략 레지스트리 초기화
@@ -93,13 +93,15 @@ class CryptoBot:
 
     def _refresh_coins(self) -> None:
         """멀티코인 목록 갱신 (30분 주기)."""
-        from datetime import datetime, timezone
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+        import time as _time
         interval = int(self._get_config("coin_refresh_interval_minutes", "30"))
 
-        # 간격 체크 (분 단위)
-        if self._last_coin_refresh and now < self._last_coin_refresh:
-            return
+        # 타임스탬프 기반 정확한 간격 체크
+        now_ts = _time.time()
+        if self._last_coin_refresh:
+            elapsed = now_ts - float(self._last_coin_refresh)
+            if elapsed < interval * 60:
+                return
 
         if not self._get_config_bool("multi_coin_enabled", True):
             self._active_coins = list(self._core_coins)
@@ -137,10 +139,7 @@ class CryptoBot:
                     self._active_coins = new_coins
                     self._init_collectors()
 
-            # 다음 갱신 시간 설정
-            next_refresh = datetime.now(timezone.utc)
-            next_refresh = next_refresh.replace(minute=(next_refresh.minute + interval) % 60)
-            self._last_coin_refresh = next_refresh.strftime("%Y-%m-%d %H:%M")
+            self._last_coin_refresh = str(now_ts)
 
         except Exception as e:
             logger.error("코인 목록 갱신 실패: %s", e)
@@ -231,9 +230,12 @@ class CryptoBot:
             if not self._get_config_bool("allow_trading", True):
                 return
 
-            # 코인별 순회
-            for coin in self._active_coins:
+            # 코인별 순회 (API rate limit 방지: 코인 간 0.5초 대기)
+            import time as _time
+            for i, coin in enumerate(self._active_coins):
                 try:
+                    if i > 0:
+                        _time.sleep(0.5)
                     self._tick_coin(coin)
                 except Exception as e:
                     logger.error("틱 에러 (%s): %s", coin, e, exc_info=True)

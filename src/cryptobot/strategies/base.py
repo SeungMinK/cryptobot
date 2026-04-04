@@ -103,7 +103,7 @@ class BaseStrategy(ABC):
         drop_pct = (current_price - self._highest_price) / self._highest_price * 100
         if drop_pct <= self.params.trailing_stop_pct:
             # 수수료 가드: 수수료(0.1%) 이상 수익이면 익절, 아니면 기다림
-            if pnl_pct > self.ROUND_TRIP_FEE_PCT:
+            if pnl_pct > self.ROUND_TRIP_FEE_PCT:  # 수수료 초과 수익만 매도
                 return Signal("sell", 0.8, f"트레일링 스탑 (익절 {pnl_pct:+.2f}%)", trigger_value=round(drop_pct, 2))
             # 수수료 이하 수익/손실 → 기다림 (손절은 stop_loss가 처리)
             return None

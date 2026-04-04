@@ -495,7 +495,7 @@ class CryptoBot:
         # 수수료 가드: 손절이 아닌 경우, 수수료 이상 수익이 나야 매도
         pnl_pct = (current_price - buy_price) / buy_price * 100
         is_stop_loss = "손절" in signal_result.reason
-        if not is_stop_loss and pnl_pct <= 0.1:  # 왕복 수수료 0.1%
+        if not is_stop_loss and pnl_pct <= 0.1:  # 왕복 수수료 0.1% 초과해야 매도
             self._recorder.record_signal(
                 coin=coin,
                 signal_type="sell",
@@ -516,8 +516,10 @@ class CryptoBot:
         if order.success:
             # 수수료 포함 실제 수익 계산
             buy_fee = active_trade.get("fee_krw") or 0
-            profit_pct = (order.price - buy_price) / buy_price * 100
-            profit_krw = order.total_krw - active_trade["total_krw"] - order.fee_krw - buy_fee
+            buy_total = active_trade["total_krw"] + buy_fee
+            sell_total = order.total_krw - order.fee_krw
+            profit_krw = round(sell_total - buy_total, 2)
+            profit_pct = round(profit_krw / buy_total * 100, 2) if buy_total > 0 else 0
             buy_time = datetime.fromisoformat(active_trade["timestamp"])
             if buy_time.tzinfo is None:
                 buy_time = buy_time.replace(tzinfo=timezone.utc)

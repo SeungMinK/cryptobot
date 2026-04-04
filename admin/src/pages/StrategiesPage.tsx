@@ -159,6 +159,7 @@ export default function StrategiesPage() {
                   key={`${section.state}-${s.name}`}
                   strategy={s}
                   hasSwitching={hasSwitching}
+                  activeCoins={coinStrategies.filter((cs: any) => cs.strategy === s.name).map((cs: any) => cs.coin?.replace("KRW-", ""))}
                   onEdit={() => setEditingStrategy(s)}
                   onActivate={() => setConfirm({ name: s.name, action: "activate" })}
                   onDeactivate={() => setConfirm({ name: s.name, action: "deactivate" })}
@@ -390,9 +391,10 @@ function EditField({ label, caption, value, onChange }: {
 
 // ── 전략 카드 ──
 
-function StrategyCard({ strategy: s, hasSwitching, onEdit, onActivate, onDeactivate }: {
+function StrategyCard({ strategy: s, hasSwitching, activeCoins, onEdit, onActivate, onDeactivate }: {
   strategy: Strategy;
   hasSwitching: boolean;
+  activeCoins: string[];
   onEdit: () => void;
   onActivate: () => void;
   onDeactivate: () => void;
@@ -411,9 +413,15 @@ function StrategyCard({ strategy: s, hasSwitching, onEdit, onActivate, onDeactiv
             <span className="badge badge-blue">{s.difficulty}</span>
           </div>
         </div>
-        <span className={`badge ${s.status === "active" ? "badge-green" : s.status === "shutting_down" ? "badge-yellow" : "badge-red"}`}>
-          {s.status === "active" ? "활성" : s.status === "shutting_down" ? "종료중" : "비활성"}
-        </span>
+        {activeCoins.length > 0 ? (
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {activeCoins.map((c) => (
+              <span key={c} className="badge badge-green" style={{ fontSize: 10 }}>{c}</span>
+            ))}
+          </div>
+        ) : (
+          <span className="badge badge-red" style={{ fontSize: 10 }}>미사용</span>
+        )}
       </div>
       <p className="strategy-desc">{s.description}</p>
       <div className="strategy-stats">

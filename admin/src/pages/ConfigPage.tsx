@@ -10,7 +10,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   strategy: "전략 파라미터",
 };
 
-const CATEGORY_ORDER = ["coin", "bot", "notification"];
+const CATEGORY_ORDER = ["coin", "bot", "risk", "notification"];
 
 export default function ConfigPage() {
   const [configs, setConfigs] = useState<ConfigItem[]>([]);

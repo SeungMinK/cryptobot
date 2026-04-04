@@ -88,6 +88,20 @@ class CoinScanner:
                 if df is None or df.empty:
                     continue
 
+                # 스프레드 필터 (호가 차이 큰 코인 제외)
+                try:
+                    orderbook = pyupbit.get_orderbook(ticker)
+                    if orderbook and len(orderbook) > 0:
+                        units = orderbook[0].get("orderbook_units", [])
+                        if units:
+                            best_ask = units[0]["ask_price"]
+                            best_bid = units[0]["bid_price"]
+                            spread_pct = (best_ask - best_bid) / best_bid * 100
+                            if spread_pct > 0.3:  # 0.3% 초과면 제외
+                                continue
+                except Exception:
+                    pass  # 호가 조회 실패 시 스킵 (제외 안 함)
+
                 volume_krw = df.iloc[-1]["close"] * df.iloc[-1]["volume"]
                 if volume_krw < self._min_volume_krw:
                     continue

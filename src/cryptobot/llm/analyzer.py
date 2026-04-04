@@ -66,7 +66,7 @@ class LLMAnalyzer:
     def __init__(self, db) -> None:
         self._db = db
         self._api_key = os.getenv("ANTHROPIC_API_KEY", "")
-        self._model = "claude-haiku-4-5-20251001"
+        self._model = os.getenv("LLM_MODEL", "claude-haiku-4-5-20251001")
 
     @property
     def is_configured(self) -> bool:

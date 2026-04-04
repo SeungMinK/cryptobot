@@ -191,7 +191,7 @@ AI 분석 (4시간) → llm_decisions + prompt_versions
 
 프로젝트 설정, DB, 지표, 10개 전략, 주문, 수집, 알림, 스케줄러
 
-### Phase 2: Admin + AI 연동 (완료)
+### Phase 2: Admin + AI 연동 ✅
 
 FastAPI + React Admin 8페이지, 멀티코인, 볼린저+RSI 복합, 수수료 가드, 뉴스 수집, Claude AI 시장분석, 프롬프트 버전 관리, 통합 테스트 90건
 

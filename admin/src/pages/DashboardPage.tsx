@@ -74,29 +74,39 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="kpi-grid">
-        <StatCard
-          label="총 보유 자산"
-          value={balance ? formatKRW(balance.krw_balance + balance.coin_value_krw) : "-"}
-          sub={balance ? `KRW ${formatKRW(balance.krw_balance)} + 코인 ${formatKRW(balance.coin_value_krw)}` : ""}
-        />
-        <StatCard
-          label="총 손익"
-          value={balance ? formatKRW(balance.krw_balance + balance.coin_value_krw - 100000) : "-"}
-          valueClass={balance && (balance.krw_balance + balance.coin_value_krw - 100000) >= 0 ? "positive" : "negative"}
-          sub="시작 ₩100,000 기준"
-        />
-        <StatCard
-          label="코인 보유"
-          value={balance ? formatKRW(balance.coin_value_krw) : "-"}
-          sub={`${((positions as any)?.positions || []).length}종목 보유`}
-        />
-        <StatCard
-          label="API 연결"
-          value={balance?.api_connected ? "연결됨" : "연결 안 됨"}
-          valueClass={balance?.api_connected ? "positive" : "negative"}
-        />
-      </div>
+      {(() => {
+        const pos = ((positions as any)?.positions || []) as any[];
+        const totalCost = pos.reduce((s: number, p: any) => s + (p.total_krw || 0), 0);
+        const totalValue = pos.reduce((s: number, p: any) => s + (p.amount || 0) * (p.current_price || 0), 0);
+        const totalAsset = (balance?.krw_balance || 0) + totalValue;
+        const totalPnl = totalAsset - 100000;
+        return (
+          <div className="kpi-grid">
+            <StatCard
+              label="총 보유 자산"
+              value={balance ? formatKRW(totalAsset) : "-"}
+              sub={`KRW ${formatKRW(balance?.krw_balance || 0)} + 코인 ${formatKRW(totalValue)}`}
+            />
+            <StatCard
+              label="총 손익"
+              value={formatKRW(totalPnl)}
+              valueClass={totalPnl >= 0 ? "positive" : "negative"}
+              sub="시작 ₩100,000 기준"
+            />
+            <StatCard
+              label="매수 금액"
+              value={formatKRW(totalCost)}
+              sub={`${pos.length}종목 보유`}
+            />
+            <StatCard
+              label="평가 금액"
+              value={formatKRW(totalValue)}
+              valueClass={totalValue >= totalCost ? "positive" : "negative"}
+              sub={totalCost > 0 ? `${formatPercent((totalValue - totalCost) / totalCost * 100)} 수익률` : ""}
+            />
+          </div>
+        );
+      })()}
 
       <div className="grid-2">
         {/* Position Card */}

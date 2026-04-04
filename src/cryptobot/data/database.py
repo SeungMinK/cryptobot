@@ -181,6 +181,17 @@ CREATE TABLE IF NOT EXISTS users (
     last_login_at DATETIME
 );
 
+CREATE TABLE IF NOT EXISTS prompt_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    version TEXT NOT NULL,
+    prompt_text TEXT NOT NULL,
+    description TEXT,
+    is_active BOOLEAN DEFAULT FALSE,
+    created_at DATETIME NOT NULL,
+    activated_at DATETIME,
+    deactivated_at DATETIME
+);
+
 CREATE TABLE IF NOT EXISTS llm_decisions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -1,64 +1,45 @@
 # CryptoBot
 
-AI 기반 코인 자동매매 시스템. 규칙 기반 매매 전략에 LLM(Claude) 시장분석을 결합하여 매매 파라미터를 자동 조절하는 개인용 트레이딩 봇.
+AI 기반 코인 자동매매 시스템. 10개 매매 전략 + Claude AI 시장분석을 결합하여 매매 파라미터를 자동 조절하는 개인용 트레이딩 봇.
 
 ## Overview
 
-업비트 API를 통해 코인을 자동으로 매수/매도하고, 매매 데이터를 축적하여 전략을 지속적으로 개선하는 시스템입니다. 단순한 자동매매를 넘어, 데이터 수집 → 변환 → 분석 → 자동화를 아우르는 데이터 파이프라인으로 설계되었습니다.
+업비트 API를 통해 멀티코인을 자동으로 매수/매도하고, 뉴스 수집 + AI 분석으로 전략을 지속 개선하는 시스템입니다. 데이터 수집 → 변환 → AI 분석 → 자동 매매를 아우르는 데이터 파이프라인으로 설계되었습니다.
 
 ### Core Features
 
-- **9개 매매 전략**: 변동성 돌파, 볼린저 밴드, RSI, MACD, 이동평균 교차 등 (Admin에서 전환)
-- **신호 강도 기반 포지션 사이징**: confidence에 비례하여 매수 금액 자동 결정
-- **실시간 리스크 관리**: 손절/트레일링 스탑/일일 손실 제한/연속 손실 차단
-- **데이터 파이프라인**: 10초 간격 시장 데이터 수집, 매매 신호/결과 기록, OHLCV 히스토리 저장
-- **React Admin 대시보드**: 대시보드, 매매 내역, 전략 관리, 매매 신호, 수익률 분석, 설정
-- **Slack 알림**: 매매 체결/수익/에러/틱별 판단 리포트 (Bot Token 방식)
-- **에러 로깅**: 날짜별 에러/경고 파일 저장 (`error/yyyy-mm-dd/`)
+- **10개 매매 전략**: 볼린저+RSI 복합, 변동성 돌파, RSI, MACD 등 (시장 상태별 자동 선택)
+- **멀티코인**: 거래량/변동성 기반 자동 선별 (BTC/ETH/XRP 고정 + 알트코인 자동)
+- **AI 시장분석**: Claude Haiku가 4시간마다 뉴스 분석 → 전략/파라미터 자동 조절
+- **뉴스 수집**: CoinDesk, CoinTelegraph RSS + Fear & Greed Index (30분 주기)
+- **리스크 관리**: 수수료 가드, 손절/트레일링 스탑, 하드 리밋 (AI 조절 범위 제한)
+- **프롬프트 버전 관리**: AI 판단 이력 + 프롬프트별 성과 추적
+- **React Admin 대시보드**: 8개 페이지 (대시보드, 매매, 전략, 신호, 뉴스, 수익, LLM, 설정)
+- **에러 로깅**: 날짜별 분리 + AI 비용 트래킹
 
 ### Architecture
 
 ```
 ┌─ Trading Bot ───────────────────────────────────┐
-│                                                  │
-│  DataCollector → Indicators → StrategyRegistry   │
-│       │            (10개 전략, 시장 상태별 자동선택) │
-│  Multi-Coin     bb_rsi_combined (횡보/하락)      │
-│  Scanner        volatility_breakout (상승)       │
-│       │                                          │
-│  RiskManager ←── confidence + 수수료 가드        │
-│       │                                          │
-│  OrderExecutor (pyupbit, 멀티코인)               │
-│       │                                          │
-│  DataRecorder (signals + trades + params)        │
+│  Multi-Coin Scanner → DataCollector (60초)       │
+│  StrategyRegistry (10개, 시장 상태별 자동선택)     │
+│  RiskManager (수수료 가드 + 하드 리밋)            │
+│  LLM Analyzer (4시간) → 파라미터 자동 조절        │
+│  OrderExecutor (pyupbit)                         │
 └──────┬───────────────────────────────────────────┘
        │
-┌──────┴──────────── SQLite (공유 DB) ────────────┐
+┌──────┴────────── SQLite (공유 DB) ──────────────┐
 │  market_snapshots │ trade_signals │ trades       │
 │  ohlcv_daily      │ news_articles │ llm_decisions│
-│  bot_config       │ strategies    │ ...          │
-└──────┬────────────┬───────────────┬──────────────┘
-       │            │               │
-┌──────┴──────┐ ┌───┴────────┐ ┌────┴─────────────┐
-│ News        │ │ Watchdog   │ │ FastAPI + React   │
-│ Collector   │ │            │ │ Admin Dashboard   │
-│             │ │ 헬스체크    │ │                   │
-│ RSS 크롤링   │ │ 에러 감시   │ │ 6개 페이지         │
-│ Fear&Greed  │ │ Slack 알림  │ │ 전략/신호/설정     │
-│ (30분 주기)  │ │ (5분 주기)  │ │                   │
-└─────────────┘ └────────────┘ └───────────────────┘
-       │
-┌──────┴──────────────────────────────────────────┐
-│ LLM Analyzer (Phase 2 — 기존 봇에 통합)          │
-│                                                  │
-│ 뉴스 분석 → 시장 심리 판단 → 파라미터 자동 조절    │
-│ Claude Haiku │ 4시간 주기 │ llm_decisions 기록   │
-│ 공포 기반 DCA │ 토큰 최적화 (~$0.004/일)          │
-└──────────────────────────────────────────────────┘
-       │
-     Slack (Bot Token)
-   매매 알림 + 에러 + 워치독
-```
+│  prompt_versions  │ fear_greed    │ bot_config   │
+└──────┬────────────┬──────────────────────────────┘
+       │            │
+┌──────┴──────┐ ┌───┴────────────────────────────┐
+│ News        │ │ FastAPI + React Admin (8페이지)  │
+│ Collector   │ │ 대시보드/매매/전략/신호/뉴스      │
+│ RSS + F&G   │ │ 수익분석/LLM관리/설정            │
+│ (30분 주기)  │ │                                │
+└─────────────┘ └────────────────────────────────┘
 ```
 
 ## Tech Stack
@@ -66,15 +47,16 @@ AI 기반 코인 자동매매 시스템. 규칙 기반 매매 전략에 LLM(Clau
 | Layer | Technology |
 |-------|-----------|
 | Language | Python 3.11+ |
-| Trading | pyupbit (Upbit API) |
+| Trading | pyupbit (Upbit API, 현물 매매) |
 | Data | pandas, numpy, SQLite |
+| LLM | Anthropic Claude Haiku 4.5 (~월 640원) |
 | API Server | FastAPI + uvicorn |
-| Dashboard | React 18 + TypeScript + Vite + Recharts |
+| Dashboard | React 18 + TypeScript + Vite |
+| News | RSS (CoinDesk, CoinTelegraph) + Fear & Greed API |
 | Notification | Slack Bot Token (slack_sdk) |
-| Scheduling | APScheduler (10초 간격) |
+| Scheduling | APScheduler |
 | Logging | RotatingFileHandler (날짜별 분리) |
-| LLM | Anthropic Claude Haiku (Phase 2) |
-| Infra | Docker, Docker Compose (Phase 3) |
+| Tests | pytest (90건) |
 
 ## Project Structure
 
@@ -82,197 +64,128 @@ AI 기반 코인 자동매매 시스템. 규칙 기반 매매 전략에 LLM(Clau
 cryptobot/
 ├── src/cryptobot/
 │   ├── bot/                # 트레이딩 봇 코어
-│   │   ├── main.py         # 진입점, 스케줄러 (10초 간격)
-│   │   ├── config.py       # 설정 관리
+│   │   ├── main.py         # 메인 루프 (60초 틱 + LLM 4시간)
 │   │   ├── trader.py       # 주문 실행 (pyupbit)
-│   │   ├── strategy.py     # 변동성 돌파 (레거시, 호환용)
-│   │   ├── indicators.py   # 기술적 지표 (RSI, MA, BB, ATR)
-│   │   ├── risk.py         # 리스크 관리 (confidence 기반 포지션 사이징)
-│   │   └── scanner.py      # 종목 자동 선별
+│   │   ├── risk.py         # 리스크 관리 (수수료 가드 + 하드 리밋)
+│   │   ├── scanner.py      # 멀티코인 자동 선별
+│   │   └── indicators.py   # 기술적 지표
 │   │
-│   ├── strategies/         # 매매 전략 (Strategy Pattern)
-│   │   ├── base.py         # BaseStrategy 인터페이스
-│   │   ├── registry.py     # StrategyRegistry (시장 상태별 선택)
-│   │   └── *.py            # 9개 전략 구현체
+│   ├── strategies/         # 매매 전략 (10개)
+│   │   ├── bb_rsi_combined.py  # 볼린저+RSI 복합 (주력)
+│   │   ├── volatility_breakout.py
+│   │   └── ...             # 총 10개 전략
+│   │
+│   ├── llm/                # AI 분석
+│   │   └── analyzer.py     # Claude 시장분석 + 파라미터 조절
 │   │
 │   ├── data/               # 데이터 레이어
-│   │   ├── database.py     # DB 스키마 + 마이그레이션
-│   │   ├── collector.py    # 시장 데이터 수집 + OHLCV 저장
-│   │   ├── recorder.py     # 매매/신호 기록 저장
-│   │   └── strategy_repository.py  # 전략 DB 관리 (단일 활성화)
+│   │   ├── database.py     # DB 스키마 + 인덱스 + 마이그레이션
+│   │   ├── collector.py    # 시장 데이터 수집 (OHLCV 캐시)
+│   │   └── recorder.py     # 매매/신호 기록
 │   │
-│   ├── api/                # FastAPI (Admin 백엔드)
-│   │   └── routes/         # auth, balance, trades, strategies, signals, config
-│   ├── notifier/           # Slack 알림 (Bot Token + Webhook 폴백)
-│   ├── logging_config.py   # 에러 로깅 (날짜별 파일)
-│   └── exceptions.py       # 공통 예외
+│   ├── api/routes/         # FastAPI (Admin 백엔드)
+│   │   ├── trades, signals, strategies, config
+│   │   ├── news, market, balance
+│   │   └── llm (decisions, prompts, hard-limits)
+│   │
+│   ├── notifier/           # Slack 알림
+│   └── logging_config.py   # 에러 로깅
 │
-├── admin/                  # React Admin 대시보드
-│   └── src/
-│       ├── pages/          # 6개 페이지 (대시보드, 매매, 전략, 신호, 수익, 설정)
-│       ├── api/            # API 클라이언트
-│       ├── utils/          # 포맷, 지표설명, 파라미터설명, 에러리포터
-│       └── context/        # Auth 상태 관리
+├── news-collector/         # 뉴스 수집기 (별도 프로세스)
+│   ├── collector.py        # 메인 (30분 주기)
+│   └── sources/            # RSS, Fear&Greed, 업비트
 │
-├── error/                  # 에러 로그 (날짜별 폴더, gitignore)
-├── data/                   # SQLite DB (gitignore)
-├── scripts/                # 유틸리티 (start_all.sh, create_admin.py 등)
-├── tests/                  # 테스트 (65개)
-└── Makefile                # make start/bot/api/web/test/lint
+├── admin/                  # React Admin 대시보드 (8페이지)
+├── error/                  # 에러 로그 (날짜별)
+├── tests/                  # 테스트 (90건)
+└── Makefile                # make start/bot/api/web/news/test
 ```
 
 ## Data Design
 
-매매 판단의 입력(시장 상태)과 출력(매매 결과)을 함께 저장하여, LLM이 과거 데이터를 기반으로 전략을 개선할 수 있도록 설계했습니다. 모든 타임스탬프는 UTC 기준.
+모든 타임스탬프는 UTC (`YYYY-MM-DD HH:MM:SS`). 매매 판단의 전체 흐름(뉴스 → AI 분석 → 전략 선택 → 매매 → 성과)을 추적 가능하도록 설계.
 
 ```
-ohlcv_daily (매일 120일치 upsert)
-    → 일봉 OHLCV 데이터 (백테스팅/LLM 학습용)
+news_articles (30분) → 뉴스 원문 + 코인 태깅 + 감성 분류
+fear_greed_index (1시간) → 공포/탐욕 지수
 
-market_snapshots (60초 간격, 멀티코인)
-    → 코인별 시세, 거래량, 기술적 지표 (RSI, MA, 볼린저, ATR), 시장 상태
+llm_decisions (4시간) → AI 시장 요약(한국어) + 파라미터 변경 + 비용
+prompt_versions → 프롬프트 전문 + 버전 관리 + 성과 연결
 
-trade_signals (매 틱마다, 코인별)
-    → 실행 여부 관계없이 모든 신호 기록 + 적용된 전략 파라미터 JSON
+market_snapshots (60초, 멀티코인) → 코인별 시세 + 지표 + 시장 상태
+ohlcv_daily (매일) → 120일 일봉 (백테스팅/학습용)
+trade_signals (매 틱) → 매수/매도/HOLD 판단 + 파라미터 JSON
+trades (체결 시) → 수익률(수수료 포함) + 보유시간 + 전략
 
-trades (체결 시)
-    → 매매 시점의 파라미터 + 시장 상태 + 수익률(수수료 포함) + 보유시간
-
-news_articles (30분 주기)
-    → RSS 뉴스 (CoinDesk, CoinTelegraph) + 업비트 공지
-    → 코인 태깅, 감성 분류, 카테고리 자동 분류
-
-fear_greed_index (1시간 주기)
-    → 공포/탐욕 지수 (0~100) — LLM 시장 심리 판단에 사용
-
-bot_config (변경 시)
-    → 봇/알림/리스크/코인 설정 (Admin에서 실시간 변경)
-
-strategy_activations (전환 시)
-    → 전략 전환 이력 (LLM 학습 데이터)
-
-daily_reports (자정)
-    → 일일 정산 (승률, 수익률, 잔고)
+bot_config → 실시간 설정 (Admin에서 변경)
+strategy_activations → 전략 전환 이력
+daily_reports (자정) → 일일 정산
 ```
 
 ## Quick Start
 
 ```bash
-# 가상환경 생성
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 패키지 설치
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-
-# 환경변수 설정
-cp .env.example .env
-# .env 파일에 Upbit API Key, Slack Bot Token 입력
-
-# Admin 웹 의존성 설치
+cp .env.example .env   # API Key, Slack, LLM 설정
 cd admin && npm install && cd ..
-
-# 관리자 계정 생성
 python scripts/create_admin.py
 ```
 
-### 바로 실행
+### 실행
 
 ```bash
-# 전체 한번에 실행 (봇 + API + 뉴스 수집기 + Admin 웹)
+# 전체 (봇 + API + 뉴스 수집기 + Admin)
 make start
-# 또는
-bash scripts/start_all.sh
-```
 
-Ctrl+C로 전체 종료. 로그에 `[BOT]`, `[API]`, `[NEWS]`, `[WEB]` 태그로 구분됨.
-
-- API 서버: http://localhost:8000
-- Admin 대시보드: http://localhost:5173
-- API 문서: http://localhost:8000/api/docs
-
-### 개별 실행
-
-```bash
+# 개별
 make bot      # 트레이딩 봇
-make api      # API 서버
-make web      # Admin 대시보드
+make api      # API 서버 (localhost:8000)
+make web      # Admin (localhost:5173)
 make news     # 뉴스 수집기
 make test     # 테스트 (90건)
-make lint     # 린트
 ```
 
 ## Admin Dashboard
 
 | 페이지 | 기능 |
 |---|---|
-| 대시보드 | KPI, 포지션, 시장 현황, BTC 가격 추이 (1h~30d 기간 선택) |
-| 매매 내역 | 매매 이력 필터/페이지네이션, 상세 모달 |
-| 전략 관리 | 9개 전략 (시장별 섹션), 파라미터 편집 + AS-IS/TO-BE 시뮬레이션 |
-| 매매 신호 | 실시간 신호 이력, 지표/파라미터 상세, 30초 자동 새로고침 |
-| 수익률 분석 | 누적 수익 차트, 일별 PnL, 승/패 비율 |
-| 설정 | 봇/알림/리스크/전략 설정 토글/입력 (변경 즉시 반영) |
+| 대시보드 | KPI(자산/손익%), 포지션, AI 시장 요약, 최근 매매, 모니터링 코인 |
+| 매매 내역 | 시간순 매매 이력, 신뢰도, 순수익(수수료 포함) |
+| 전략 관리 | 10개 전략 카드, 코인별 적용 현황, 파라미터 편집 + 시뮬레이션 |
+| 매매 신호 | 실시간 신호 이력, 지표/파라미터 상세, 30초 자동 갱신 |
+| 뉴스 | RSS 뉴스 + 공포/탐욕 지수, 감성 필터, 코인 검색 |
+| 수익률 분석 | 승률, 매도 수익 합계, 총 수수료 |
+| LLM 관리 | AI 모델/비용/프롬프트 히스토리, 분석 이력(before/after) |
+| 설정 | 봇/리스크/알림/코인 설정 + LLM 하드 리밋 (읽기 전용) |
 
 ## Development Roadmap
 
 ### Phase 1: MVP — 자동매매 기본 동작 (완료)
 
-- [x] #1 프로젝트 초기 설정
-- [x] #4 API Key 발급 + 연결 테스트
-- [x] #5 설정 관리 모듈 (config.py)
-- [x] #6 데이터베이스 초기화
-- [x] #7 기술적 지표 계산 모듈
-- [x] #8 변동성 돌파 전략 엔진 + 8개 추가 전략
-- [x] #9 주문 실행 모듈
-- [x] #10 시장 데이터 수집기
-- [x] #11 Slack 알림 모듈
-- [x] #12 메인 루프 + 스케줄러
+- [x] #1~#12 프로젝트 설정, DB, 지표, 전략, 주문, 수집, 알림, 스케줄러
 
-### Phase 2: Admin 대시보드 + LLM 연동
+### Phase 2: Admin + AI 연동 (완료)
 
-**백엔드 API (FastAPI)**
-- [x] #29 FastAPI 프로젝트 초기 설정
-- [x] #30 JWT 인증 + 로그인 API
-- [x] #31 매매 내역 API
-- [x] #32 잔고 + 포지션 API
-- [x] #33 전략 관리 API
-- [x] #34 시장 현황 API
+- [x] #29~#39 FastAPI + React Admin 대시보드 (8페이지)
+- [x] #44~#68 멀티코인, 볼린저+RSI 복합, 수수료 가드, 최적화, 통합 테스트
+- [x] #16 뉴스 수집기 (RSS + Fear & Greed)
+- [x] #17 Claude Haiku 연동 — AI 시장분석 + 파라미터 자동 조절
+- [x] #18 프롬프트 버전 관리 + 과거 성과 기반 튜닝
+- [ ] #19 백테스트 엔진 (ohlcv_daily 활용)
+- [ ] #70 워치독 서비스
 
-**프론트엔드 (React)**
-- [x] #35 React Admin 프로젝트 초기 설정
-- [x] #36 대시보드 페이지 — 전체 현황
-- [x] #37 대시보드 페이지 — 매매 내역
-- [x] #38 대시보드 페이지 — 전략 관리
-- [x] #39 대시보드 페이지 — 수익률 분석
-- [x] #44 Slack Bot Token 알림
-- [x] #46 로그인 안정화 (thread-local DB)
-- [x] #47 신호 강도 기반 포지션 사이징
-- [x] #49 에러 로깅 시스템
-- [x] #50 전략 레지스트리 봇 연결
-- [x] #52 봇 설정 관리 + 틱별 Slack 리포트
-- [x] #55 전략 단일 활성화 + 종료중 상태
-- [x] #57 타임스탬프 UTC 통일 + OHLCV 히스토리
-- [x] #59 멀티코인 자동 선별 + 신뢰도 기반 자산 배분
-- [x] #62 코인별 시장 상태 기반 전략 자동 선택
-- [x] #65 코드 최적화 (API 캐시, DB 배치, 인덱스)
-- [x] #67 볼린저+RSI 복합 전략 (60%+ 승률)
-- [x] #63 실제 매매 데이터 기반 통합 테스트 25건
-
-**뉴스 수집 + LLM 연동**
-- [x] #16 뉴스 수집기 (RSS + Fear & Greed Index)
-- [ ] #17 Claude Haiku 연동 — 시장분석
-- [ ] #18 LLM 파라미터 튜닝 — 매매 결과 피드백
-- [ ] #19 백테스트 엔진
-
-### Phase 3: 인프라 — 컨테이너화
+### Phase 3: 인프라
 
 - [ ] #20 Docker 컨테이너화
 - [ ] #21 SQLite → PostgreSQL 마이그레이션
 
-### Phase 4: 클라우드 — 배포 + 오케스트레이션
+### Phase 4: 클라우드 + 고도화
 
 - [ ] #22 Airflow DAG 설계
-- [ ] #23 클라우드 배포 (Oracle/AWS)
+- [ ] #23 클라우드 배포
+- [ ] #78 매매 판단 데이터 분석 파이프라인
+- [ ] #79 자체 LLM 파인튜닝
 
 ## License
 

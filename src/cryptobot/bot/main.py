@@ -508,6 +508,13 @@ class CryptoBot:
             return
 
         buy_price = active_trade["price"]
+
+        # 보유 시간 계산 → 전략에 전달 (ROI 테이블용)
+        buy_time = datetime.fromisoformat(active_trade["timestamp"])
+        if buy_time.tzinfo is None:
+            buy_time = buy_time.replace(tzinfo=timezone.utc)
+        self._strategy._hold_minutes = int((datetime.now(timezone.utc) - buy_time).total_seconds() / 60)
+
         signal_result = self._strategy.check_sell(df, current_price, buy_price)
 
         # 틱 리포트 발송 (보유 중)

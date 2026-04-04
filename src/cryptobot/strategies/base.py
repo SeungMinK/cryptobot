@@ -43,6 +43,15 @@ class StrategyParams:
     position_size_pct: float = 100.0  # 포지션 크기 (잔고 대비 %)
     extra: dict = field(default_factory=dict)  # 전략별 추가 파라미터
 
+    # 시간 기반 ROI 테이블: {보유 분: 최소 수익%}
+    # 보유 시간이 길어질수록 목표 수익을 낮춤
+    roi_table: dict = field(default_factory=lambda: {
+        10: 3.0,    # 10분 내 +3% 이상이면 매도
+        30: 2.0,    # 30분 내 +2%
+        60: 1.0,    # 60분 내 +1%
+        120: 0.15,  # 120분 내 +0.15% (수수료 이상이면 탈출)
+    })
+
 
 class BaseStrategy(ABC):
     """매매 전략 베이스 클래스.
@@ -54,6 +63,7 @@ class BaseStrategy(ABC):
     def __init__(self, params: StrategyParams | None = None) -> None:
         self.params = params or StrategyParams()
         self._highest_price: float | None = None  # 트레일링 스탑용
+        self._hold_minutes: int = 0  # 보유 시간 (main.py에서 설정)
 
     @abstractmethod
     def info(self) -> StrategyInfo:
@@ -87,8 +97,8 @@ class BaseStrategy(ABC):
     # 업비트 수수료: 매수 0.05% + 매도 0.05% = 왕복 0.1%
     ROUND_TRIP_FEE_PCT = 0.1
 
-    def check_trailing_stop(self, current_price: float, buy_price: float) -> Signal | None:
-        """공통 트레일링 스탑 + 손절 + 수수료 가드. 모든 전략이 공유."""
+    def check_trailing_stop(self, current_price: float, buy_price: float, hold_minutes: int | None = None) -> Signal | None:
+        """공통 트레일링 스탑 + 손절 + ROI + 수수료 가드."""
         # 최고가 갱신
         if self._highest_price is None or current_price > self._highest_price:
             self._highest_price = current_price
@@ -99,13 +109,22 @@ class BaseStrategy(ABC):
         if pnl_pct <= self.params.stop_loss_pct:
             return Signal("sell", 1.0, "손절", trigger_value=round(pnl_pct, 2))
 
+        # 시간 기반 ROI — 보유 시간별 최소 수익 도달 시 매도
+        hold_minutes = hold_minutes if hold_minutes is not None else self._hold_minutes
+        if hold_minutes > 0 and self.params.roi_table:
+            for minutes, min_roi in sorted(self.params.roi_table.items()):
+                if hold_minutes >= minutes and pnl_pct >= min_roi and pnl_pct > self.ROUND_TRIP_FEE_PCT:
+                    return Signal(
+                        "sell", 0.9,
+                        f"ROI 도달 ({hold_minutes}분 보유, +{pnl_pct:.2f}% >= {min_roi}%)",
+                        trigger_value=round(pnl_pct, 2),
+                    )
+
         # 트레일링 스탑
         drop_pct = (current_price - self._highest_price) / self._highest_price * 100
         if drop_pct <= self.params.trailing_stop_pct:
-            # 수수료 가드: 수수료(0.1%) 이상 수익이면 익절, 아니면 기다림
-            if pnl_pct > self.ROUND_TRIP_FEE_PCT:  # 수수료 초과 수익만 매도
+            if pnl_pct > self.ROUND_TRIP_FEE_PCT:
                 return Signal("sell", 0.8, f"트레일링 스탑 (익절 {pnl_pct:+.2f}%)", trigger_value=round(drop_pct, 2))
-            # 수수료 이하 수익/손실 → 기다림 (손절은 stop_loss가 처리)
             return None
 
         return None

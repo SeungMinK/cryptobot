@@ -38,6 +38,10 @@ class DataRecorder:
         Returns:
             생성된 signal의 id
         """
+        # snapshot_id가 0이면 None으로 (FK 제약 방지)
+        if snapshot_id is not None and snapshot_id <= 0:
+            snapshot_id = None
+
         cursor = self._db.execute(
             """
             INSERT INTO trade_signals (

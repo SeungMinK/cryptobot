@@ -562,9 +562,17 @@ class Database:
 
             # 마이그레이션: market_snapshots의 timestamp UNIQUE 제거 (멀티코인 대응)
             try:
-                conn.execute("DROP INDEX IF EXISTS sqlite_autoindex_market_snapshots_1")
-            except sqlite3.OperationalError:
-                pass
+                # UNIQUE 제약이 있는지 확인
+                idx = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='market_snapshots'").fetchone()
+                if idx and "UNIQUE(timestamp)" in (idx[0] or ""):
+                    conn.executescript("""
+                        ALTER TABLE market_snapshots RENAME TO market_snapshots_old;
+                        CREATE TABLE market_snapshots AS SELECT * FROM market_snapshots_old;
+                        DROP TABLE market_snapshots_old;
+                    """)
+                    logger.info("market_snapshots UNIQUE(timestamp) 제약 제거 완료")
+            except Exception as e:
+                logger.warning("market_snapshots 마이그레이션 스킵: %s", e)
 
             # 마이그레이션: market_snapshots에 coin 컬럼 추가
             try:

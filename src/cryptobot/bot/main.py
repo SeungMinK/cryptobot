@@ -492,6 +492,25 @@ class CryptoBot:
             logger.info("매도 신호 발생했으나 API Key 미설정 — 스킵")
             return
 
+        # 수수료 가드: 손절이 아닌 경우, 수수료 이상 수익이 나야 매도
+        pnl_pct = (current_price - buy_price) / buy_price * 100
+        is_stop_loss = "손절" in signal_result.reason
+        if not is_stop_loss and pnl_pct <= 0.1:  # 왕복 수수료 0.1%
+            self._recorder.record_signal(
+                coin=coin,
+                signal_type="sell",
+                strategy=self._strategy_name,
+                confidence=signal_result.confidence,
+                trigger_reason=signal_result.reason,
+                current_price=current_price,
+                trigger_value=signal_result.trigger_value,
+                skip_reason=f"수수료 가드: 수익 {pnl_pct:+.2f}% < 수수료 0.1%",
+                snapshot_id=snapshot_id,
+                strategy_params_json=self._get_strategy_params_json(),
+            )
+            logger.info("매도 신호 발생했으나 수수료 가드: %s %+.2f%%", coin, pnl_pct)
+            return
+
         # 매도 실행
         order = self._trader.sell_market(coin)
         if order.success:

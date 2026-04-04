@@ -33,34 +33,49 @@ def get_balance(_: UserResponse = Depends(get_current_user)):
 
 @router.get("/positions")
 def get_positions(_: UserResponse = Depends(get_current_user)):
-    """현재 보유 포지션 (미실현 손익 포함)."""
-    from cryptobot.bot.config import config
+    """현재 보유 포지션 전체 (멀티코인 대응)."""
     from cryptobot.bot.trader import Trader
 
-    recorder = get_recorder()
-    active_trade = recorder.get_active_buy_trade(config.bot.coin)
+    db = get_db()
+    # 미매도 매수 건 전체 조회
+    rows = db.execute(
+        """
+        SELECT t.* FROM trades t
+        WHERE t.side = 'buy'
+        AND NOT EXISTS (SELECT 1 FROM trades s WHERE s.buy_trade_id = t.id AND s.side = 'sell')
+        ORDER BY t.id DESC
+        """
+    ).fetchall()
 
-    if active_trade is None:
-        return {"has_position": False, "position": None}
+    if not rows:
+        return {"has_position": False, "positions": []}
 
-    # 현재가 조회
-    try:
-        current_price = Trader().get_current_price(config.bot.coin)
-        unrealized_pnl_pct = (current_price - active_trade["price"]) / active_trade["price"] * 100
-        unrealized_pnl_krw = (current_price - active_trade["price"]) * active_trade["amount"]
-    except Exception:
-        current_price = 0
-        unrealized_pnl_pct = 0
-        unrealized_pnl_krw = 0
+    trader = Trader()
+    positions = []
+    for row in rows:
+        trade = dict(row)
+        coin = trade["coin"]
+        try:
+            current_price = trader.get_current_price(coin)
+            unrealized_pnl_pct = (current_price - trade["price"]) / trade["price"] * 100
+            unrealized_pnl_krw = (current_price - trade["price"]) * trade["amount"]
+        except Exception:
+            current_price = 0
+            unrealized_pnl_pct = 0
+            unrealized_pnl_krw = 0
 
-    return {
-        "has_position": True,
-        "position": {
-            **dict(active_trade),
+        positions.append({
+            **trade,
             "current_price": current_price,
             "unrealized_pnl_pct": round(unrealized_pnl_pct, 2),
             "unrealized_pnl_krw": round(unrealized_pnl_krw, 0),
-        },
+        })
+
+    return {
+        "has_position": True,
+        "positions": positions,
+        # 하위 호환: 첫 번째 포지션
+        "position": positions[0] if positions else None,
     }
 
 

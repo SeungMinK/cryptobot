@@ -174,6 +174,9 @@ class DataCollector:
         logger.info("OHLCV 일봉 저장: %s %d일치", self._coin, len(rows))
 
     def get_latest_snapshot(self) -> dict | None:
-        """가장 최근 스냅샷 조회."""
-        row = self._db.execute("SELECT * FROM market_snapshots ORDER BY id DESC LIMIT 1").fetchone()
+        """이 코인의 가장 최근 스냅샷 조회."""
+        row = self._db.execute(
+            "SELECT * FROM market_snapshots WHERE coin = ? ORDER BY id DESC LIMIT 1",
+            (self._coin,),
+        ).fetchone()
         return dict(row) if row else None

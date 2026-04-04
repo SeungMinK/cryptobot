@@ -98,31 +98,22 @@ export default function DashboardPage() {
         {/* Position Card */}
         <div className="card">
           <div className="card-title">현재 포지션</div>
-          {positions?.has_position && positions.position ? (
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
-                {positions.position.coin}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>매수가</div>
-                  <div>{formatKRW(positions.position.price)}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>현재가</div>
-                  <div>{formatKRW(positions.position.current_price)}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>수량</div>
-                  <div>{formatNumber(positions.position.amount, 8)}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)" }}>미실현 손익</div>
-                  <div className={positions.position.unrealized_pnl_pct >= 0 ? "positive" : "negative"}>
-                    {formatPercent(positions.position.unrealized_pnl_pct)} ({formatKRW(positions.position.unrealized_pnl_krw)})
+          {positions?.has_position && (positions as any).positions?.length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {((positions as any).positions || []).map((p: any) => (
+                <div key={p.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ fontWeight: 600 }}>{p.coin?.replace("KRW-", "")}</span>
+                    <span className={p.unrealized_pnl_pct >= 0 ? "positive" : "negative"} style={{ fontWeight: 600 }}>
+                      {formatPercent(p.unrealized_pnl_pct)} ({formatKRW(p.unrealized_pnl_krw)})
+                    </span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 12 }}>
+                    <div><span style={{ color: "var(--text-muted)" }}>매수 </span>{formatKRW(p.price)}</div>
+                    <div><span style={{ color: "var(--text-muted)" }}>현재 </span>{formatKRW(p.current_price)}</div>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           ) : (
             <div className="empty-state">보유 포지션 없음</div>

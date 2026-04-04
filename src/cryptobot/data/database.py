@@ -716,6 +716,17 @@ class Database:
                     )
                 logger.info("봇 설정 기본값 삽입 완료 (%d개)", len(_DEFAULT_BOT_CONFIG))
 
+            # 인덱스 생성
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_snapshots_coin_id ON market_snapshots(coin, id DESC)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_snapshots_timestamp ON market_snapshots(timestamp)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_signals_coin_timestamp ON trade_signals(coin, timestamp)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_signals_timestamp ON trade_signals(timestamp)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_coin_side ON trades(coin, side)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ohlcv_coin_date ON ohlcv_daily(coin, date)")
+
+            # 잔여 마이그레이션 테이블 정리
+            conn.execute("DROP TABLE IF EXISTS market_snapshots_old")
+
             conn.commit()
             logger.debug("데이터베이스 연결 준비 완료: %s", self._db_path)
         except sqlite3.Error as e:

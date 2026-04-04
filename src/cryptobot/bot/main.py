@@ -59,10 +59,15 @@ class CryptoBot:
         self._db.initialize()
 
         self._trader = Trader()
-        self._collector = DataCollector(self._db, config.bot.coin)
         self._recorder = DataRecorder(self._db)
         self._notifier = SlackNotifier()
         self._risk = RiskManager(self._db)
+
+        # 멀티코인: 코인별 collector 관리
+        self._collectors: dict[str, DataCollector] = {}
+        self._active_coins: list[str] = [config.bot.coin]  # 기본: BTC만
+        self._last_coin_refresh: str = ""
+        self._init_collectors()
 
         # 전략 레지스트리 초기화
         self._registry = StrategyRegistry()
@@ -78,10 +83,63 @@ class CryptoBot:
 
         self._scheduler = BlockingScheduler()
 
+    def _init_collectors(self) -> None:
+        """활성 코인별 DataCollector 초기화."""
+        for coin in self._active_coins:
+            if coin not in self._collectors:
+                self._collectors[coin] = DataCollector(self._db, coin)
+
+    def _refresh_coins(self) -> None:
+        """멀티코인 목록 갱신 (30분 주기)."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+        interval = int(self._get_config("coin_refresh_interval_minutes", "30"))
+
+        # 간격 체크 (분 단위)
+        if self._last_coin_refresh and now < self._last_coin_refresh:
+            return
+
+        if not self._get_config_bool("multi_coin_enabled", True):
+            self._active_coins = [config.bot.coin]
+            self._init_collectors()
+            return
+
+        try:
+            from cryptobot.bot.scanner import CoinScanner
+            max_coins = int(self._get_config("max_coins", "5"))
+            min_volume = float(self._get_config("min_volume_krw", "10000000000"))
+            min_price = float(self._get_config("min_price_krw", "1000"))
+
+            scanner = CoinScanner(
+                min_volume_krw=min_volume,
+                min_price_krw=min_price,
+                max_coins=max_coins,
+            )
+            top_coins = scanner.scan_top_coins()
+
+            if top_coins:
+                new_coins = [c["ticker"] for c in top_coins]
+                # BTC는 항상 포함
+                if config.bot.coin not in new_coins:
+                    new_coins.insert(0, config.bot.coin)
+
+                if set(new_coins) != set(self._active_coins):
+                    logger.info("코인 목록 갱신: %s → %s", self._active_coins, new_coins)
+                    self._active_coins = new_coins
+                    self._init_collectors()
+
+            # 다음 갱신 시간 설정
+            next_refresh = datetime.now(timezone.utc)
+            next_refresh = next_refresh.replace(minute=(next_refresh.minute + interval) % 60)
+            self._last_coin_refresh = next_refresh.strftime("%Y-%m-%d %H:%M")
+
+        except Exception as e:
+            logger.error("코인 목록 갱신 실패: %s", e)
+
     def start(self) -> None:
         """봇 시작."""
         logger.info("=== CryptoBot 시작 ===")
-        logger.info("종목: %s", config.bot.coin)
+        logger.info("종목: %s (%d개)", ", ".join(self._active_coins), len(self._active_coins))
         logger.info("활성 전략: %s", self._strategy_name or "없음")
         logger.info("등록 전략: %s", ", ".join(self._registry.list_names()))
         logger.info("API Key 설정: %s", "O" if self._trader.is_ready else "X")
@@ -152,46 +210,86 @@ class CryptoBot:
         )
 
     def _tick(self) -> None:
-        """10초마다 실행되는 메인 로직."""
+        """매 틱마다 실행되는 메인 로직. 멀티코인 순회."""
         try:
-            # 0. 전략/설정 변경 확인
+            # 0. 전략/설정 변경 확인 + 코인 목록 갱신
             self._refresh_strategy()
+            self._refresh_coins()
 
             if self._strategy is None:
                 return
 
-            # 매매 허용 여부 확인
             if not self._get_config_bool("allow_trading", True):
                 return
 
-            # 1. 시장 데이터 수집
-            snapshot_id = self._collector.collect_and_save()
-            if snapshot_id is None:
-                return
-
-            snapshot = self._collector.get_latest_snapshot()
-            if snapshot is None:
-                return
-
-            current_price = snapshot["btc_price"]
-
-            # 2. 보유 중인 포지션 확인
-            active_trade = self._recorder.get_active_buy_trade(config.bot.coin)
-
-            if active_trade:
-                # 보유 중 → 매도 신호 확인
-                self._check_and_sell(active_trade, current_price, snapshot_id, snapshot)
-            else:
-                # 미보유 → 매수 신호 확인
-                self._check_and_buy(snapshot, current_price, snapshot_id)
+            # 코인별 순회
+            for coin in self._active_coins:
+                try:
+                    self._tick_coin(coin)
+                except Exception as e:
+                    logger.error("틱 에러 (%s): %s", coin, e, exc_info=True)
 
         except Exception as e:
             logger.error("틱 실행 에러: %s", e, exc_info=True)
             self._notifier.notify_error(str(e))
 
-    def _check_and_buy(self, snapshot: dict, current_price: float, snapshot_id: int) -> None:
+    def _tick_coin(self, coin: str) -> None:
+        """개별 코인에 대한 매매 판단."""
+        collector = self._collectors.get(coin)
+        if collector is None:
+            return
+
+        # 1. 시장 데이터 수집
+        snapshot_id = collector.collect_and_save()
+        if snapshot_id is None:
+            return
+
+        snapshot = collector.get_latest_snapshot()
+        if snapshot is None:
+            return
+
+        current_price = snapshot["btc_price"]
+
+        # 2. 보유 중인 포지션 확인
+        active_trade = self._recorder.get_active_buy_trade(coin)
+
+        if active_trade:
+            self._check_and_sell(active_trade, current_price, snapshot_id, snapshot, coin)
+        else:
+            self._check_and_buy(snapshot, current_price, snapshot_id, coin)
+
+    def _get_coin_buy_amount(self, coin: str, confidence: float) -> float:
+        """코인별 매수 금액 계산 (신뢰도 + 최대 포지션 비율 적용).
+
+        Args:
+            coin: 종목 코드
+            confidence: 매수 신호 강도
+
+        Returns:
+            매수 가능 금액 (원)
+        """
+        balance = self._trader.get_balance_krw()
+        max_per_coin_pct = float(self._get_config("max_position_per_coin_pct", "50"))
+        position_size_pct = self._strategy.params.position_size_pct
+
+        # 1종목당 최대 금액 = 잔고 × max_per_coin_pct%
+        max_for_coin = balance * max_per_coin_pct / 100
+
+        # 가용 금액 = min(잔고 기반 포지션, 종목당 최대) - 최소 유지 잔고
+        available = min(max_for_coin, balance - self._risk.limits.min_balance_krw)
+        if available <= 0:
+            return 0
+
+        ratio = max(0.0, min(confidence, 1.0)) * max(0.0, min(position_size_pct, 100.0)) / 100.0
+        sized_amount = available * ratio
+
+        return min(sized_amount, self._risk.limits.max_position_size_krw)
+
+    def _check_and_buy(self, snapshot: dict, current_price: float, snapshot_id: int, coin: str | None = None) -> None:
         """매수 신호 확인 및 실행."""
-        df = self._collector.latest_df
+        coin = coin or config.bot.coin
+        collector = self._collectors.get(coin)
+        df = collector.latest_df if collector else None
         if df is None:
             return
 
@@ -202,7 +300,7 @@ class CryptoBot:
 
         if signal_result.signal_type != "buy":
             self._recorder.record_signal(
-                coin=config.bot.coin,
+                coin=coin,
                 signal_type=signal_result.signal_type,
                 strategy=self._strategy_name,
                 confidence=signal_result.confidence,
@@ -217,7 +315,7 @@ class CryptoBot:
 
         if not self._trader.is_ready:
             self._recorder.record_signal(
-                coin=config.bot.coin,
+                coin=coin,
                 signal_type="buy",
                 strategy=self._strategy_name,
                 confidence=signal_result.confidence,
@@ -231,18 +329,14 @@ class CryptoBot:
             logger.info("매수 신호 발생했으나 API Key 미설정 — 스킵")
             return
 
-        # 매수 실행 — 리스크 점검 후 진행
+        # 매수 실행 — 코인별 배분 + 리스크 점검
+        buy_amount = self._get_coin_buy_amount(coin, signal_result.confidence)
         balance = self._trader.get_balance_krw()
-        buy_amount = self._risk.get_safe_position_size(
-            balance,
-            confidence=signal_result.confidence,
-            position_size_pct=self._strategy.params.position_size_pct,
-        )
 
-        can_buy, reason = self._risk.check_can_buy(config.bot.coin, buy_amount, balance)
+        can_buy, reason = self._risk.check_can_buy(coin, buy_amount, balance)
         if not can_buy:
             self._recorder.record_signal(
-                coin=config.bot.coin,
+                coin=coin,
                 signal_type="buy",
                 strategy=self._strategy_name,
                 confidence=signal_result.confidence,
@@ -256,10 +350,10 @@ class CryptoBot:
             logger.info("매수 신호 발생했으나 리스크 차단: %s", reason)
             return
 
-        order = self._trader.buy_market(config.bot.coin, buy_amount)
+        order = self._trader.buy_market(coin, buy_amount)
         if order.success:
             trade_id = self._recorder.record_trade(
-                coin=config.bot.coin,
+                coin=coin,
                 side="buy",
                 price=order.price,
                 amount=order.amount,
@@ -276,7 +370,7 @@ class CryptoBot:
                 rsi_at_trade=snapshot.get("btc_rsi_14"),
             )
             self._recorder.record_signal(
-                coin=config.bot.coin,
+                coin=coin,
                 signal_type="buy",
                 strategy=self._strategy_name,
                 confidence=signal_result.confidence,
@@ -289,11 +383,13 @@ class CryptoBot:
                 strategy_params_json=self._get_strategy_params_json(),
             )
             if self._get_config_bool("slack_trade_notification", True):
-                self._notifier.notify_trade("buy", config.bot.coin, order.price, order.amount, order.total_krw)
+                self._notifier.notify_trade("buy", coin, order.price, order.amount, order.total_krw)
 
-    def _check_and_sell(self, active_trade: dict, current_price: float, snapshot_id: int, snapshot: dict | None = None) -> None:
+    def _check_and_sell(self, active_trade: dict, current_price: float, snapshot_id: int, snapshot: dict | None = None, coin: str | None = None) -> None:
         """매도 신호 확인 및 실행."""
-        df = self._collector.latest_df
+        coin = coin or config.bot.coin
+        collector = self._collectors.get(coin)
+        df = collector.latest_df if collector else None
         if df is None:
             return
 
@@ -307,7 +403,7 @@ class CryptoBot:
         if signal_result.signal_type != "sell":
             # 보유 중 hold 신호도 기록
             self._recorder.record_signal(
-                coin=config.bot.coin,
+                coin=coin,
                 signal_type=signal_result.signal_type,
                 strategy=self._strategy_name,
                 confidence=signal_result.confidence,
@@ -325,7 +421,7 @@ class CryptoBot:
             return
 
         # 매도 실행
-        order = self._trader.sell_market(config.bot.coin)
+        order = self._trader.sell_market(coin)
         if order.success:
             profit_pct = (order.price - buy_price) / buy_price * 100
             profit_krw = order.total_krw - active_trade["total_krw"]
@@ -333,7 +429,7 @@ class CryptoBot:
             hold_minutes = int((datetime.now(timezone.utc) - buy_time).total_seconds() / 60)
 
             trade_id = self._recorder.record_trade(
-                coin=config.bot.coin,
+                coin=coin,
                 side="sell",
                 price=order.price,
                 amount=order.amount,
@@ -351,7 +447,7 @@ class CryptoBot:
                 hold_duration_minutes=hold_minutes,
             )
             self._recorder.record_signal(
-                coin=config.bot.coin,
+                coin=coin,
                 signal_type="sell",
                 strategy=self._strategy_name,
                 confidence=signal_result.confidence,
@@ -365,8 +461,8 @@ class CryptoBot:
             )
             self._strategy.reset()
             if self._get_config_bool("slack_trade_notification", True):
-                self._notifier.notify_trade("sell", config.bot.coin, order.price, order.amount, order.total_krw)
-                self._notifier.notify_profit(config.bot.coin, profit_pct, profit_krw, hold_minutes)
+                self._notifier.notify_trade("sell", coin, order.price, order.amount, order.total_krw)
+                self._notifier.notify_profit(coin, profit_pct, profit_krw, hold_minutes)
 
     def _load_strategies(self) -> None:
         """DB에서 전략 목록을 읽고 레지스트리에 등록."""

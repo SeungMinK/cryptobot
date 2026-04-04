@@ -79,7 +79,8 @@ export default function DashboardPage() {
         const totalCost = pos.reduce((s: number, p: any) => s + (p.total_krw || 0), 0);
         const totalValue = pos.reduce((s: number, p: any) => s + (p.amount || 0) * (p.current_price || 0), 0);
         const totalAsset = (balance?.krw_balance || 0) + totalValue;
-        const totalPnl = totalAsset - 100000;
+        const STARTING_BALANCE = 100000; // TODO: bot_config에서 가져오기
+        const totalPnl = totalAsset - STARTING_BALANCE;
         return (
           <div className="kpi-grid">
             <StatCard
@@ -91,7 +92,7 @@ export default function DashboardPage() {
               label="총 손익"
               value={formatKRW(totalPnl)}
               valueClass={totalPnl >= 0 ? "positive" : "negative"}
-              sub="시작 ₩100,000 기준"
+              sub={`시작 ₩${STARTING_BALANCE.toLocaleString()} 기준`}
             />
             <StatCard
               label="매수 금액"

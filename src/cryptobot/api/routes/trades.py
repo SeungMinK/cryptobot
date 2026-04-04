@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 """매매 내역 라우트.
 
 NestJS의 TradeController와 동일.
@@ -115,7 +117,8 @@ def get_trade_stats(
         coins = list(set(h["coin"] for h in held))
         try:
             prices = pyupbit.get_current_price(coins) if len(coins) > 1 else {coins[0]: pyupbit.get_current_price(coins[0])}
-        except Exception:
+        except Exception as e:
+            logger.warning("코인 가격 조회 실패: %s", e)
             prices = {}
         if prices:
             for h in held:

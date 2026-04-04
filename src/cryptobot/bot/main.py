@@ -95,10 +95,16 @@ class CryptoBot:
         self._scheduler = BlockingScheduler()
 
     def _init_collectors(self) -> None:
-        """활성 코인별 DataCollector 초기화."""
+        """활성 코인별 DataCollector 초기화 + 불필요한 collector 정리."""
+        # 새 코인 추가
         for coin in self._active_coins:
             if coin not in self._collectors:
                 self._collectors[coin] = DataCollector(self._db, coin)
+        # 목록에서 빠진 코인 정리 (메모리 누수 방지)
+        removed = [c for c in self._collectors if c not in self._active_coins]
+        for coin in removed:
+            del self._collectors[coin]
+            logger.debug("collector 정리: %s", coin)
 
     def _refresh_coins(self) -> None:
         """멀티코인 목록 갱신 (30분 주기)."""
@@ -261,7 +267,8 @@ class CryptoBot:
             # 틱 단위 배치 commit (signal 등)
             try:
                 self._db.commit()
-            except Exception:
+            except Exception as e:
+                logger.warning("틱 commit 실패: %s", e)
                 pass
 
     def _get_held_coins(self) -> list[str]:
@@ -529,7 +536,8 @@ class CryptoBot:
         # 수수료 가드: 손절이 아닌 경우, 수수료 이상 수익이 나야 매도
         pnl_pct = (current_price - buy_price) / buy_price * 100
         is_stop_loss = "손절" in signal_result.reason
-        if not is_stop_loss and pnl_pct <= 0.1:  # 왕복 수수료 0.1% 초과해야 매도
+        min_profit_pct = BaseStrategy.ROUND_TRIP_FEE_PCT  # 0.1% (수수료)
+        if not is_stop_loss and pnl_pct <= min_profit_pct:
             self._recorder.record_signal(
                 coin=coin,
                 signal_type="sell",

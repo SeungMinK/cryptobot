@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 """잔고 + 포지션 라우트."""
 
 from fastapi import APIRouter, Depends, Query
@@ -25,7 +27,8 @@ def get_balance(_: UserResponse = Depends(get_current_user)):
             price = trader.get_current_price(config.bot.coin)
             result["coin_value_krw"] = result["coin_balance"] * price
             result["total_asset_krw"] = result["krw_balance"] + result["coin_value_krw"]
-        except Exception:
+        except Exception as e:
+            logger.warning("잔고 조회 실패: %s", e)
             pass
 
     return result

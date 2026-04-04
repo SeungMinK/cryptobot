@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from cryptobot.api.auth import UserResponse, get_current_user
@@ -39,7 +39,6 @@ def get_config(key: str, _: UserResponse = Depends(get_current_user)) -> ConfigI
     db = get_db()
     row = db.execute("SELECT * FROM bot_config WHERE key = ?", (key,)).fetchone()
     if row is None:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail=f"설정 '{key}' 없음")
     return ConfigItem(**dict(row))
 
@@ -54,7 +53,6 @@ def update_config(
     db = get_db()
     row = db.execute("SELECT * FROM bot_config WHERE key = ?", (key,)).fetchone()
     if row is None:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail=f"설정 '{key}' 없음")
 
     db.execute(

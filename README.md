@@ -5,7 +5,7 @@
     <br />
     10개 매매 전략 + Claude AI 시장분석 + 멀티코인 자동 선별
     <br />
-    <a href="http://localhost:5173">Admin Dashboard</a> · <a href="http://localhost:8000/api/docs">API 문서</a>
+    <sub>로컬 실행: Admin localhost:5173 · API localhost:8000/api/docs</sub>
   </p>
 </p>
 

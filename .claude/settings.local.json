@@ -131,7 +131,8 @@
       "Bash(sed -i '' '1s/^/import logging\\\\nlogger = logging.getLogger\\(__name__\\)\\\\n/' src/cryptobot/api/routes/trades.py)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://api-manager.upbit.com/api/v1/notices?page=1&per_page=5\" --max-time 5 echo \"\" curl -s -o /dev/null -w \"%{http_code}\" \"https://api-manager.upbit.com/api/v1/notices\" --max-time 5 echo \"\" curl -s -o /dev/null -w \"%{http_code}\" \"https://api-manager.upbit.com/api/v1/announcements?page=1&per_page=5\" --max-time 5 echo \"\" curl -s \"https://api-manager.upbit.com/api/v1/notices?os=web&page=1&per_page=5\" --max-time 5)",
       "Bash(.venv/bin/pip install:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(gh api:*)"
     ]
   }
 }

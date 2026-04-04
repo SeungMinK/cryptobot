@@ -1,12 +1,15 @@
 <p align="center">
-  <h1 align="center">CryptoBot</h1>
-  <p align="center">
-    AI 기반 코인 자동매매 시스템
-    <br />
-    10개 매매 전략 + Claude AI 시장분석 + 멀티코인 자동 선별
-    <br />
-    <sub>로컬 실행: Admin localhost:5173 · API localhost:8000/api/docs</sub>
-  </p>
+  <img src="docs/images/logo.png" alt="CryptoBot Logo" width="200" />
+</p>
+
+<h1 align="center">CryptoBot</h1>
+
+<p align="center">
+  AI 기반 코인 자동매매 시스템
+  <br />
+  10개 매매 전략 + Claude AI 시장분석 + 멀티코인 자동 선별
+  <br />
+  <sub>로컬 실행: Admin localhost:5173 · API localhost:8000/api/docs</sub>
 </p>
 
 <p align="center">

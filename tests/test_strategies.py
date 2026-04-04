@@ -240,7 +240,7 @@ def test_common_trailing_stop():
     s.check_trailing_stop(current_price=110, buy_price=100)  # 최고가 110 설정
     signal = s.check_trailing_stop(current_price=106, buy_price=100)  # 110→106 = -3.6%
     assert signal is not None
-    assert signal.reason == "트레일링 스탑"
+    assert "트레일링 스탑" in signal.reason
 
 
 def test_common_hold():

@@ -60,19 +60,23 @@ class CoinScanner:
             if not tickers:
                 return []
 
-            # 전체 종목 시세 조회
+            # 전체 종목 시세 조회 (1회 API 호출)
             all_prices = pyupbit.get_current_price(tickers)
             if all_prices is None:
                 return []
 
-            results = []
-            for ticker in tickers:
-                if ticker in self.EXCLUDED_COINS:
-                    continue
+            # 1차 필터: 제외 코인 + 최소 가격
+            candidates = [
+                t for t in tickers
+                if t not in self.EXCLUDED_COINS and all_prices.get(t, 0) >= self._min_price_krw
+            ]
 
+            # 상위 30개만 OHLCV 조회 (API 호출 제한)
+            candidates = candidates[:30]
+
+            results = []
+            for ticker in candidates:
                 price = all_prices.get(ticker, 0)
-                if price < self._min_price_krw:
-                    continue
 
                 # OHLCV로 거래대금 + 변동성 확인
                 df = pyupbit.get_ohlcv(ticker, interval="day", count=14)

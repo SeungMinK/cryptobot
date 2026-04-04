@@ -84,21 +84,32 @@ class BaseStrategy(ABC):
             매도 신호 또는 hold
         """
 
+    # 업비트 수수료: 매수 0.05% + 매도 0.05% = 왕복 0.1%
+    ROUND_TRIP_FEE_PCT = 0.1
+
     def check_trailing_stop(self, current_price: float, buy_price: float) -> Signal | None:
-        """공통 트레일링 스탑 + 손절 체크. 모든 전략이 공유."""
+        """공통 트레일링 스탑 + 손절 + 수수료 가드. 모든 전략이 공유."""
         # 최고가 갱신
         if self._highest_price is None or current_price > self._highest_price:
             self._highest_price = current_price
 
-        # 손절
-        loss_pct = (current_price - buy_price) / buy_price * 100
-        if loss_pct <= self.params.stop_loss_pct:
-            return Signal("sell", 1.0, "손절", trigger_value=round(loss_pct, 2))
+        pnl_pct = (current_price - buy_price) / buy_price * 100
 
-        # 트레일링 스탑
+        # 손절 — 무조건 실행 (수수료 무시)
+        if pnl_pct <= self.params.stop_loss_pct:
+            return Signal("sell", 1.0, "손절", trigger_value=round(pnl_pct, 2))
+
+        # 트레일링 스탑 — 수수료 가드: 수수료 이상 수익이 나야 매도
         drop_pct = (current_price - self._highest_price) / self._highest_price * 100
         if drop_pct <= self.params.trailing_stop_pct:
-            return Signal("sell", 0.8, "트레일링 스탑", trigger_value=round(drop_pct, 2))
+            if pnl_pct > self.ROUND_TRIP_FEE_PCT:
+                # 수수료 이상 수익 → 익절
+                return Signal("sell", 0.8, f"트레일링 스탑 (익절 {pnl_pct:+.2f}%)", trigger_value=round(drop_pct, 2))
+            elif pnl_pct <= -1.0:
+                # -1% 이상 손해 → 손절
+                return Signal("sell", 0.9, f"트레일링 스탑 (손절 {pnl_pct:+.2f}%)", trigger_value=round(drop_pct, 2))
+            # 수수료 이하 미미한 수익/손실 → 좀 더 기다림
+            return None
 
         return None
 

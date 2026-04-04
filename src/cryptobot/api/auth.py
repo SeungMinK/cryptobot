@@ -3,7 +3,7 @@
 NestJS의 AuthGuard + JwtStrategy와 동일한 역할.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import bcrypt
 from fastapi import Depends, HTTPException, status
@@ -43,7 +43,7 @@ def hash_password(password: str) -> str:
 def create_access_token(data: dict) -> str:
     """JWT 토큰 생성."""
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+    expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
     to_encode["exp"] = expire
     return jwt.encode(to_encode, get_jwt_secret(), algorithm=ALGORITHM)
 

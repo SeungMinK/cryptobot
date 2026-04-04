@@ -16,6 +16,7 @@ export interface Position extends Trade {
 
 export interface PositionsResponse {
   has_position: boolean;
+  positions: Position[];
   position: Position | null;
 }
 

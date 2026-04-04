@@ -205,7 +205,7 @@ export default function SignalsPage() {
         )}
 
         {totalPages > 1 && (
-          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          <Pagination page={page} pages={totalPages} onPageChange={setPage} />
         )}
       </div>
 
@@ -267,7 +267,7 @@ export default function SignalsPage() {
               <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0", paddingTop: 16 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>적용된 전략 파라미터</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  {Object.entries(JSON.parse(selected.strategy_params_json) as Record<string, number>).map(([key, value]) => {
+                  {Object.entries((() => { try { return JSON.parse(selected.strategy_params_json) as Record<string, number>; } catch { return {}; } })()).map(([key, value]) => {
                     const desc = getParamDesc(selected.strategy, key);
                     return (
                       <div key={key}>

@@ -126,6 +126,12 @@ class CryptoBot:
                     if core not in new_coins:
                         new_coins.insert(0, core)
 
+                # 보유 중인 코인도 항상 포함 (매도 가능하도록)
+                held_coins = self._get_held_coins()
+                for held in held_coins:
+                    if held not in new_coins:
+                        new_coins.append(held)
+
                 if set(new_coins) != set(self._active_coins):
                     logger.info("코인 목록 갱신: %s → %s", self._active_coins, new_coins)
                     self._active_coins = new_coins
@@ -235,6 +241,17 @@ class CryptoBot:
         except Exception as e:
             logger.error("틱 실행 에러: %s", e, exc_info=True)
             self._notifier.notify_error(str(e))
+
+    def _get_held_coins(self) -> list[str]:
+        """현재 보유 중인 코인 목록 (미매도 매수 건)."""
+        rows = self._db.execute(
+            """
+            SELECT DISTINCT t.coin FROM trades t
+            WHERE t.side = 'buy'
+            AND NOT EXISTS (SELECT 1 FROM trades s WHERE s.buy_trade_id = t.id AND s.side = 'sell')
+            """
+        ).fetchall()
+        return [r["coin"] for r in rows]
 
     def _get_coin_category(self, coin: str) -> str:
         """코인의 카테고리 반환 (core / alt)."""

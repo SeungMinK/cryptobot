@@ -21,6 +21,81 @@ def get_current_market(_: UserResponse = Depends(get_current_user)):
     return dict(row)
 
 
+@router.get("/coins")
+def get_monitored_coins(_: UserResponse = Depends(get_current_user)):
+    """현재 모니터링 중인 코인별 최신 데이터."""
+    db = get_db()
+
+    # 모니터링 중인 코인 = 최근 1시간 내 스냅샷이 있는 코인들
+    rows = db.execute(
+        """
+        SELECT coin, MAX(id) as latest_id
+        FROM (
+            SELECT 'KRW-BTC' as coin, id, btc_price as price, market_state, btc_rsi_14 as rsi, btc_change_pct_24h as change_pct
+            FROM market_snapshots
+            WHERE timestamp >= datetime('now', '-1 hour')
+        )
+        GROUP BY coin
+        """
+    ).fetchall()
+
+    # 전체 코인의 최신 스냅샷 (각 코인별)
+    # market_snapshots는 현재 BTC만 저장하므로, trade_signals에서 코인 목록을 가져옴
+    active_coins = db.execute(
+        """
+        SELECT DISTINCT coin FROM trade_signals
+        WHERE timestamp >= datetime('now', '-1 hour')
+        ORDER BY coin
+        """
+    ).fetchall()
+
+    result = []
+    for row in active_coins:
+        coin = row["coin"]
+        # 최신 신호에서 가격/상태 가져오기
+        latest = db.execute(
+            """
+            SELECT ts.coin, ts.current_price, ts.strategy, ts.signal_type, ts.confidence,
+                   ts.trigger_reason, ts.timestamp,
+                   ms.market_state, ms.btc_rsi_14 as rsi
+            FROM trade_signals ts
+            LEFT JOIN market_snapshots ms ON ts.snapshot_id = ms.id
+            WHERE ts.coin = ?
+            ORDER BY ts.id DESC LIMIT 1
+            """,
+            (coin,),
+        ).fetchone()
+
+        if latest:
+            # 보유 여부 확인
+            held = db.execute(
+                """
+                SELECT t.price as buy_price, t.total_krw, t.timestamp as buy_time
+                FROM trades t
+                WHERE t.coin = ? AND t.side = 'buy'
+                AND NOT EXISTS (SELECT 1 FROM trades s WHERE s.buy_trade_id = t.id AND s.side = 'sell')
+                ORDER BY t.id DESC LIMIT 1
+                """,
+                (coin,),
+            ).fetchone()
+
+            entry = dict(latest)
+            if held:
+                entry["holding"] = True
+                entry["buy_price"] = held["buy_price"]
+                entry["buy_total_krw"] = held["total_krw"]
+                entry["buy_time"] = held["buy_time"]
+                entry["unrealized_pnl_pct"] = round(
+                    (entry["current_price"] - held["buy_price"]) / held["buy_price"] * 100, 2
+                ) if entry["current_price"] and held["buy_price"] else 0
+            else:
+                entry["holding"] = False
+
+            result.append(entry)
+
+    return result
+
+
 @router.get("/snapshots")
 def get_snapshots(
     limit: int = Query(60, ge=1, le=1440),

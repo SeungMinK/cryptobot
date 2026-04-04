@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { getBalance, getPositions, getBalanceHistory, getBalanceHistorySnapshots } from "../api/balance";
 import type { SnapshotHistory } from "../api/balance";
+import client from "../api/client";
 import { getCurrentMarket } from "../api/market";
 import { getTrades } from "../api/trades";
 import { getActiveStrategies } from "../api/strategies";
@@ -33,6 +34,7 @@ export default function DashboardPage() {
   const [market, setMarket] = useState<MarketSnapshot | null>(null);
   const [recentTrades, setRecentTrades] = useState<Trade[]>([]);
   const [activeStrategies, setActiveStrategies] = useState<Strategy[]>([]);
+  const [monitoredCoins, setMonitoredCoins] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [chartLoading, setChartLoading] = useState(false);
 
@@ -45,7 +47,8 @@ export default function DashboardPage() {
       getCurrentMarket().catch(() => null),
       getTrades({ limit: 5 }).catch(() => ({ items: [] })),
       getActiveStrategies().catch(() => []),
-    ]).then(([bal, pos, hist, snapHist, mkt, trades, strats]) => {
+      client.get("/market/coins").then((r) => r.data).catch(() => []),
+    ]).then(([bal, pos, hist, snapHist, mkt, trades, strats, coins]) => {
       setBalance(bal);
       setPositions(pos as PositionsResponse | null);
       setHistory(hist as BalanceHistory[]);
@@ -53,6 +56,7 @@ export default function DashboardPage() {
       setMarket(mkt as MarketSnapshot | null);
       setRecentTrades((trades as { items: Trade[] }).items);
       setActiveStrategies(strats as Strategy[]);
+      setMonitoredCoins(coins as any[]);
       setLoading(false);
     });
   }, []);
@@ -240,6 +244,57 @@ export default function DashboardPage() {
           <div className="empty-state">데이터 없음 (봇이 수집 중이면 잠시 후 표시됩니다)</div>
         )}
       </div>
+
+      {/* 모니터링 코인 현황 */}
+      {monitoredCoins.length > 0 && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card-title">모니터링 코인 현황</div>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>코인</th>
+                  <th>현재가</th>
+                  <th>전략</th>
+                  <th>신호</th>
+                  <th>시장</th>
+                  <th>보유</th>
+                  <th>미실현 손익</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monitoredCoins.map((c: any) => (
+                  <tr key={c.coin}>
+                    <td style={{ fontWeight: 600 }}>{c.coin?.replace("KRW-", "")}</td>
+                    <td>{formatKRW(c.current_price || 0)}</td>
+                    <td><span className="badge badge-purple">{c.strategy}</span></td>
+                    <td>
+                      <span className={`badge ${c.signal_type === "buy" ? "badge-green" : c.signal_type === "sell" ? "badge-red" : "badge-yellow"}`}>
+                        {c.signal_type === "buy" ? "매수" : c.signal_type === "sell" ? "매도" : "HOLD"}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`badge ${c.market_state === "bullish" ? "badge-green" : c.market_state === "bearish" ? "badge-red" : "badge-yellow"}`}>
+                        {getMarketStateKR(c.market_state || "")}
+                      </span>
+                    </td>
+                    <td>
+                      {c.holding ? (
+                        <span className="badge badge-green">보유중</span>
+                      ) : (
+                        <span style={{ color: "var(--text-muted)" }}>-</span>
+                      )}
+                    </td>
+                    <td className={c.unrealized_pnl_pct > 0 ? "positive" : c.unrealized_pnl_pct < 0 ? "negative" : ""}>
+                      {c.holding ? formatPercent(c.unrealized_pnl_pct || 0) : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="grid-2">
         {/* Recent Trades */}

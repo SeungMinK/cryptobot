@@ -74,8 +74,8 @@ class CoinScanner:
                 if price < self._min_price_krw:
                     continue
 
-                # OHLCV로 거래대금 확인
-                df = pyupbit.get_ohlcv(ticker, interval="day", count=1)
+                # OHLCV로 거래대금 + 변동성 확인
+                df = pyupbit.get_ohlcv(ticker, interval="day", count=14)
                 if df is None or df.empty:
                     continue
 
@@ -85,17 +85,49 @@ class CoinScanner:
 
                 change_rate = (price - df.iloc[-1]["open"]) / df.iloc[-1]["open"] * 100
 
+                # ATR (14일 평균 변동폭) 계산
+                atr = 0.0
+                if len(df) >= 2:
+                    tr_values = []
+                    for i in range(1, len(df)):
+                        high = df.iloc[i]["high"]
+                        low = df.iloc[i]["low"]
+                        prev_close = df.iloc[i - 1]["close"]
+                        tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
+                        tr_values.append(tr)
+                    atr = sum(tr_values) / len(tr_values) if tr_values else 0
+
+                # ATR 변동성 비율 (%)
+                volatility_pct = (atr / price * 100) if price > 0 else 0
+
+                # RSI 계산 (14일)
+                rsi = None
+                if len(df) >= 14:
+                    deltas = df["close"].diff().dropna()
+                    gains = deltas.where(deltas > 0, 0)
+                    losses = (-deltas.where(deltas < 0, 0))
+                    avg_gain = gains.rolling(14).mean().iloc[-1]
+                    avg_loss = losses.rolling(14).mean().iloc[-1]
+                    if avg_loss > 0:
+                        rs = avg_gain / avg_loss
+                        rsi = round(100 - (100 / (1 + rs)), 1)
+
                 results.append(
                     {
                         "ticker": ticker,
                         "price": price,
                         "volume_krw": volume_krw,
                         "change_rate": round(change_rate, 2),
+                        "atr": round(atr, 2),
+                        "volatility_pct": round(volatility_pct, 2),
+                        "rsi": rsi,
                     }
                 )
 
-            # 거래대금 내림차순 정렬
-            results.sort(key=lambda x: x["volume_krw"], reverse=True)
+            # 변동성 × 거래대금 종합 점수로 정렬 (변동성 높고 거래량 많은 코인 우선)
+            for r in results:
+                r["score"] = r["volatility_pct"] * (r["volume_krw"] / 1_000_000_000)
+            results.sort(key=lambda x: x["score"], reverse=True)
             top = results[: self._max_coins]
 
             for coin in top:

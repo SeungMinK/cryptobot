@@ -31,6 +31,8 @@ class DataCollector:
         self._coin = coin
         self._latest_df: "pd.DataFrame | None" = None
         self._last_ohlcv_save_date: str = ""  # 일봉 저장 중복 방지
+        self._last_ohlcv_fetch: float = 0  # OHLCV 캐시 타임스탬프
+        self._ohlcv_cache_seconds: int = 3600  # 1시간 캐시
 
     @property
     def latest_df(self) -> "pd.DataFrame | None":
@@ -61,16 +63,20 @@ class DataCollector:
 
     def _collect_market_data(self) -> dict | None:
         """업비트 API로 시장 데이터 수집."""
+        import time as _time
         try:
-            # OHLCV 데이터 조회 (일봉 120개 — 지표 계산 + 전략에서 사용)
-            df = pyupbit.get_ohlcv(self._coin, interval="day", count=120)
-            if df is None or df.empty:
-                raise APIError(f"OHLCV 데이터 없음: {self._coin}")
+            # OHLCV 데이터 조회 — 1시간 캐시 (일봉은 자주 안 바뀜)
+            now = _time.time()
+            if self._latest_df is None or (now - self._last_ohlcv_fetch) > self._ohlcv_cache_seconds:
+                df = pyupbit.get_ohlcv(self._coin, interval="day", count=120)
+                if df is None or df.empty:
+                    raise APIError(f"OHLCV 데이터 없음: {self._coin}")
+                self._latest_df = df
+                self._last_ohlcv_fetch = now
+            else:
+                df = self._latest_df
 
-            # 전략에서 사용할 수 있도록 캐시
-            self._latest_df = df
-
-            # 현재가
+            # 현재가 (이건 매 틱마다 필요)
             current_price = pyupbit.get_current_price(self._coin)
             if current_price is None:
                 raise APIError(f"현재가 조회 실패: {self._coin}")

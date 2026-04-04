@@ -76,20 +76,24 @@ export default function DashboardPage() {
       {/* KPI Cards */}
       <div className="kpi-grid">
         <StatCard
-          label="총 자산"
-          value={balance ? formatKRW(balance.total_asset_krw) : "-"}
+          label="총 보유 자산"
+          value={balance ? formatKRW(balance.krw_balance + balance.coin_value_krw) : "-"}
+          sub={balance ? `KRW ${formatKRW(balance.krw_balance)} + 코인 ${formatKRW(balance.coin_value_krw)}` : ""}
         />
         <StatCard
-          label="KRW 잔고"
-          value={balance ? formatKRW(balance.krw_balance) : "-"}
+          label="총 손익"
+          value={balance ? formatKRW(balance.krw_balance + balance.coin_value_krw - 100000) : "-"}
+          valueClass={balance && (balance.krw_balance + balance.coin_value_krw - 100000) >= 0 ? "positive" : "negative"}
+          sub="시작 ₩100,000 기준"
         />
         <StatCard
-          label="코인 가치"
+          label="코인 보유"
           value={balance ? formatKRW(balance.coin_value_krw) : "-"}
+          sub={`${((positions as any)?.positions || []).length}종목 보유`}
         />
         <StatCard
           label="API 연결"
-          value={balance?.api_connected ? "Connected" : "Disconnected"}
+          value={balance?.api_connected ? "연결됨" : "연결 안 됨"}
           valueClass={balance?.api_connected ? "positive" : "negative"}
         />
       </div>
@@ -109,8 +113,8 @@ export default function DashboardPage() {
                     </span>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 12 }}>
-                    <div><span style={{ color: "var(--text-muted)" }}>매수 </span>{formatKRW(p.price)}</div>
-                    <div><span style={{ color: "var(--text-muted)" }}>현재 </span>{formatKRW(p.current_price)}</div>
+                    <div><span style={{ color: "var(--text-muted)" }}>투자 </span>{formatKRW(p.total_krw)}</div>
+                    <div><span style={{ color: "var(--text-muted)" }}>현재 </span>{formatKRW(p.amount * p.current_price)}</div>
                   </div>
                 </div>
               ))}

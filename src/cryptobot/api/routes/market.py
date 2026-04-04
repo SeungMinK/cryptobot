@@ -11,9 +11,15 @@ router = APIRouter(prefix="/api/market", tags=["market"])
 
 @router.get("/current")
 def get_current_market(_: UserResponse = Depends(get_current_user)):
-    """현재 시장 상태 (최근 스냅샷 기반)."""
+    """현재 시장 상태 (BTC 기준 최근 스냅샷)."""
     db = get_db()
-    row = db.execute("SELECT * FROM market_snapshots ORDER BY id DESC LIMIT 1").fetchone()
+    row = db.execute(
+        "SELECT * FROM market_snapshots WHERE coin = 'KRW-BTC' ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+
+    if row is None:
+        # BTC 없으면 아무거나
+        row = db.execute("SELECT * FROM market_snapshots ORDER BY id DESC LIMIT 1").fetchone()
 
     if row is None:
         return {"status": "no_data", "message": "시장 데이터 없음"}

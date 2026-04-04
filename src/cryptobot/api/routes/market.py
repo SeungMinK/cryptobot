@@ -37,7 +37,7 @@ def get_monitored_coins(_: UserResponse = Depends(get_current_user)):
         """
         SELECT coin, MAX(id) as latest_id
         FROM (
-            SELECT 'KRW-BTC' as coin, id, btc_price as price, market_state, btc_rsi_14 as rsi, btc_change_pct_24h as change_pct
+            SELECT 'KRW-BTC' as coin, id, price, market_state, rsi_14 as rsi, change_pct_24h as change_pct
             FROM market_snapshots
             WHERE timestamp >= datetime('now', '-1 hour')
         )
@@ -63,7 +63,7 @@ def get_monitored_coins(_: UserResponse = Depends(get_current_user)):
             """
             SELECT ts.coin, ts.current_price, ts.strategy, ts.signal_type, ts.confidence,
                    ts.trigger_reason, ts.timestamp,
-                   ms.market_state, ms.btc_rsi_14 as rsi
+                   ms.market_state, ms.rsi_14 as rsi
             FROM trade_signals ts
             LEFT JOIN market_snapshots ms ON ts.snapshot_id = ms.id
             WHERE ts.coin = ?

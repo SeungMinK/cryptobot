@@ -145,17 +145,17 @@ export default function DashboardPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 <div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)" }}>BTC 가격</div>
-                  <div style={{ fontSize: 18, fontWeight: 600 }}>{formatKRW(market.btc_price)}</div>
+                  <div style={{ fontSize: 18, fontWeight: 600 }}>{formatKRW(market.price)}</div>
                 </div>
                 <div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)" }}>24h 변동</div>
-                  <div className={market.btc_change_pct_24h >= 0 ? "positive" : "negative"} style={{ fontSize: 18, fontWeight: 600 }}>
-                    {formatPercent(market.btc_change_pct_24h)}
+                  <div className={market.change_pct_24h >= 0 ? "positive" : "negative"} style={{ fontSize: 18, fontWeight: 600 }}>
+                    {formatPercent(market.change_pct_24h)}
                   </div>
                 </div>
                 <div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)" }}>RSI (14)</div>
-                  <div>{market.btc_rsi_14?.toFixed(1) ?? "-"}</div>
+                  <div>{market.rsi_14?.toFixed(1) ?? "-"}</div>
                 </div>
                 <div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)" }}>시장 상태</div>

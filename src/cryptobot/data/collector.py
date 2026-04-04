@@ -55,7 +55,7 @@ class DataCollector:
             # OHLCV 일봉 데이터 저장 (하루 1회)
             self._save_ohlcv_daily()
 
-            logger.debug("스냅샷 저장: id=%d, price=%s", snapshot_id, f"{snapshot['btc_price']:,.0f}")
+            logger.debug("스냅샷 저장: id=%d, price=%s", snapshot_id, f"{snapshot['price']:,.0f}")
             return snapshot_id
         except Exception as e:
             logger.error("데이터 수집 실패: %s", e)
@@ -93,19 +93,19 @@ class DataCollector:
             return {
                 "timestamp": _utcnow(),
                 "coin": self._coin,
-                "btc_price": current_price,
-                "btc_open_24h": today["open"],
-                "btc_high_24h": today["high"],
-                "btc_low_24h": today["low"],
-                "btc_change_pct_24h": round((current_price - today["open"]) / today["open"] * 100, 2),
-                "btc_volume_24h": today["volume"],
-                "btc_rsi_14": indicators["rsi_14"],
-                "btc_ma_5": indicators["ma_5"],
-                "btc_ma_20": indicators["ma_20"],
-                "btc_ma_60": indicators["ma_60"],
-                "btc_bb_upper": indicators["bb_upper"],
-                "btc_bb_lower": indicators["bb_lower"],
-                "btc_atr_14": indicators["atr_14"],
+                "price": current_price,
+                "open_24h": today["open"],
+                "high_24h": today["high"],
+                "low_24h": today["low"],
+                "change_pct_24h": round((current_price - today["open"]) / today["open"] * 100, 2),
+                "volume_24h": today["volume"],
+                "rsi_14": indicators["rsi_14"],
+                "ma_5": indicators["ma_5"],
+                "ma_20": indicators["ma_20"],
+                "ma_60": indicators["ma_60"],
+                "bb_upper": indicators["bb_upper"],
+                "bb_lower": indicators["bb_lower"],
+                "atr_14": indicators["atr_14"],
                 "market_state": market_state,
             }
         except Exception as e:
@@ -117,28 +117,28 @@ class DataCollector:
         cursor = self._db.execute(
             """
             INSERT INTO market_snapshots (
-                timestamp, coin, btc_price, btc_open_24h, btc_high_24h, btc_low_24h,
-                btc_change_pct_24h, btc_volume_24h, btc_rsi_14,
-                btc_ma_5, btc_ma_20, btc_ma_60,
-                btc_bb_upper, btc_bb_lower, btc_atr_14, market_state
+                timestamp, coin, price, open_24h, high_24h, low_24h,
+                change_pct_24h, volume_24h, rsi_14,
+                ma_5, ma_20, ma_60,
+                bb_upper, bb_lower, atr_14, market_state
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 data["timestamp"],
                 data["coin"],
-                data["btc_price"],
-                data["btc_open_24h"],
-                data["btc_high_24h"],
-                data["btc_low_24h"],
-                data["btc_change_pct_24h"],
-                data["btc_volume_24h"],
-                data["btc_rsi_14"],
-                data["btc_ma_5"],
-                data["btc_ma_20"],
-                data["btc_ma_60"],
-                data["btc_bb_upper"],
-                data["btc_bb_lower"],
-                data["btc_atr_14"],
+                data["price"],
+                data["open_24h"],
+                data["high_24h"],
+                data["low_24h"],
+                data["change_pct_24h"],
+                data["volume_24h"],
+                data["rsi_14"],
+                data["ma_5"],
+                data["ma_20"],
+                data["ma_60"],
+                data["bb_upper"],
+                data["bb_lower"],
+                data["atr_14"],
                 data["market_state"],
             ),
         )

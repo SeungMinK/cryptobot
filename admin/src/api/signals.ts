@@ -17,12 +17,12 @@ export interface SignalItem {
   snapshot_id: number | null;
   strategy_params_json: string | null;
   // joined from market_snapshots
-  btc_rsi_14: number | null;
-  btc_ma_5: number | null;
-  btc_ma_20: number | null;
-  btc_bb_upper: number | null;
-  btc_bb_lower: number | null;
-  btc_atr_14: number | null;
+  rsi_14: number | null;
+  ma_5: number | null;
+  ma_20: number | null;
+  bb_upper: number | null;
+  bb_lower: number | null;
+  atr_14: number | null;
   market_state: string | null;
 }
 

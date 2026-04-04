@@ -118,7 +118,7 @@ def get_balance_history_snapshots(
     db = get_db()
     rows = db.execute(
         """
-        SELECT timestamp, btc_price, market_state
+        SELECT timestamp, price, market_state
         FROM market_snapshots
         WHERE timestamp >= datetime('now', ?)
         ORDER BY timestamp

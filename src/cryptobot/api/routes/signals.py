@@ -38,8 +38,8 @@ def get_signals(
     offset = (page - 1) * limit
     rows = db.execute(
         f"""
-        SELECT ts.*, ms.btc_rsi_14, ms.btc_ma_5, ms.btc_ma_20,
-               ms.btc_bb_upper, ms.btc_bb_lower, ms.btc_atr_14, ms.market_state
+        SELECT ts.*, ms.rsi_14, ms.ma_5, ms.ma_20,
+               ms.bb_upper, ms.bb_lower, ms.atr_14, ms.market_state
         FROM trade_signals ts
         LEFT JOIN market_snapshots ms ON ts.snapshot_id = ms.id
         {where}

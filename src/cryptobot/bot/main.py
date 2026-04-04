@@ -212,12 +212,12 @@ class CryptoBot:
             return
 
         indicators = {
-            "rsi_14": snapshot.get("btc_rsi_14"),
-            "ma_5": snapshot.get("btc_ma_5"),
-            "ma_20": snapshot.get("btc_ma_20"),
-            "bb_upper": snapshot.get("btc_bb_upper"),
-            "bb_lower": snapshot.get("btc_bb_lower"),
-            "atr_14": snapshot.get("btc_atr_14"),
+            "rsi_14": snapshot.get("rsi_14"),
+            "ma_5": snapshot.get("ma_5"),
+            "ma_20": snapshot.get("ma_20"),
+            "bb_upper": snapshot.get("bb_upper"),
+            "bb_lower": snapshot.get("bb_lower"),
+            "atr_14": snapshot.get("atr_14"),
         }
 
         self._notifier.notify_tick_report(
@@ -225,7 +225,7 @@ class CryptoBot:
             signal_type=signal_type,
             confidence=confidence,
             reason=reason,
-            current_price=snapshot.get("btc_price", 0),
+            current_price=snapshot.get("price", 0),
             market_state=snapshot.get("market_state", "unknown"),
             indicators=indicators,
         )
@@ -338,7 +338,7 @@ class CryptoBot:
         if snapshot is None:
             return
 
-        current_price = snapshot["btc_price"]
+        current_price = snapshot["price"]
 
         # 2. 코인 카테고리에 맞는 전략 선택
         coin_strategy, coin_strategy_name, _ = self._get_coin_strategy(coin)
@@ -473,7 +473,7 @@ class CryptoBot:
                 param_trailing_stop=self._strategy.params.trailing_stop_pct,
                 market_state_at_trade=snapshot.get("market_state"),
                 btc_price_at_trade=current_price,
-                rsi_at_trade=snapshot.get("btc_rsi_14"),
+                rsi_at_trade=snapshot.get("rsi_14"),
             )
             self._recorder.record_signal(
                 coin=coin,

@@ -140,12 +140,12 @@ class TestMultiCoinSnapshot:
         try:
             # BTC 스냅샷 저장
             db.execute(
-                "INSERT INTO market_snapshots (timestamp, coin, btc_price, market_state) VALUES (?, ?, ?, ?)",
+                "INSERT INTO market_snapshots (timestamp, coin, price, market_state) VALUES (?, ?, ?, ?)",
                 ("2026-04-04 08:00:00", "KRW-BTC", 101000000, "bearish"),
             )
             # ETH 스냅샷 저장 (더 나중)
             db.execute(
-                "INSERT INTO market_snapshots (timestamp, coin, btc_price, market_state) VALUES (?, ?, ?, ?)",
+                "INSERT INTO market_snapshots (timestamp, coin, price, market_state) VALUES (?, ?, ?, ?)",
                 ("2026-04-04 08:00:01", "KRW-ETH", 3100000, "sideways"),
             )
             db.commit()
@@ -154,13 +154,13 @@ class TestMultiCoinSnapshot:
             btc_row = db.execute(
                 "SELECT * FROM market_snapshots WHERE coin = 'KRW-BTC' ORDER BY id DESC LIMIT 1"
             ).fetchone()
-            assert btc_row["btc_price"] == 101000000
+            assert btc_row["price"] == 101000000
 
             # ETH collector는 ETH만
             eth_row = db.execute(
                 "SELECT * FROM market_snapshots WHERE coin = 'KRW-ETH' ORDER BY id DESC LIMIT 1"
             ).fetchone()
-            assert eth_row["btc_price"] == 3100000
+            assert eth_row["price"] == 3100000
 
             # 전체 최신은 ETH인데, BTC가 섞이면 안 됨
             latest = db.execute("SELECT * FROM market_snapshots ORDER BY id DESC LIMIT 1").fetchone()
@@ -261,7 +261,7 @@ class TestForeignKeySafety:
         try:
             # 스냅샷 먼저 생성
             cursor = db.execute(
-                "INSERT INTO market_snapshots (timestamp, coin, btc_price) VALUES (?, ?, ?)",
+                "INSERT INTO market_snapshots (timestamp, coin, price) VALUES (?, ?, ?)",
                 ("2026-04-04 08:00:00", "KRW-BTC", 101000000),
             )
             db.commit()

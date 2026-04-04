@@ -238,17 +238,17 @@ export default function SignalsPage() {
               )}
             </div>
 
-            {(selected.btc_rsi_14 != null || selected.btc_ma_5 != null) && (
+            {(selected.rsi_14 != null || selected.ma_5 != null) && (
               <div style={{ borderTop: "1px solid var(--border)", margin: "16px 0", paddingTop: 16 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>지표 데이터</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   {[
-                    { key: "btc_rsi_14", value: selected.btc_rsi_14?.toFixed(1) },
-                    { key: "btc_ma_5", value: selected.btc_ma_5 ? formatKRW(selected.btc_ma_5) : null },
-                    { key: "btc_ma_20", value: selected.btc_ma_20 ? formatKRW(selected.btc_ma_20) : null },
-                    { key: "btc_bb_upper", value: selected.btc_bb_upper ? formatKRW(selected.btc_bb_upper) : null },
-                    { key: "btc_bb_lower", value: selected.btc_bb_lower ? formatKRW(selected.btc_bb_lower) : null },
-                    { key: "btc_atr_14", value: selected.btc_atr_14 ? formatKRW(selected.btc_atr_14) : null },
+                    { key: "rsi_14", value: selected.rsi_14?.toFixed(1) },
+                    { key: "ma_5", value: selected.ma_5 ? formatKRW(selected.ma_5) : null },
+                    { key: "ma_20", value: selected.ma_20 ? formatKRW(selected.ma_20) : null },
+                    { key: "bb_upper", value: selected.bb_upper ? formatKRW(selected.bb_upper) : null },
+                    { key: "bb_lower", value: selected.bb_lower ? formatKRW(selected.bb_lower) : null },
+                    { key: "atr_14", value: selected.atr_14 ? formatKRW(selected.atr_14) : null },
                   ].filter((i) => i.value != null).map((item) => {
                     const desc = getIndicatorDesc(item.key);
                     return (

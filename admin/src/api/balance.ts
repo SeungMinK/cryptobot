@@ -18,7 +18,7 @@ export async function getBalanceHistory(days: number = 30): Promise<BalanceHisto
 
 export interface SnapshotHistory {
   timestamp: string;
-  btc_price: number;
+  price: number;
   market_state: string;
 }
 

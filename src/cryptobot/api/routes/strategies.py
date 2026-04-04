@@ -140,13 +140,13 @@ def simulate_strategy(name: str, body: SimulateRequest, _: UserResponse = Depend
     simulation = {}
     if snapshot:
         snapshot = dict(snapshot)
-        ma_20 = snapshot.get("btc_ma_20")
-        bb_upper = snapshot.get("btc_bb_upper")
-        bb_lower = snapshot.get("btc_bb_lower")
-        current_price = snapshot.get("btc_price", 0)
-        yesterday_high = snapshot.get("btc_high_24h", 0)
-        yesterday_low = snapshot.get("btc_low_24h", 0)
-        today_open = snapshot.get("btc_open_24h", 0)
+        ma_20 = snapshot.get("ma_20")
+        bb_upper = snapshot.get("bb_upper")
+        bb_lower = snapshot.get("bb_lower")
+        current_price = snapshot.get("price", 0)
+        yesterday_high = snapshot.get("high_24h", 0)
+        yesterday_low = snapshot.get("low_24h", 0)
+        today_open = snapshot.get("open_24h", 0)
         price_range = yesterday_high - yesterday_low
 
         # 현재 std 계산 (bb_upper, ma_20에서 역산)
@@ -188,7 +188,7 @@ def simulate_strategy(name: str, body: SimulateRequest, _: UserResponse = Depend
         if name == "ma_crossover":
             simulation = {
                 "current_price": current_price,
-                "ma_5": snapshot.get("btc_ma_5"),
+                "ma_5": snapshot.get("ma_5"),
                 "ma_20": ma_20,
                 "current_short_period": current_params.get("short_period", 5),
                 "current_long_period": current_params.get("long_period", 20),
@@ -197,7 +197,7 @@ def simulate_strategy(name: str, body: SimulateRequest, _: UserResponse = Depend
             }
 
         if name == "rsi_mean_reversion":
-            rsi = snapshot.get("btc_rsi_14", 0)
+            rsi = snapshot.get("rsi_14", 0)
             simulation = {
                 "current_rsi": rsi,
                 "current_oversold": current_params.get("oversold", 30),

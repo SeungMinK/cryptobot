@@ -59,11 +59,11 @@ def test_insert_and_query():
             db.initialize()
 
             db.execute(
-                "INSERT INTO market_snapshots (btc_price, market_state) VALUES (?, ?)",
+                "INSERT INTO market_snapshots (price, market_state) VALUES (?, ?)",
                 (50000000.0, "bullish"),
             )
             db.commit()
 
             row = db.execute("SELECT * FROM market_snapshots").fetchone()
-            assert row["btc_price"] == 50000000.0
+            assert row["price"] == 50000000.0
             assert row["market_state"] == "bullish"

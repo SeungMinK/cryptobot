@@ -19,23 +19,46 @@ AI 기반 코인 자동매매 시스템. 규칙 기반 매매 전략에 LLM(Clau
 ### Architecture
 
 ```
-┌─ Trading Bot (Python) ──────────────────────────┐
+┌─ Trading Bot ───────────────────────────────────┐
 │                                                  │
-│  DataCollector → IndicatorEngine → StrategyEngine│
-│       │                                  │       │
-│  OHLCV Daily    StrategyRegistry (9개)   │       │
-│                                          │       │
-│  RiskManager ←── confidence ─────────────┘       │
+│  DataCollector → Indicators → StrategyRegistry   │
+│       │            (10개 전략, 시장 상태별 자동선택) │
+│  Multi-Coin     bb_rsi_combined (횡보/하락)      │
+│  Scanner        volatility_breakout (상승)       │
 │       │                                          │
-│  OrderExecutor (pyupbit)                         │
+│  RiskManager ←── confidence + 수수료 가드        │
+│       │                                          │
+│  OrderExecutor (pyupbit, 멀티코인)               │
 │       │                                          │
 │  DataRecorder (signals + trades + params)        │
-│       │                                          │
-│   SQLite (UTC timestamps)                        │
+└──────┬───────────────────────────────────────────┘
+       │
+┌──────┴──────────── SQLite (공유 DB) ────────────┐
+│  market_snapshots │ trade_signals │ trades       │
+│  ohlcv_daily      │ news_articles │ llm_decisions│
+│  bot_config       │ strategies    │ ...          │
+└──────┬────────────┬───────────────┬──────────────┘
+       │            │               │
+┌──────┴──────┐ ┌───┴────────┐ ┌────┴─────────────┐
+│ News        │ │ Watchdog   │ │ FastAPI + React   │
+│ Collector   │ │            │ │ Admin Dashboard   │
+│             │ │ 헬스체크    │ │                   │
+│ RSS 크롤링   │ │ 에러 감시   │ │ 6개 페이지         │
+│ Fear&Greed  │ │ Slack 알림  │ │ 전략/신호/설정     │
+│ (30분 주기)  │ │ (5분 주기)  │ │                   │
+└─────────────┘ └────────────┘ └───────────────────┘
+       │
+┌──────┴──────────────────────────────────────────┐
+│ LLM Analyzer (Phase 2 — 기존 봇에 통합)          │
+│                                                  │
+│ 뉴스 분석 → 시장 심리 판단 → 파라미터 자동 조절    │
+│ Claude Haiku │ 4시간 주기 │ llm_decisions 기록   │
+│ 공포 기반 DCA │ 토큰 최적화 (~$0.004/일)          │
 └──────────────────────────────────────────────────┘
-        │                    │
-     Slack              FastAPI + React
-   (Bot Token)         (Admin Dashboard)
+       │
+     Slack (Bot Token)
+   매매 알림 + 에러 + 워치독
+```
 ```
 
 ## Tech Stack

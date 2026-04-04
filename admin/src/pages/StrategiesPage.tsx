@@ -170,45 +170,6 @@ export default function StrategiesPage() {
         );
       })}
 
-      {/* Activation History */}
-      <div className="card">
-        <div className="card-title">활성화 이력</div>
-        {activations.length > 0 ? (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>시간</th>
-                  <th>전략</th>
-                  <th>동작</th>
-                  <th>소스</th>
-                  <th>시장 상태</th>
-                  <th>사유</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activations.map((a) => (
-                  <tr key={a.id}>
-                    <td style={{ fontSize: 12 }}>{formatDateTime(a.timestamp)}</td>
-                    <td>{a.strategy_name}</td>
-                    <td>
-                      <span className={`badge ${a.action === "activate" ? "badge-green" : a.action === "shutting_down" ? "badge-yellow" : "badge-red"}`}>
-                        {a.action === "activate" ? "활성화" : a.action === "shutting_down" ? "종료중" : "비활성화"}
-                      </span>
-                    </td>
-                    <td><span className="badge badge-blue">{a.source}</span></td>
-                    <td>{a.market_state}</td>
-                    <td style={{ fontSize: 12, color: "var(--text-secondary)" }}>{a.reason || "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty-state">활성화 이력 없음</div>
-        )}
-      </div>
-
       {confirm && (
         <ConfirmDialog
           title={`전략 ${confirm.action === "activate" ? "전환" : "비활성화"}`}

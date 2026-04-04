@@ -200,11 +200,19 @@ FastAPI + React Admin 8페이지, 멀티코인, 볼린저+RSI 복합, 수수료 
 
 ### Phase 4: 고도화 (예정)
 
-- [ ] 백테스트 엔진
-- [ ] Airflow DAG
-- [ ] 클라우드 배포
-- [ ] 데이터 분석 파이프라인
-- [ ] 자체 LLM 파인튜닝
+- [ ] #19 백테스트 엔진
+- [ ] #22 Airflow DAG
+- [ ] #23 클라우드 배포
+- [ ] #78 데이터 분석 파이프라인
+- [ ] #79 자체 LLM 파인튜닝
+
+### Phase 5: 벤치마킹 개선 (예정)
+
+[Freqtrade](https://github.com/freqtrade/freqtrade) · [Hummingbot](https://github.com/hummingbot/hummingbot) 참고
+
+- [ ] #84 단계별 동적 손절
+- [ ] #85 DCA 안전 주문
+- [ ] #86 Optuna 하이퍼파라미터 최적화
 
 ---
 

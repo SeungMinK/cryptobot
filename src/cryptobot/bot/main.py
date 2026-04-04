@@ -495,8 +495,10 @@ class CryptoBot:
         # 매도 실행
         order = self._trader.sell_market(coin)
         if order.success:
+            # 수수료 포함 실제 수익 계산
+            buy_fee = active_trade.get("fee_krw") or 0
             profit_pct = (order.price - buy_price) / buy_price * 100
-            profit_krw = order.total_krw - active_trade["total_krw"]
+            profit_krw = order.total_krw - active_trade["total_krw"] - order.fee_krw - buy_fee
             buy_time = datetime.fromisoformat(active_trade["timestamp"])
             if buy_time.tzinfo is None:
                 buy_time = buy_time.replace(tzinfo=timezone.utc)

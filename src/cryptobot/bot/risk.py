@@ -31,6 +31,11 @@ class RiskManager:
     NestJS의 Guard처럼, 조건 미충족 시 매매를 차단한다.
     """
 
+    # 코인별 쿨다운 (매도 후 재매수 방지)
+    COOLDOWN_MINUTES = 60  # 매도 후 1시간
+    LOSS_LOCK_MINUTES = 240  # 연속 손실 시 4시간 잠금
+    LOSS_LOCK_THRESHOLD = 2  # 연속 N회 손실 시 잠금
+
     def __init__(self, db: Database, limits: RiskLimits | None = None) -> None:
         self._db = db
         self.limits = limits or RiskLimits()
@@ -46,7 +51,12 @@ class RiskManager:
         Returns:
             (가능 여부, 사유)
         """
-        # 0. 업비트 최소 주문 금액 체크
+        # 0-1. 코인별 쿨다운 체크 (매도 후 재매수 방지)
+        cooldown_reason = self._check_coin_cooldown(coin)
+        if cooldown_reason:
+            return False, cooldown_reason
+
+        # 0-2. 업비트 최소 주문 금액 체크
         if buy_amount_krw < self.limits.min_order_krw:
             return False, f"최소 주문 금액 미달: {buy_amount_krw:,.0f}원 < {self.limits.min_order_krw:,.0f}원"
 
@@ -143,3 +153,40 @@ class RiskManager:
             else:
                 break
         return count
+
+    def _check_coin_cooldown(self, coin: str) -> str | None:
+        """코인별 쿨다운 체크. 매도 후 일정 시간 재매수 방지.
+
+        Returns:
+            차단 사유 또는 None (통과)
+        """
+        # 1. 매도 후 쿨다운 — 최근 매도 시간 체크
+        last_sell = self._db.execute(
+            """
+            SELECT timestamp FROM trades
+            WHERE coin = ? AND side = 'sell'
+            ORDER BY id DESC LIMIT 1
+            """,
+            (coin,),
+        ).fetchone()
+
+        if last_sell:
+            from datetime import datetime, timezone
+            sell_time = datetime.fromisoformat(last_sell["timestamp"])
+            if sell_time.tzinfo is None:
+                sell_time = sell_time.replace(tzinfo=timezone.utc)
+            elapsed = (datetime.now(timezone.utc) - sell_time).total_seconds() / 60
+
+            # 연속 손실 체크 → 더 긴 잠금
+            consecutive = self._get_consecutive_losses(coin)
+            if consecutive >= self.LOSS_LOCK_THRESHOLD:
+                if elapsed < self.LOSS_LOCK_MINUTES:
+                    remaining = int(self.LOSS_LOCK_MINUTES - elapsed)
+                    return f"손실 잠금: {coin} 연속 {consecutive}회 손실 — {remaining}분 후 해제"
+
+            # 일반 쿨다운
+            if elapsed < self.COOLDOWN_MINUTES:
+                remaining = int(self.COOLDOWN_MINUTES - elapsed)
+                return f"쿨다운: {coin} 매도 후 {remaining}분 남음"
+
+        return None

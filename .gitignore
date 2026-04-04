@@ -23,6 +23,9 @@ build/
 *.db-wal
 !data/example/*.db
 
+# 임시 문서 파일
+docs/temp/
+
 # IDE
 .idea/
 .vscode/

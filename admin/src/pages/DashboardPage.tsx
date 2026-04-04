@@ -88,7 +88,7 @@ export default function DashboardPage() {
         return (
           <div className="kpi-grid">
             <StatCard label="총 보유 자산" value={balance ? formatKRW(totalAsset) : "-"} sub={`KRW ${formatKRW(balance?.krw_balance || 0)} + 코인 ${formatKRW(totalValue)}`} />
-            <StatCard label="총 손익" value={formatKRW(totalPnl)} valueClass={totalPnl >= 0 ? "positive" : "negative"} sub={`시작 ₩${STARTING_BALANCE.toLocaleString()} 기준`} />
+            <StatCard label="총 손익" value={`${formatKRW(totalPnl)} (${formatPercent(totalPnl / STARTING_BALANCE * 100)})`} valueClass={totalPnl >= 0 ? "positive" : "negative"} sub={`시작 ₩${STARTING_BALANCE.toLocaleString()} 기준`} />
             <StatCard label="매수 금액" value={formatKRW(totalCost)} sub={`${pos.length}종목 보유`} />
             <StatCard label="평가 금액" value={formatKRW(totalValue)} valueClass={totalValue >= totalCost ? "positive" : "negative"} sub={totalCost > 0 ? `${formatPercent((totalValue - totalCost) / totalCost * 100)} 수익률` : ""} />
           </div>

@@ -137,7 +137,12 @@
       "Bash(for repo in swagger-ui api-server basic-algo-lecture web BoardPJT study-back-office programmers NTP soynet-project BaekJoon hallym-pedia objectRecognition analysisCompany ReactToyPJT daily-voca SeungMinK.github.io studyReact Git Geomex AlgorithmOfBaekJoon dataVisualing Opencv_haarcascades Logistics-Storage-System-ERD-API-Doc uglyus-tennis-reservation; do\n  echo \"Converting $repo to private...\"\n  gh repo edit \"SeungMinK/$repo\" --visibility private 2>&1\ndone)",
       "Bash(for repo in swagger-ui api-server basic-algo-lecture web BoardPJT study-back-office programmers NTP soynet-project BaekJoon hallym-pedia objectRecognition analysisCompany ReactToyPJT daily-voca SeungMinK.github.io studyReact Git Geomex AlgorithmOfBaekJoon dataVisualing Opencv_haarcascades Logistics-Storage-System-ERD-API-Doc uglyus-tennis-reservation; do\n  echo -n \"$repo: \"\n  gh repo edit \"SeungMinK/$repo\" --visibility private --accept-visibility-change-consequences 2>&1\ndone)",
       "WebFetch(domain:dev.to)",
-      "Bash(gh repo list SeungMinK --visibility public --json name --jq '.[].name')"
+      "Bash(gh repo list SeungMinK --visibility public --json name --jq '.[].name')",
+      "Bash(sed -i '' '273s/except Exception:/except Exception as e:/' src/cryptobot/llm/analyzer.py)",
+      "Bash(sed -i '' '274s/pass/logger.debug\\(\"before\\\\/after 파싱 실패: %s\", e\\)/' src/cryptobot/llm/analyzer.py)",
+      "Bash(sed -i '' '311s/except Exception:/except Exception as e:/' src/cryptobot/llm/analyzer.py)",
+      "Bash(sed -i '' '312s/pass/logger.debug\\(\"파라미터 변환 실패 %s: %s\", param_key, e\\)/' src/cryptobot/llm/analyzer.py)",
+      "Bash(sed -i '' '63s/except Exception:/except Exception as e:/' src/cryptobot/api/routes/balance.py)"
     ]
   }
 }

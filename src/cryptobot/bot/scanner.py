@@ -99,8 +99,8 @@ class CoinScanner:
                             spread_pct = (best_ask - best_bid) / best_bid * 100
                             if spread_pct > 0.3:  # 0.3% 초과면 제외
                                 continue
-                except Exception:
-                    pass  # 호가 조회 실패 시 스킵 (제외 안 함)
+                except Exception as e:
+                    logger.debug("호가 조회 실패 %s: %s", ticker, e)
 
                 volume_krw = df.iloc[-1]["close"] * df.iloc[-1]["volume"]
                 if volume_krw < self._min_volume_krw:
@@ -179,5 +179,6 @@ class CoinScanner:
         try:
             price = pyupbit.get_current_price(ticker)
             return price is not None and price >= self._min_price_krw
-        except Exception:
+        except Exception as e:
+            logger.debug("코인 유효성 체크 실패: %s", e)
             return False

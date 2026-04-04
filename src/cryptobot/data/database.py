@@ -48,8 +48,7 @@ CREATE TABLE IF NOT EXISTS market_snapshots (
     total_market_volume_krw REAL,
     top10_avg_change_pct REAL,
     market_state TEXT,
-    volatility_level TEXT,
-    UNIQUE(timestamp)
+    volatility_level TEXT
 );
 
 CREATE TABLE IF NOT EXISTS trade_signals (
@@ -560,6 +559,12 @@ class Database:
                 conn.execute("UPDATE strategies SET status = 'active' WHERE is_active = TRUE")
                 conn.execute("UPDATE strategies SET status = 'inactive' WHERE is_active = FALSE")
                 logger.info("strategies 테이블에 status 컬럼 추가 완료")
+
+            # 마이그레이션: market_snapshots의 timestamp UNIQUE 제거 (멀티코인 대응)
+            try:
+                conn.execute("DROP INDEX IF EXISTS sqlite_autoindex_market_snapshots_1")
+            except sqlite3.OperationalError:
+                pass
 
             # 마이그레이션: market_snapshots에 coin 컬럼 추가
             try:

@@ -110,7 +110,7 @@ class DataCollector:
         """스냅샷을 DB에 저장하고 id 반환."""
         cursor = self._db.execute(
             """
-            INSERT INTO market_snapshots (
+            INSERT OR IGNORE INTO market_snapshots (
                 timestamp, coin, btc_price, btc_open_24h, btc_high_24h, btc_low_24h,
                 btc_change_pct_24h, btc_volume_24h, btc_rsi_14,
                 btc_ma_5, btc_ma_20, btc_ma_60,

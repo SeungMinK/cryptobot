@@ -105,7 +105,8 @@
       "Read(//usr/local/include/node/**)",
       "Bash(sudo rm:*)",
       "Bash(.venv/bin/python:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(grep -n \"sell_market\\\\|매도.*실행\\\\|매도.*에러\\\\|sell.*order\" error/2026-04-04/*.log)"
     ]
   }
 }

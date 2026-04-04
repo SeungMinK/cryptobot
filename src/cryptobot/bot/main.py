@@ -498,6 +498,8 @@ class CryptoBot:
             profit_pct = (order.price - buy_price) / buy_price * 100
             profit_krw = order.total_krw - active_trade["total_krw"]
             buy_time = datetime.fromisoformat(active_trade["timestamp"])
+            if buy_time.tzinfo is None:
+                buy_time = buy_time.replace(tzinfo=timezone.utc)
             hold_minutes = int((datetime.now(timezone.utc) - buy_time).total_seconds() / 60)
 
             trade_id = self._recorder.record_trade(

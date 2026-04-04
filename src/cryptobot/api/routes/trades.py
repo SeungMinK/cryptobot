@@ -60,7 +60,7 @@ def get_trades(
         FROM trades t
         LEFT JOIN trade_signals ts ON ts.trade_id = t.id AND ts.executed = TRUE
         {where}
-        ORDER BY t.id DESC LIMIT ? OFFSET ?
+        ORDER BY t.timestamp DESC, t.id DESC LIMIT ? OFFSET ?
         """,
         (*params, limit, offset),
     ).fetchall()

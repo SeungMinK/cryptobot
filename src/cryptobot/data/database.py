@@ -569,17 +569,29 @@ class Database:
                 conn.execute("UPDATE strategies SET status = 'inactive' WHERE is_active = FALSE")
                 logger.info("strategies 테이블에 status 컬럼 추가 완료")
 
-            # 마이그레이션: market_snapshots의 timestamp UNIQUE 제거 (멀티코인 대응)
+            # 마이그레이션: market_snapshots AUTOINCREMENT 복원
             try:
-                # UNIQUE 제약이 있는지 확인
                 idx = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='market_snapshots'").fetchone()
-                if idx and "UNIQUE(timestamp)" in (idx[0] or ""):
+                if idx and "AUTOINCREMENT" not in (idx[0] or ""):
                     conn.executescript("""
-                        ALTER TABLE market_snapshots RENAME TO market_snapshots_old;
-                        CREATE TABLE market_snapshots AS SELECT * FROM market_snapshots_old;
-                        DROP TABLE market_snapshots_old;
+                        CREATE TABLE IF NOT EXISTS market_snapshots_new (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            coin TEXT NOT NULL DEFAULT 'KRW-BTC',
+                            btc_price REAL NOT NULL,
+                            btc_open_24h REAL, btc_high_24h REAL, btc_low_24h REAL,
+                            btc_change_pct_24h REAL, btc_volume_24h REAL,
+                            btc_trade_count_24h INTEGER,
+                            btc_rsi_14 REAL, btc_ma_5 REAL, btc_ma_20 REAL, btc_ma_60 REAL,
+                            btc_bb_upper REAL, btc_bb_lower REAL, btc_atr_14 REAL,
+                            total_market_volume_krw REAL, top10_avg_change_pct REAL,
+                            market_state TEXT, volatility_level TEXT
+                        );
+                        INSERT INTO market_snapshots_new SELECT * FROM market_snapshots;
+                        DROP TABLE market_snapshots;
+                        ALTER TABLE market_snapshots_new RENAME TO market_snapshots;
                     """)
-                    logger.info("market_snapshots UNIQUE(timestamp) 제약 제거 완료")
+                    logger.info("market_snapshots AUTOINCREMENT 복원 완료")
             except Exception as e:
                 logger.warning("market_snapshots 마이그레이션 스킵: %s", e)
 

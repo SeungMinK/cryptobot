@@ -423,7 +423,7 @@ function StrategyCard({ strategy: s, hasSwitching, onEdit, onActivate, onDeactiv
         </div>
         <div className="strategy-stat-item">
           <div className="stat-label">승률</div>
-          <div className="stat-value">{s.stats?.win_rate != null ? formatPercent(s.stats.win_rate * 100).replace("+", "") : "-"}</div>
+          <div className="stat-value">{s.stats?.win_rate != null ? `${s.stats.win_rate.toFixed(1)}%` : "-"}</div>
         </div>
         <div className="strategy-stat-item">
           <div className="stat-label">평균 수익률</div>

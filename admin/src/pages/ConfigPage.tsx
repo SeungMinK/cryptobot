@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { getAllConfig, updateConfig, scanCoinsCurrent } from "../api/config";
-import type { ConfigItem, ScannedCoin } from "../api/config";
-import { formatKRW } from "../utils/format";
+import { getAllConfig, updateConfig } from "../api/config";
+import type { ConfigItem } from "../api/config";
 
 const CATEGORY_LABELS: Record<string, string> = {
   coin: "코인 선별",
@@ -11,24 +10,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   strategy: "전략 파라미터",
 };
 
-const CATEGORY_ORDER = ["coin", "bot", "notification", "risk", "strategy"];
+const CATEGORY_ORDER = ["coin", "bot", "notification"];
 
 export default function ConfigPage() {
   const [configs, setConfigs] = useState<ConfigItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
-  const [scannedCoins, setScannedCoins] = useState<ScannedCoin[]>([]);
-  const [scanLoading, setScanLoading] = useState(false);
-
   const loadConfigs = useCallback(async () => {
     try {
-      const [data, coins] = await Promise.all([
-        getAllConfig(),
-        scanCoinsCurrent().catch(() => []),
-      ]);
+      const data = await getAllConfig();
       setConfigs(data);
-      setScannedCoins(coins);
       const values: Record<string, string> = {};
       data.forEach((c) => (values[c.key] = c.value));
       setEditValues(values);
@@ -36,16 +28,6 @@ export default function ConfigPage() {
       // ignore
     } finally {
       setLoading(false);
-    }
-  }, []);
-
-  const refreshScan = useCallback(async () => {
-    setScanLoading(true);
-    try {
-      const coins = await scanCoinsCurrent();
-      setScannedCoins(coins);
-    } catch { /* ignore */ } finally {
-      setScanLoading(false);
     }
   }, []);
 
@@ -183,57 +165,6 @@ export default function ConfigPage() {
           </div>
         </div>
 
-        {/* 코인 카테고리 뒤에 미리보기 */}
-        {category === "coin" && (
-          <div className="card" style={{ marginTop: 12, marginBottom: 20 }}>
-            <div className="card-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>현재 선별 코인 미리보기</span>
-              <button
-                onClick={refreshScan}
-                disabled={scanLoading}
-                style={{
-                  padding: "4px 12px", fontSize: 12, borderRadius: 6, border: "none",
-                  cursor: "pointer", background: "#4a9eff", color: "#fff",
-                  opacity: scanLoading ? 0.6 : 1,
-                }}
-              >
-                {scanLoading ? "스캔 중..." : "새로고침"}
-              </button>
-            </div>
-            {scannedCoins.length > 0 ? (
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>코인</th>
-                      <th>가격</th>
-                      <th>거래대금 (24h)</th>
-                      <th>변동률</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {scannedCoins.map((c, i) => (
-                      <tr key={c.ticker}>
-                        <td>{i + 1}</td>
-                        <td style={{ fontWeight: 600 }}>{c.ticker.replace("KRW-", "")}</td>
-                        <td>{formatKRW(c.price)}</td>
-                        <td>{(c.volume_krw / 100_000_000).toFixed(0)}억원</td>
-                        <td className={c.change_rate >= 0 ? "positive" : "negative"}>
-                          {c.change_rate >= 0 ? "+" : ""}{c.change_rate.toFixed(2)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="empty-state">
-                {scanLoading ? "스캔 중..." : "조건에 맞는 코인 없음 (필터를 낮춰보세요)"}
-              </div>
-            )}
-          </div>
-        )}
         </div>
       ))}
     </div>

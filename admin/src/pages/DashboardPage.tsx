@@ -117,7 +117,10 @@ export default function DashboardPage() {
               {((positions as any).positions || []).map((p: any) => (
                 <div key={p.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ fontWeight: 600 }}>{p.coin?.replace("KRW-", "")}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontWeight: 600 }}>{p.coin?.replace("KRW-", "")}</span>
+                      {p.strategy && <span className="badge badge-purple" style={{ fontSize: 10 }}>{p.strategy}</span>}
+                    </div>
                     <span className={p.unrealized_pnl_pct >= 0 ? "positive" : "negative"} style={{ fontWeight: 600 }}>
                       {formatPercent(p.unrealized_pnl_pct)} ({formatKRW(p.unrealized_pnl_krw)})
                     </span>
@@ -264,18 +267,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Active Strategies */}
-        <div className="card">
-          <div className="card-title">활성 전략</div>
-          {activeStrategies.length > 0 ? (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {activeStrategies.map((s) => (
-                <span key={s.name} className="badge badge-blue">{s.display_name}</span>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">활성화된 전략 없음</div>
-          )}
         </div>
       </div>
     </div>

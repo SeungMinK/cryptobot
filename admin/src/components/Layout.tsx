@@ -21,6 +21,9 @@ export default function Layout() {
           <NavLink to="/signals" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
             매매 신호
           </NavLink>
+          <NavLink to="/news" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
+            뉴스
+          </NavLink>
           <NavLink to="/profit" className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
             수익률 분석
           </NavLink>

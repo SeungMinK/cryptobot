@@ -17,6 +17,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from cryptobot.bot.coin_manager import CoinManager
 from cryptobot.bot.config import config
 from cryptobot.bot.config_manager import ConfigManager
+from cryptobot.bot.health_checker import HealthChecker
 from cryptobot.bot.risk import RiskManager
 from cryptobot.bot.strategy_selector import StrategySelector
 from cryptobot.bot.trader import Trader
@@ -61,6 +62,7 @@ class CryptoBot:
 
         self._scheduler.add_job(self._tick, "interval", seconds=self._tick_interval, id="main_tick")
         self._scheduler.add_job(self._daily_report, "cron", hour=0, minute=0, id="daily_report")
+        self._scheduler.add_job(self._daily_health_check, "cron", hour=6, minute=0, id="daily_health")
         self._scheduler.add_job(self._llm_analyze, "interval", minutes=10, id="llm_analyze")
 
         signal.signal(signal.SIGINT, self._shutdown)
@@ -308,6 +310,14 @@ class CryptoBot:
                 )
         except Exception as e:
             logger.error("일일 정산 에러: %s", e, exc_info=True)
+
+    def _daily_health_check(self):
+        """일일 헬스체크 (06:00)."""
+        try:
+            checker = HealthChecker(self._db, self._trader, self._notifier)
+            checker.run_all()
+        except Exception as e:
+            logger.error("헬스체크 에러: %s", e, exc_info=True)
 
     def _safety_check(self):
         if self._trader.is_ready:

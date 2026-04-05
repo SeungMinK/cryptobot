@@ -114,20 +114,21 @@ logger = logging.getLogger(__name__)
 
 | 접두사 | 용도 | 이슈 필요 | 예시 |
 |--------|------|-----------|------|
-| `hotfix:` | **프로덕션 긴급 수정** — 봇 크래시, 매매 중단, 데이터 유실 등 즉시 배포 필요 | X (main 직접 커밋) | `hotfix: DataFrame bool 변환 에러` |
-| `fix:` | 일반 버그 수정 — 기능 오작동, UI 깨짐 등 | △ (규모에 따라) | `fix: Pagination prop 이름 불일치 (#96)` |
-| `feat:` | 새 기능 추가 | O | `feat: 대시보드에 최근 뉴스 섹션 추가` |
-| `improve:` | 기존 기능 개선 — UX 개선, 표시 정보 추가/변경 등 | X | `improve: AI 시장 분석 제목에 시간 표시` |
+| `hotfix:` | **프로덕션 긴급 수정** — 봇 크래시, 매매 중단, 데이터 유실 등 즉시 배포 필요 | O (main 직접 커밋, 이슈는 사전 또는 사후) | `hotfix: DataFrame bool 변환 에러 (#106)` |
+| `fix:` | 일반 버그 수정 — 기능 오작동, UI 깨짐 등 | O | `fix: Pagination prop 이름 불일치 (#96)` |
+| `feat:` | 새 기능 추가 | O | `feat: 대시보드에 최근 뉴스 섹션 추가 (#XX)` |
+| `improve:` | 기존 기능 개선 — UX 개선, 표시 정보 추가/변경 등 | O | `improve: AI 시장 분석 제목에 시간 표시 (#XX)` |
 | `refactor:` | 동작 변경 없는 코드 구조 개선 | O | `refactor: main.py 모듈 분리 (#90)` |
-| `perf:` | 성능 최적화 | △ | `perf: OHLCV 캐싱으로 API 호출 감소` |
-| `test:` | 테스트 추가/수정 | X | `test: 통합 테스트 15건 추가` |
+| `perf:` | 성능 최적화 | O | `perf: OHLCV 캐싱으로 API 호출 감소 (#XX)` |
+| `test:` | 테스트 추가/수정 | △ | `test: 통합 테스트 15건 추가` |
 | `docs:` | 문서, README, 주석 | X | `docs: README 로드맵 업데이트` |
 | `chore:` | 설정, 빌드, 의존성 등 | X | `chore: .gitignore 업데이트` |
 
 **판단 기준:**
 - `hotfix:` vs `fix:` — 봇이 돌고 있는데 지금 당장 안 고치면 돈 잃거나 매매 못 하면 `hotfix:`
 - `feat:` vs `improve:` — 완전히 새로운 기능이면 `feat:`, 기존 기능의 UX/정보 개선이면 `improve:`
-- 이슈 없이 main 직접 커밋 가능: `hotfix:`, `improve:`, `test:`, `docs:`, `chore:`
+- **모든 코드 변경은 이슈 필수** — 블로그 히스토리 추적용. hotfix는 긴급 시 커밋 먼저 → 사후 이슈 생성 허용.
+- 이슈 없이 커밋 가능: `docs:`, `chore:` 만
 
 ## README.md 로드맵 관리 규칙
 

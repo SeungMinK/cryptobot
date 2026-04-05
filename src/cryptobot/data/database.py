@@ -547,6 +547,22 @@ _DEFAULT_BOT_CONFIG = [
         "description": "현재가가 이 값 이상인 코인만 선별.",
     },
     {
+        "key": "llm_add_coins",
+        "value": "[]",
+        "value_type": "string",
+        "category": "coin",
+        "display_name": "LLM 추천 추가 코인",
+        "description": "LLM이 추천한 추가 모니터링 코인 목록 (JSON 배열).",
+    },
+    {
+        "key": "llm_remove_coins",
+        "value": "[]",
+        "value_type": "string",
+        "category": "coin",
+        "display_name": "LLM 추천 제거 코인",
+        "description": "LLM이 추천한 모니터링 제외 코인 목록 (JSON 배열).",
+    },
+    {
         "key": "k_value",
         "value": "0.5",
         "value_type": "float",

@@ -1,9 +1,9 @@
 """멀티코인 관리 — 코인 목록 갱신 + collector 관리."""
 
+import json
 import logging
 import time as _time
 
-from cryptobot.bot.config import config
 from cryptobot.data.collector import DataCollector
 
 logger = logging.getLogger(__name__)
@@ -57,14 +57,41 @@ class CoinManager:
 
             if top_coins:
                 new_coins = [c["ticker"] for c in top_coins]
+
+                # LLM 추천 코인 반영
+                llm_add = self._get_llm_coins("llm_add_coins")
+                llm_remove = set(self._get_llm_coins("llm_remove_coins"))
+
+                for coin in llm_add:
+                    if coin not in new_coins and coin not in self.CORE_COINS:
+                        new_coins.append(coin)
+
+                # LLM 제거 추천 (CORE + 보유 중 코인은 제외 불가)
+                held_coins = self._get_held_coins()
+                new_coins = [
+                    c for c in new_coins
+                    if c not in llm_remove or c in self.CORE_COINS or c in held_coins
+                ]
+
+                # CORE 코인 보장
                 for core in reversed(self.CORE_COINS):
                     if core not in new_coins:
                         new_coins.insert(0, core)
 
-                held_coins = self._get_held_coins()
+                # 보유 중 코인 보장
                 for held in held_coins:
                     if held not in new_coins:
                         new_coins.append(held)
+
+                # max_coins 제한 (CORE + 보유 코인은 항상 포함)
+                max_coins = int(self._config.get("max_coins", "5"))
+                if len(new_coins) > max_coins:
+                    protected = set(self.CORE_COINS) | set(held_coins)
+                    trimmed = [c for c in new_coins if c in protected]
+                    for c in new_coins:
+                        if c not in protected and len(trimmed) < max_coins:
+                            trimmed.append(c)
+                    new_coins = trimmed
 
                 if set(new_coins) != set(self.active_coins):
                     logger.info("코인 목록 갱신: %s → %s", self.active_coins, new_coins)
@@ -85,6 +112,16 @@ class CoinManager:
             """
         ).fetchall()
         return [r["coin"] for r in rows]
+
+    def _get_llm_coins(self, key: str) -> list[str]:
+        """bot_config에서 LLM 추천 코인 목록 조회."""
+        row = self._db.execute("SELECT value FROM bot_config WHERE key = ?", (key,)).fetchone()
+        if row:
+            try:
+                return json.loads(dict(row)["value"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return []
 
     def get_category(self, coin: str) -> str:
         """코인 카테고리 (core / alt)."""

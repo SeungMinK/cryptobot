@@ -159,15 +159,13 @@ class LLMAnalyzer:
         return bool(self._api_key)
 
     # Haiku 4.5 가격 (2026-04 기준)
-    PRICE_INPUT_PER_M = 0.80   # $0.80 / 1M 입력 토큰
+    PRICE_INPUT_PER_M = 0.80  # $0.80 / 1M 입력 토큰
     PRICE_OUTPUT_PER_M = 4.00  # $4.00 / 1M 출력 토큰
     MIN_INTERVAL_HOURS = 4
 
     def _should_run(self) -> bool:
         """마지막 분석으로부터 4시간 이상 지났는지 확인."""
-        row = self._db.execute(
-            "SELECT timestamp FROM llm_decisions ORDER BY id DESC LIMIT 1"
-        ).fetchone()
+        row = self._db.execute("SELECT timestamp FROM llm_decisions ORDER BY id DESC LIMIT 1").fetchone()
         if row is None:
             return True
 
@@ -183,8 +181,7 @@ class LLMAnalyzer:
     def _calc_cost(self, input_tokens: int, output_tokens: int) -> float:
         """토큰 → USD 비용 계산."""
         return round(
-            input_tokens / 1_000_000 * self.PRICE_INPUT_PER_M +
-            output_tokens / 1_000_000 * self.PRICE_OUTPUT_PER_M,
+            input_tokens / 1_000_000 * self.PRICE_INPUT_PER_M + output_tokens / 1_000_000 * self.PRICE_OUTPUT_PER_M,
             6,
         )
 
@@ -284,8 +281,11 @@ class LLMAnalyzer:
     def _send_stop_alert(self, message: str) -> None:
         """매수 중단 권고 Slack 알림."""
         from cryptobot.notifier.slack import SlackNotifier
+
         notifier = SlackNotifier()
-        notifier.send(f"🚨 *LLM 매수 중단 권고*\n{message}\n\n매매를 중단하려면 Admin 설정에서 '매매 허용'을 OFF로 변경하세요.")
+        notifier.send(
+            f"🚨 *LLM 매수 중단 권고*\n{message}\n\n매매를 중단하려면 Admin 설정에서 '매매 허용'을 OFF로 변경하세요."
+        )
 
     def _retry_missing_params(self, result: dict) -> dict:
         """LLM 응답에서 필수 전략 파라미터가 누락되면 1회 재시도."""
@@ -299,6 +299,7 @@ class LLMAnalyzer:
 
         try:
             import anthropic
+
             client = anthropic.Anthropic(api_key=self._api_key)
             retry_prompt = RETRY_PROMPT.format(missing_fields=", ".join(missing))
 
@@ -338,6 +339,7 @@ class LLMAnalyzer:
         """현재 잔고 + 포지션 정보."""
         try:
             from cryptobot.bot.trader import Trader
+
             trader = Trader()
             if not trader.is_ready:
                 return "API 키 미설정"
@@ -345,11 +347,11 @@ class LLMAnalyzer:
             krw = trader.get_balance_krw()
 
             # 보유 코인
-            held = self._db.execute('''
+            held = self._db.execute("""
                 SELECT coin, price, amount, total_krw FROM trades t
                 WHERE side = 'buy'
                 AND NOT EXISTS (SELECT 1 FROM trades s WHERE s.buy_trade_id = t.id AND s.side = 'sell')
-            ''').fetchall()
+            """).fetchall()
 
             lines = [f"KRW 잔고: {krw:,.0f}원"]
             total_coin = 0
@@ -357,15 +359,16 @@ class LLMAnalyzer:
                 h = dict(h)
                 try:
                     import pyupbit
+
                     cp = pyupbit.get_current_price(h["coin"])
                     val = h["amount"] * cp if cp else h["total_krw"]
                     total_coin += val
-                    lines.append(f"  {h['coin'].replace('KRW-','')}: 투자 {h['total_krw']:,.0f} → 평가 {val:,.0f}")
-                except Exception as e:
+                    lines.append(f"  {h['coin'].replace('KRW-', '')}: 투자 {h['total_krw']:,.0f} → 평가 {val:,.0f}")
+                except Exception:
                     total_coin += h["total_krw"]
 
             lines.append(f"총 자산: {krw + total_coin:,.0f}원")
-            lines.append(f"최소 주문: 5,000원")
+            lines.append("최소 주문: 5,000원")
             lines.append(f"신규 매수 가능: {max(0, krw - 10000):,.0f}원")
             return "\n".join(lines)
         except Exception as e:
@@ -373,9 +376,7 @@ class LLMAnalyzer:
 
     def _get_previous_feedback(self) -> str:
         """이전 LLM 분석의 성과 피드백."""
-        prev = self._db.execute(
-            "SELECT * FROM llm_decisions ORDER BY id DESC LIMIT 1"
-        ).fetchone()
+        prev = self._db.execute("SELECT * FROM llm_decisions ORDER BY id DESC LIMIT 1").fetchone()
         if prev is None:
             return "첫 분석 (이전 기록 없음)"
 
@@ -407,6 +408,7 @@ class LLMAnalyzer:
     def _ensure_prompt_version(self, prompt: str) -> int:
         """현재 프롬프트를 DB에 저장하고 버전 ID 반환."""
         import hashlib
+
         prompt_hash = hashlib.md5(prompt.encode()).hexdigest()[:8]
 
         # 이미 같은 프롬프트가 활성화되어 있으면 그대로
@@ -472,12 +474,15 @@ class LLMAnalyzer:
         for r in stats_rows:
             r = dict(r)
             win_rate = (r["wins"] or 0) / r["sell_cnt"] * 100 if r["sell_cnt"] > 0 else 0
+            avg_pnl = r["avg_pnl"] or 0
             lines.append(
-                f"  {r['strategy']}: {r['sell_cnt']}건 매도, 승률 {win_rate:.0f}%, 평균 손익 {r['avg_pnl'] or 0:+,.0f}원"
+                f"  {r['strategy']}: {r['sell_cnt']}건 매도, 승률 {win_rate:.0f}%, 평균 손익 {avg_pnl:+,.0f}원"
             )
 
         total_trades = sum(dict(r)["sell_cnt"] for r in stats_rows)
-        reliability = "적극 참고" if total_trades >= 50 else "참고만 (데이터 부족)" if total_trades >= 10 else "매우 제한적"
+        reliability = (
+            "적극 참고" if total_trades >= 50 else "참고만 (데이터 부족)" if total_trades >= 10 else "매우 제한적"
+        )
         lines.insert(0, f"총 {total_trades}건 매도 — 신뢰도: {reliability}")
 
         return "\n".join(lines)
@@ -501,18 +506,14 @@ class LLMAnalyzer:
         for i, r in enumerate(rows, 1):
             r = dict(r)
             coins = f" [{r['coins_mentioned']}]" if r["coins_mentioned"] else ""
-            lines.append(
-                f"{i}. [{r['source']}] {r['title']}{coins} ({r['sentiment_keyword']})"
-            )
+            lines.append(f"{i}. [{r['source']}] {r['title']}{coins} ({r['sentiment_keyword']})")
             if r["summary"]:
                 lines.append(f"   {r['summary'][:150]}")
         return "\n".join(lines)
 
     def _get_fear_greed_text(self) -> str:
         """Fear & Greed 최신값."""
-        row = self._db.execute(
-            "SELECT * FROM fear_greed_index ORDER BY id DESC LIMIT 1"
-        ).fetchone()
+        row = self._db.execute("SELECT * FROM fear_greed_index ORDER BY id DESC LIMIT 1").fetchone()
         if row:
             r = dict(row)
             return f"값: {r['value']} ({r['classification']}) — 측정시간: {r['timestamp']}"
@@ -580,13 +581,22 @@ class LLMAnalyzer:
 
     # 필수 응답 필드
     REQUIRED_FIELDS = ["market_summary_kr", "market_state", "recommended_strategy"]
-    REQUIRED_PARAMS = ["rsi_oversold", "bb_std", "stop_loss_pct", "trailing_stop_pct", "k_value", "max_position_per_coin_pct", "max_coins"]
+    REQUIRED_PARAMS = [
+        "rsi_oversold",
+        "bb_std",
+        "stop_loss_pct",
+        "trailing_stop_pct",
+        "k_value",
+        "max_position_per_coin_pct",
+        "max_coins",
+    ]
     MAX_RETRIES = 2
 
     def _call_claude(self, prompt: str) -> dict | None:
         """Claude API 호출 (최대 2회 재시도 + 응답 검증)."""
-        import anthropic
         import time as _time
+
+        import anthropic
 
         total_input = 0
         total_output = 0
@@ -624,9 +634,7 @@ class LLMAnalyzer:
                     result = self._fill_defaults(result)
 
                 # 파라미터 누락 시 과거 값으로 채우기
-                result["recommended_params"] = self._fill_param_defaults(
-                    result.get("recommended_params", {})
-                )
+                result["recommended_params"] = self._fill_param_defaults(result.get("recommended_params", {}))
 
                 result["_input_tokens"] = total_input
                 result["_output_tokens"] = total_output
@@ -634,7 +642,9 @@ class LLMAnalyzer:
 
                 logger.info(
                     "Claude 응답 (시도 %d): %d input + %d output 토큰",
-                    attempt, total_input, total_output,
+                    attempt,
+                    total_input,
+                    total_output,
                 )
                 return result
 
@@ -682,9 +692,7 @@ class LLMAnalyzer:
         }
         for param_key, config_key in config_keys.items():
             if param_key not in params:
-                row = self._db.execute(
-                    "SELECT value FROM bot_config WHERE key = ?", (config_key,)
-                ).fetchone()
+                row = self._db.execute("SELECT value FROM bot_config WHERE key = ?", (config_key,)).fetchone()
                 if row:
                     try:
                         params[param_key] = float(dict(row)["value"])
@@ -750,9 +758,7 @@ class LLMAnalyzer:
 
     def _evaluate_previous(self) -> None:
         """이전 LLM 분석의 성과를 평가하여 기록."""
-        prev = self._db.execute(
-            "SELECT id, timestamp FROM llm_decisions ORDER BY id DESC LIMIT 1"
-        ).fetchone()
+        prev = self._db.execute("SELECT id, timestamp FROM llm_decisions ORDER BY id DESC LIMIT 1").fetchone()
         if prev is None:
             return
 
@@ -778,8 +784,9 @@ class LLMAnalyzer:
                 (round(pnl, 2), was_good, prev["id"]),
             )
             self._db.commit()
-            logger.info("이전 LLM 성과: %d건 매매, PnL %+,.0f원, 판단 %s",
-                        r["trades"], pnl, "good" if was_good else "bad")
+            logger.info(
+                "이전 LLM 성과: %d건 매매, PnL %+,.0f원, 판단 %s", r["trades"], pnl, "good" if was_good else "bad"
+            )
 
     def _apply_recommendations(self, result: dict) -> None:
         """LLM 권고를 bot_config에 반영. before/after 스냅샷 기록."""
@@ -791,7 +798,14 @@ class LLMAnalyzer:
 
         # before 스냅샷 (bot_config + 전략 파라미터)
         before = {}
-        config_keys = ["stop_loss_pct", "trailing_stop_pct", "k_value", "allow_trading", "max_position_per_coin_pct", "max_coins"]
+        config_keys = [
+            "stop_loss_pct",
+            "trailing_stop_pct",
+            "k_value",
+            "allow_trading",
+            "max_position_per_coin_pct",
+            "max_coins",
+        ]
         for key in config_keys:
             row = self._db.execute("SELECT value FROM bot_config WHERE key = ?", (key,)).fetchone()
             if row:
@@ -835,10 +849,10 @@ class LLMAnalyzer:
         strategy = result.get("recommended_strategy")
         if strategy:
             # 기존 파라미터 로드
-            row = self._db.execute(
-                "SELECT default_params_json FROM strategies WHERE name = ?", (strategy,)
-            ).fetchone()
-            strategy_params = json.loads(dict(row)["default_params_json"]) if row and dict(row)["default_params_json"] else {}
+            row = self._db.execute("SELECT default_params_json FROM strategies WHERE name = ?", (strategy,)).fetchone()
+            strategy_params = (
+                json.loads(dict(row)["default_params_json"]) if row and dict(row)["default_params_json"] else {}
+            )
 
             # LLM 추천값으로 머지 (있는 것만 덮어쓰기)
             if "bb_std" in params:

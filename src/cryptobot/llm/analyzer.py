@@ -320,6 +320,8 @@ class LLMAnalyzer:
                 content = content.split("```")[1].split("```")[0].strip()
 
             retry_result = json.loads(content)
+            if not isinstance(retry_result, dict):
+                retry_result = {}
             retry_params = retry_result.get("recommended_params", retry_result)
 
             # 누락된 필드만 채우기 (기존 값 유지)

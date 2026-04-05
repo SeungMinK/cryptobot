@@ -240,23 +240,81 @@ class CryptoBot:
 
     def _daily_report(self):
         try:
+            import pyupbit
+
             today = date.today()
-            trades = self._recorder.get_today_trades(config.bot.coin)
+            trades = self._recorder.get_today_trades()  # 전체 코인
             sells = [t for t in trades if t["side"] == "sell"]
+            buys = [t for t in trades if t["side"] == "buy"]
             wins = [t for t in sells if (t.get("profit_pct") or 0) > 0]
-            bal = self._trader.get_balance_krw() if self._trader.is_ready else 0
+            losses = [t for t in sells if (t.get("profit_pct") or 0) <= 0]
             wr = (len(wins) / len(sells) * 100) if sells else 0
-            self._recorder.save_daily_report(report_date=today, starting_balance=bal, ending_balance=bal, total_asset_value=bal, realized_pnl=sum(t.get("profit_krw", 0) or 0 for t in sells), unrealized_pnl=0, trades_summary={"total": len(trades), "sells": len(sells), "wins": len(wins), "win_rate": round(wr, 1)})
+
+            # 실제 자산 가치 계산 (KRW + 보유 코인)
+            krw = self._trader.get_balance_krw() if self._trader.is_ready else 0
+            coin_value = 0
+            unrealized = 0
+            for coin in self._coin_mgr.active_coins:
+                active = self._recorder.get_active_buy_trade(coin)
+                if active:
+                    cp = pyupbit.get_current_price(coin)
+                    if cp:
+                        val = active["amount"] * cp
+                        coin_value += val
+                        unrealized += val - active["total_krw"]
+
+            total_asset = krw + coin_value
+            realized = sum(t.get("profit_krw", 0) or 0 for t in sells)
+            total_fees = sum(t.get("fee_krw", 0) or 0 for t in trades)
+
+            avg_profit = (
+                sum(t.get("profit_pct", 0) or 0 for t in wins) / len(wins)
+                if wins else 0
+            )
+            avg_loss = (
+                sum(t.get("profit_pct", 0) or 0 for t in losses) / len(losses)
+                if losses else 0
+            )
+
+            self._recorder.save_daily_report(
+                report_date=today,
+                starting_balance=total_asset,
+                ending_balance=total_asset,
+                total_asset_value=total_asset,
+                realized_pnl=realized,
+                unrealized_pnl=round(unrealized, 2),
+                trades_summary={
+                    "total": len(trades),
+                    "buys": len(buys),
+                    "sells": len(sells),
+                    "wins": len(wins),
+                    "losses": len(losses),
+                    "win_rate": round(wr, 1),
+                    "avg_profit_pct": round(avg_profit, 2),
+                    "avg_loss_pct": round(avg_loss, 2),
+                    "total_fees": round(total_fees, 2),
+                },
+            )
+
             if self._config_mgr.get_bool("slack_daily_report", True):
-                self._notifier.notify_daily_report(date_str=today.isoformat(), daily_return_pct=sum(t.get("profit_pct", 0) or 0 for t in sells), total_trades=len(trades), win_rate=wr, balance_krw=bal)
+                self._notifier.notify_daily_report(
+                    date_str=today.isoformat(),
+                    daily_return_pct=sum(
+                        t.get("profit_pct", 0) or 0 for t in sells
+                    ),
+                    total_trades=len(trades),
+                    win_rate=wr,
+                    balance_krw=total_asset,
+                )
         except Exception as e:
             logger.error("일일 정산 에러: %s", e, exc_info=True)
 
     def _safety_check(self):
         if self._trader.is_ready:
-            c = self._trader.cancel_all_orders(config.bot.coin)
-            if c > 0:
-                logger.info("미체결 주문 %d건 취소", c)
+            for coin in self._coin_mgr.active_coins:
+                c = self._trader.cancel_all_orders(coin)
+                if c > 0:
+                    logger.info("미체결 주문 %d건 취소 (%s)", c, coin)
 
     def _shutdown(self, *args):
         logger.info("=== CryptoBot 종료 ===")

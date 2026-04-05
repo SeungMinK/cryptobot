@@ -145,12 +145,17 @@ class DataRecorder:
         ).fetchone()
         return dict(row) if row else None
 
-    def get_today_trades(self, coin: str) -> list[dict]:
-        """오늘 매매 내역 조회."""
-        rows = self._db.execute(
-            "SELECT * FROM trades WHERE coin = ? AND DATE(timestamp) = DATE('now') ORDER BY id",
-            (coin,),
-        ).fetchall()
+    def get_today_trades(self, coin: str | None = None) -> list[dict]:
+        """오늘 매매 내역 조회. coin=None이면 전체 코인."""
+        if coin:
+            rows = self._db.execute(
+                "SELECT * FROM trades WHERE coin = ? AND DATE(timestamp) = DATE('now') ORDER BY id",
+                (coin,),
+            ).fetchall()
+        else:
+            rows = self._db.execute(
+                "SELECT * FROM trades WHERE DATE(timestamp) = DATE('now') ORDER BY id"
+            ).fetchall()
         return [dict(r) for r in rows]
 
     def save_daily_report(

@@ -400,7 +400,7 @@ class LLMAnalyzer:
                 if "before" in ba:
                     lines.append(f"이전 변경: {ba.get('before', {})} → {ba.get('after', {})}")
             except Exception as e:
-                logger.debug("파라미터 변환 실패 %s: %s", param_key, e)
+                logger.debug("파라미터 변환 실패: %s", e)
 
         return "\n".join(lines)
 
@@ -789,13 +789,25 @@ class LLMAnalyzer:
         # 이전 성과 평가
         self._evaluate_previous()
 
-        # before 스냅샷
+        # before 스냅샷 (bot_config + 전략 파라미터)
         before = {}
-        config_keys = ["stop_loss_pct", "trailing_stop_pct", "k_value", "allow_trading"]
+        config_keys = ["stop_loss_pct", "trailing_stop_pct", "k_value", "allow_trading", "max_position_per_coin_pct", "max_coins"]
         for key in config_keys:
             row = self._db.execute("SELECT value FROM bot_config WHERE key = ?", (key,)).fetchone()
             if row:
                 before[key] = dict(row)["value"]
+        # 전략 파라미터도 before에 포함
+        strategy = result.get("recommended_strategy")
+        if strategy:
+            row = self._db.execute("SELECT default_params_json FROM strategies WHERE name = ?", (strategy,)).fetchone()
+            if row and dict(row)["default_params_json"]:
+                try:
+                    sp = json.loads(dict(row)["default_params_json"])
+                    for k in ["rsi_oversold", "bb_std"]:
+                        if k in sp:
+                            before[k] = sp[k]
+                except (json.JSONDecodeError, TypeError):
+                    pass
 
         # 파라미터 적용
         config_map = {
@@ -829,11 +841,11 @@ class LLMAnalyzer:
             strategy_params = json.loads(dict(row)["default_params_json"]) if row and dict(row)["default_params_json"] else {}
 
             # LLM 추천값으로 머지 (있는 것만 덮어쓰기)
-            if params.get("bb_std"):
+            if "bb_std" in params:
                 strategy_params["bb_std"] = params["bb_std"]
-            if params.get("rsi_oversold"):
+            if "rsi_oversold" in params:
                 strategy_params["rsi_oversold"] = params["rsi_oversold"]
-            if params.get("k_value"):
+            if "k_value" in params:
                 strategy_params["k_value"] = params["k_value"]
 
             self._db.execute(
@@ -841,10 +853,13 @@ class LLMAnalyzer:
                 (json.dumps(strategy_params), now, strategy),
             )
 
-        # after 스냅샷
+        # after 스냅샷 (전략 파라미터 포함)
         after = {k: str(v) for k, v in config_map.items() if v is not None}
         if result.get("allow_trading") is not None:
             after["allow_trading"] = str(result["allow_trading"]).lower()
+        for k in ["rsi_oversold", "bb_std"]:
+            if k in params:
+                after[k] = params[k]
 
         # before/after를 최신 llm_decisions에 기록
         self._db.execute(

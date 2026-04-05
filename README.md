@@ -9,7 +9,7 @@
   <br />
   10개 매매 전략 + Claude AI 시장분석 + 멀티코인 자동 선별
   <br />
-  <a href="https://cryptobot-eight.vercel.app"><strong>Live Demo</strong></a> · <sub>API localhost:8000/api/docs</sub>
+  <a href="https://cryptobot-eight.vercel.app"><strong>Live Demo</strong></a> · <a href="https://api.seungmink.dev/api/docs"><strong>API Docs</strong></a>
 </p>
 
 <p align="center">
@@ -65,26 +65,41 @@
 ## 아키텍처
 
 ```
-┌─ Trading Bot ───────────────────────────────────┐
-│  Multi-Coin Scanner → DataCollector (60초)       │
-│  StrategyRegistry (10개, 시장 상태별 자동선택)     │
-│  RiskManager (수수료 가드 + 하드 리밋)            │
-│  LLM Analyzer (4시간) → 파라미터 자동 조절        │
-│  OrderExecutor (pyupbit)                         │
-└──────┬───────────────────────────────────────────┘
-       │
-┌──────┴────────── SQLite (공유 DB) ──────────────┐
-│  market_snapshots │ trade_signals │ trades       │
-│  ohlcv_daily      │ news_articles │ llm_decisions│
-│  prompt_versions  │ fear_greed    │ bot_config   │
-└──────┬────────────┬──────────────────────────────┘
-       │            │
-┌──────┴──────┐ ┌───┴────────────────────────────┐
-│ News        │ │ FastAPI + React Admin (8페이지)  │
-│ Collector   │ │                                │
-│ RSS + F&G   │ │                                │
-│ (30분 주기)  │ │                                │
-└─────────────┘ └────────────────────────────────┘
+                    ┌─────────────────────────────────────┐
+                    │        Vercel (Frontend)             │
+                    │   cryptobot-eight.vercel.app         │
+                    │   React 18 + TypeScript + Vite       │
+                    └──────────────┬──────────────────────┘
+                                   │ HTTPS
+                    ┌──────────────┴──────────────────────┐
+                    │   Cloudflare Tunnel (API Proxy)      │
+                    │   api.seungmink.dev → localhost:8000 │
+                    └──────────────┬──────────────────────┘
+                                   │
+┌──────────────────────────────────┴──────────────────────┐
+│                    Local Machine                        │
+│                                                         │
+│  ┌─ Trading Bot ─────────────────────────────────────┐  │
+│  │  Scanner → DataCollector (60초)                    │  │
+│  │  StrategyRegistry (10개, 시장 상태별 자동선택)       │  │
+│  │  RiskManager (수수료 가드 + 하드 리밋)              │  │
+│  │  LLM Analyzer (4시간) → 파라미터 자동 조절          │  │
+│  │  HealthChecker (매일) / WeeklyReporter / MonthlyAudit│ │
+│  └───────┬───────────────────────────────────────────┘  │
+│          │                                              │
+│  ┌───────┴──────── SQLite (공유 DB) ─────────────────┐  │
+│  │  market_snapshots │ trade_signals │ trades         │  │
+│  │  ohlcv_daily      │ news_articles │ llm_decisions  │  │
+│  │  prompt_versions  │ fear_greed    │ bot_config     │  │
+│  └───────┬───────────┬───────────────────────────────┘  │
+│          │           │                                  │
+│  ┌───────┴─────┐ ┌───┴──────────────────────────────┐   │
+│  │ News        │ │ FastAPI (API Server)              │   │
+│  │ Collector   │ │ JWT Auth + Rate Limit             │   │
+│  │ RSS + F&G   │ │ Security Headers                  │   │
+│  │ (30분 주기)  │ │                                  │   │
+│  └─────────────┘ └──────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -142,8 +157,8 @@ make start
 |---|---|
 | `make start` | 전체 실행 |
 | `make bot` | 트레이딩 봇 |
-| `make api` | API 서버 (localhost:8000) |
-| `make web` | Admin (localhost:5173) |
+| `make api` | API 서버 |
+| `make web` | Admin 개발 서버 |
 | `make news` | 뉴스 수집기 |
 | `make test` | 테스트 (101건) |
 
@@ -159,6 +174,8 @@ make start
 | LLM | Anthropic Claude Haiku 4.5 |
 | API | FastAPI + uvicorn |
 | Frontend | React 18 + TypeScript + Vite |
+| Hosting | Vercel (Frontend) + Cloudflare Tunnel (API) |
+| Domain | seungmink.dev (Cloudflare DNS) |
 | News | RSS + Fear & Greed API |
 | Notification | Slack Bot Token |
 | Tests | pytest (101건) |

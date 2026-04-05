@@ -20,6 +20,7 @@ from cryptobot.bot.config_manager import ConfigManager
 from cryptobot.bot.health_checker import HealthChecker
 from cryptobot.bot.risk import RiskManager
 from cryptobot.bot.strategy_selector import StrategySelector
+from cryptobot.bot.weekly_reporter import WeeklyReporter
 from cryptobot.bot.trader import Trader
 from cryptobot.data.database import Database
 from cryptobot.data.recorder import DataRecorder
@@ -63,6 +64,7 @@ class CryptoBot:
         self._scheduler.add_job(self._tick, "interval", seconds=self._tick_interval, id="main_tick")
         self._scheduler.add_job(self._daily_report, "cron", hour=0, minute=0, id="daily_report")
         self._scheduler.add_job(self._daily_health_check, "cron", hour=6, minute=0, id="daily_health")
+        self._scheduler.add_job(self._weekly_report, "cron", day_of_week="sun", hour=3, minute=0, id="weekly_report")
         self._scheduler.add_job(self._llm_analyze, "interval", minutes=10, id="llm_analyze")
 
         signal.signal(signal.SIGINT, self._shutdown)
@@ -318,6 +320,14 @@ class CryptoBot:
             checker.run_all()
         except Exception as e:
             logger.error("헬스체크 에러: %s", e, exc_info=True)
+
+    def _weekly_report(self):
+        """주간 리포트 (일요일 03:00)."""
+        try:
+            reporter = WeeklyReporter(self._db, self._notifier)
+            reporter.run_all()
+        except Exception as e:
+            logger.error("주간 리포트 에러: %s", e, exc_info=True)
 
     def _safety_check(self):
         if self._trader.is_ready:

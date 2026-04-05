@@ -867,6 +867,26 @@ class LLMAnalyzer:
                 (json.dumps(strategy_params), now, strategy),
             )
 
+        # 코인 추천 반영
+        coin_recs = result.get("coin_recommendations", {})
+        add_coins = coin_recs.get("add", [])
+        remove_coins = coin_recs.get("remove", [])
+        if add_coins or remove_coins:
+            # KRW- 접두사 보장
+            add_coins = [c if c.startswith("KRW-") else f"KRW-{c}" for c in add_coins]
+            remove_coins = [c if c.startswith("KRW-") else f"KRW-{c}" for c in remove_coins]
+
+            self._db.execute(
+                "UPDATE bot_config SET value = ?, updated_at = ? WHERE key = 'llm_add_coins'",
+                (json.dumps(add_coins), now),
+            )
+            self._db.execute(
+                "UPDATE bot_config SET value = ?, updated_at = ? WHERE key = 'llm_remove_coins'",
+                (json.dumps(remove_coins), now),
+            )
+            reasons = coin_recs.get("reasons", "")
+            logger.info("LLM 코인 추천: add=%s, remove=%s (%s)", add_coins, remove_coins, reasons)
+
         # after 스냅샷 (전략 파라미터 포함)
         after = {k: str(v) for k, v in config_map.items() if v is not None}
         if result.get("allow_trading") is not None:

@@ -94,8 +94,8 @@ class BaseStrategy(ABC):
             매도 신호 또는 hold
         """
 
-    # 업비트 수수료: 매수 0.05% + 매도 0.05% = 왕복 0.1%
-    ROUND_TRIP_FEE_PCT = 0.1
+    # 업비트 수수료: 매수 0.05% + 매도 0.05% = 왕복 0.1% + 슬리피지 마진
+    ROUND_TRIP_FEE_PCT = 0.15
 
     def check_trailing_stop(self, current_price: float, buy_price: float, hold_minutes: int | None = None) -> Signal | None:
         """공통 트레일링 스탑 + 손절 + ROI + 수수료 가드."""

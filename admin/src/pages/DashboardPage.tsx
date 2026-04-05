@@ -27,6 +27,7 @@ export default function DashboardPage() {
   const [recentTrades, setRecentTrades] = useState<Trade[]>([]);
   const [monitoredCoins, setMonitoredCoins] = useState<any[]>([]);
   const [newsStats, setNewsStats] = useState<any>(null);
+  const [recentNews, setRecentNews] = useState<any[]>([]);
   const [llmDecisions, setLlmDecisions] = useState<LLMDecision[]>([]);
   const [llmTab, setLlmTab] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -40,8 +41,9 @@ export default function DashboardPage() {
       getTrades({ limit: 10 }).catch(() => ({ items: [] })),
       client.get("/market/coins").then((r) => r.data).catch(() => []),
       client.get("/news/stats", { params: { hours: 24 } }).then((r) => r.data).catch(() => null),
+      client.get("/news?limit=6&sort=latest").then((r) => r.data?.items || r.data || []).catch(() => []),
       client.get("/llm/decisions?limit=4").then((r) => r.data).catch(() => []),
-    ]).then(([bal, pos, hist, mkt, trades, coins, nStats, llm]) => {
+    ]).then(([bal, pos, hist, mkt, trades, coins, nStats, news, llm]) => {
       setBalance(bal);
       setPositions(pos as PositionsResponse | null);
       setHistory(hist as BalanceHistory[]);
@@ -49,6 +51,7 @@ export default function DashboardPage() {
       setRecentTrades((trades as { items: Trade[] }).items);
       setMonitoredCoins(coins as any[]);
       setNewsStats(nStats);
+      setRecentNews(news as any[]);
       setLlmDecisions(llm as LLMDecision[]);
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -245,6 +248,36 @@ export default function DashboardPage() {
           <div className="empty-state">보유 포지션 없음</div>
         )}
       </div>
+
+      {/* 최근 뉴스 */}
+      {recentNews.length > 0 && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>최근 뉴스</span>
+            <Link to="/news" style={{ fontSize: 12 }}>전체 보기</Link>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {recentNews.map((n: any, i: number) => (
+              <div key={n.id || i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "8px 0", borderBottom: i < recentNews.length - 1 ? "1px solid var(--border)" : "none" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                    <span className={`badge ${n.sentiment === "positive" ? "badge-green" : n.sentiment === "negative" ? "badge-red" : "badge-yellow"}`} style={{ fontSize: 9 }}>
+                      {n.sentiment === "positive" ? "긍정" : n.sentiment === "negative" ? "부정" : "중립"}
+                    </span>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{n.source}</span>
+                  </div>
+                  <a href={n.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--text-primary)", textDecoration: "none", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {n.title}
+                  </a>
+                </div>
+                <span style={{ fontSize: 10, color: "var(--text-muted)", whiteSpace: "nowrap", marginLeft: 12 }}>
+                  {formatDateTime(n.published_at || n.collected_at).replace(/\d{4}\. /, "")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 모니터링 코인 현황 (맨 아래) */}
       {monitoredCoins.length > 0 && (

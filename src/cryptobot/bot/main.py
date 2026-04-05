@@ -143,7 +143,7 @@ class CryptoBot:
         sn = self._strategy_sel.current_strategy_name
         collector = self._coin_mgr.collectors.get(coin)
         df = collector.latest_df if collector else None
-        if not df or not s:
+        if df is None or s is None:
             return
 
         sig = s.check_buy(df, price)
@@ -183,7 +183,7 @@ class CryptoBot:
         sn = self._strategy_sel.current_strategy_name
         collector = self._coin_mgr.collectors.get(coin)
         df = collector.latest_df if collector else None
-        if not df or not s:
+        if df is None or s is None:
             return
 
         buy_price = active_trade["price"]

@@ -42,7 +42,7 @@ export default function DashboardPage() {
       client.get("/market/coins").then((r) => r.data).catch(() => []),
       client.get("/news/stats", { params: { hours: 24 } }).then((r) => r.data).catch(() => null),
       client.get("/news?limit=6&sort=latest").then((r) => r.data?.items || r.data || []).catch(() => []),
-      client.get("/llm/decisions?limit=4").then((r) => r.data).catch(() => []),
+      client.get("/llm/decisions?limit=6").then((r) => r.data).catch(() => []),
     ]).then(([bal, pos, hist, mkt, trades, coins, nStats, news, llm]) => {
       setBalance(bal);
       setPositions(pos as PositionsResponse | null);
@@ -141,7 +141,14 @@ export default function DashboardPage() {
           {llmDecisions.length > 0 && (
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>AI 시장 분석</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  AI 시장 분석
+                  {llmDecisions[llmTab] && (
+                    <span style={{ fontSize: 11, fontWeight: 400, color: "var(--text-muted)", marginLeft: 8 }}>
+                      {formatDateTime(llmDecisions[llmTab].timestamp)} · {getMarketStateKR(llmDecisions[llmTab].output_market_state || "")}
+                    </span>
+                  )}
+                </div>
                 <div style={{ display: "flex", gap: 2 }}>
                   {llmDecisions.map((_, i) => (
                     <button
@@ -168,9 +175,6 @@ export default function DashboardPage() {
                   <div>
                     <div style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 8 }}>{summary}</div>
                     {reasoning && <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>{reasoning}</div>}
-                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 6 }}>
-                      {formatDateTime(d.timestamp)} · {getMarketStateKR(d.output_market_state || "")} · ${d.cost_usd?.toFixed(4) || "0"}
-                    </div>
                   </div>
                 );
               })()}

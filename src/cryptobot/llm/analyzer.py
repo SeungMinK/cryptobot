@@ -559,15 +559,16 @@ class LLMAnalyzer:
         return result
 
     def _fill_param_defaults(self, params: dict) -> dict:
-        """파라미터 누락 시 현재 bot_config에서 가져와 채우기."""
-        param_keys = {
+        """파라미터 누락 시 현재 bot_config + 전략 파라미터에서 가져와 채우기."""
+        # bot_config 기반
+        config_keys = {
             "stop_loss_pct": "stop_loss_pct",
             "trailing_stop_pct": "trailing_stop_pct",
             "k_value": "k_value",
             "max_position_per_coin_pct": "max_position_per_coin_pct",
             "max_coins": "max_coins",
         }
-        for param_key, config_key in param_keys.items():
+        for param_key, config_key in config_keys.items():
             if param_key not in params:
                 row = self._db.execute(
                     "SELECT value FROM bot_config WHERE key = ?", (config_key,)
@@ -576,6 +577,21 @@ class LLMAnalyzer:
                     try:
                         params[param_key] = float(dict(row)["value"])
                     except (ValueError, TypeError):
+                        pass
+
+        # 전략 파라미터 기반 (rsi_oversold, bb_std 등)
+        strategy_keys = ["rsi_oversold", "bb_std"]
+        for key in strategy_keys:
+            if key not in params:
+                row = self._db.execute(
+                    "SELECT default_params_json FROM strategies WHERE name = 'bb_rsi_combined'"
+                ).fetchone()
+                if row and dict(row)["default_params_json"]:
+                    try:
+                        sp = json.loads(dict(row)["default_params_json"])
+                        if key in sp:
+                            params[key] = sp[key]
+                    except (json.JSONDecodeError, TypeError):
                         pass
         return params
 
@@ -691,25 +707,27 @@ class LLMAnalyzer:
                 (str(result["allow_trading"]).lower(), now),
             )
 
-        # 전략 파라미터 반영
+        # 전략 파라미터 반영 (기존 값에 머지, 전체 교체 방지)
         strategy = result.get("recommended_strategy")
         if strategy:
-            strategy_params = {}
+            # 기존 파라미터 로드
+            row = self._db.execute(
+                "SELECT default_params_json FROM strategies WHERE name = ?", (strategy,)
+            ).fetchone()
+            strategy_params = json.loads(dict(row)["default_params_json"]) if row and dict(row)["default_params_json"] else {}
+
+            # LLM 추천값으로 머지 (있는 것만 덮어쓰기)
             if params.get("bb_std"):
                 strategy_params["bb_std"] = params["bb_std"]
-                strategy_params["bb_period"] = 20
             if params.get("rsi_oversold"):
                 strategy_params["rsi_oversold"] = params["rsi_oversold"]
-                strategy_params["rsi_period"] = 14
-                strategy_params["rsi_overbought"] = 50
             if params.get("k_value"):
                 strategy_params["k_value"] = params["k_value"]
 
-            if strategy_params:
-                self._db.execute(
-                    "UPDATE strategies SET default_params_json = ?, updated_at = ? WHERE name = ?",
-                    (json.dumps(strategy_params), now, strategy),
-                )
+            self._db.execute(
+                "UPDATE strategies SET default_params_json = ?, updated_at = ? WHERE name = ?",
+                (json.dumps(strategy_params), now, strategy),
+            )
 
         # after 스냅샷
         after = {k: str(v) for k, v in config_map.items() if v is not None}

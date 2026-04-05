@@ -8,7 +8,7 @@ import type { BalanceResponse, PositionsResponse, BalanceHistory } from "../type
 import type { MarketSnapshot } from "../types/market";
 import type { Trade } from "../types/trades";
 import StatCard from "../components/StatCard";
-import { formatKRW, formatPercent, formatNumber, formatDateTime } from "../utils/format";
+import { formatKRW, formatPercent, formatDateTime } from "../utils/format";
 import { getMarketStateKR } from "../utils/indicatorDescriptions";
 
 interface LLMDecision {
@@ -22,7 +22,7 @@ interface LLMDecision {
 export default function DashboardPage() {
   const [balance, setBalance] = useState<BalanceResponse | null>(null);
   const [positions, setPositions] = useState<PositionsResponse | null>(null);
-  const [history, setHistory] = useState<BalanceHistory[]>([]);
+  const [, setHistory] = useState<BalanceHistory[]>([]);
   const [market, setMarket] = useState<MarketSnapshot | null>(null);
   const [recentTrades, setRecentTrades] = useState<Trade[]>([]);
   const [monitoredCoins, setMonitoredCoins] = useState<any[]>([]);
@@ -65,7 +65,6 @@ export default function DashboardPage() {
 
   if (loading) return <div className="loading">로딩 중...</div>;
 
-  const marketState = market && "market_state" in market ? market.market_state : null;
   const fg = newsStats?.fear_greed;
 
   return (

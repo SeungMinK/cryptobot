@@ -6,8 +6,11 @@ NestJS의 main.ts (bootstrap) + AppModule과 동일.
     uvicorn cryptobot.api.main:app --reload --port 8000
 """
 
-from fastapi import FastAPI
+import os
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from cryptobot.api.routes import auth, balance, coin_strategy, config, market, news, signals, strategies, trades
 from cryptobot.logging_config import setup_logging
@@ -23,18 +26,34 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
-# CORS — React dev 서버 (localhost:5173) 허용
+# CORS — 개발 + 프로덕션 도메인 허용
+_cors_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+]
+_extra_origins = os.getenv("CORS_ORIGINS", "")
+if _extra_origins:
+    _cors_origins.extend([o.strip() for o in _extra_origins.split(",") if o.strip()])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
+
+
+# 보안 헤더 미들웨어
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """보안 헤더 추가."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
 
 # 라우트 등록 — NestJS의 imports: [AuthModule, TradeModule, ...]
 app.include_router(auth.router)
@@ -108,9 +127,22 @@ class _WebErrorReport(_BaseModel):
     user_agent: str | None = None
 
 
+import time as _time
+from collections import defaultdict as _defaultdict
+
+_error_report_attempts: dict[str, list[float]] = _defaultdict(list)
+
+
 @app.post("/api/error/report", tags=["system"])
-def report_web_error(error: _WebErrorReport):
-    """Admin 웹에서 발생한 에러를 서버 로그로 기록."""
+def report_web_error(request: Request, error: _WebErrorReport):
+    """Admin 웹에서 발생한 에러를 서버 로그로 기록 (rate limit: 10회/분)."""
+    client_ip = request.client.host if request.client else "unknown"
+    now = _time.time()
+    _error_report_attempts[client_ip] = [t for t in _error_report_attempts[client_ip] if now - t < 60]
+    if len(_error_report_attempts[client_ip]) >= 10:
+        return JSONResponse(status_code=429, content={"detail": "Too many requests"})
+    _error_report_attempts[client_ip].append(now)
+
     _web_logger.error(
         "[WEB] %s | source=%s | url=%s\n  %s",
         error.message,

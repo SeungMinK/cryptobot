@@ -17,8 +17,8 @@ const MARKET_SECTIONS = [
 
 export default function StrategiesPage() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
-  const [activations, setActivations] = useState<StrategyActivation[]>([]);
-  const [coinConfigs, setCoinConfigs] = useState<CoinStrategyConfig[]>([]);
+  const [, setActivations] = useState<StrategyActivation[]>([]);
+  const [, setCoinConfigs] = useState<CoinStrategyConfig[]>([]);
   const [coinStrategies, setCoinStrategies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirm, setConfirm] = useState<{ name: string; action: "activate" | "deactivate" } | null>(null);

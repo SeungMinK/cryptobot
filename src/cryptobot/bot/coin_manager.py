@@ -63,30 +63,25 @@ class CoinManager:
                 llm_remove = set(self._get_llm_coins("llm_remove_coins"))
 
                 for coin in llm_add:
-                    if coin not in new_coins and coin not in self.CORE_COINS:
+                    if coin not in new_coins:
                         new_coins.append(coin)
 
-                # LLM 제거 추천 (CORE + 보유 중 코인은 제외 불가)
+                # LLM 제거 추천 (보유 중 코인만 제외 불가)
                 held_coins = self._get_held_coins()
                 new_coins = [
                     c for c in new_coins
-                    if c not in llm_remove or c in self.CORE_COINS or c in held_coins
+                    if c not in llm_remove or c in held_coins
                 ]
-
-                # CORE 코인 보장
-                for core in reversed(self.CORE_COINS):
-                    if core not in new_coins:
-                        new_coins.insert(0, core)
 
                 # 보유 중 코인 보장
                 for held in held_coins:
                     if held not in new_coins:
                         new_coins.append(held)
 
-                # max_coins 제한 (CORE + 보유 코인은 항상 포함)
+                # max_coins 제한 (보유 코인은 항상 포함)
                 max_coins = int(self._config.get("max_coins", "5"))
                 if len(new_coins) > max_coins:
-                    protected = set(self.CORE_COINS) | set(held_coins)
+                    protected = set(held_coins)
                     trimmed = [c for c in new_coins if c in protected]
                     for c in new_coins:
                         if c not in protected and len(trimmed) < max_coins:

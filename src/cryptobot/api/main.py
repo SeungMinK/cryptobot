@@ -32,6 +32,8 @@ _cors_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:5173",
     "https://cryptobot-eight.vercel.app",
+    "https://seungmink.dev",
+    "https://crypto.seungmink.dev",
 ]
 _extra_origins = os.getenv("CORS_ORIGINS", "")
 if _extra_origins:

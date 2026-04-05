@@ -60,7 +60,7 @@ class CryptoBot:
 
         self._scheduler.add_job(self._tick, "interval", seconds=self._tick_interval, id="main_tick")
         self._scheduler.add_job(self._daily_report, "cron", hour=0, minute=0, id="daily_report")
-        self._scheduler.add_job(self._llm_analyze, "interval", hours=4, id="llm_analyze")
+        self._scheduler.add_job(self._llm_analyze, "interval", minutes=10, id="llm_analyze")
 
         signal.signal(signal.SIGINT, self._shutdown)
         signal.signal(signal.SIGTERM, self._shutdown)

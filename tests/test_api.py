@@ -29,6 +29,10 @@ def _test_db():
     # 테스트 DB 오버라이드
     deps._test_db_override = db
 
+    # rate limit 초기화
+    from cryptobot.api.routes.auth import _login_attempts
+    _login_attempts.clear()
+
     yield db
 
     deps._test_db_override = None

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { updateStrategyParams, getStrategySimulation } from "../../api/strategies";
-import type { Strategy, StrategySimulation } from "../../types/strategies";
+import type { StrategySimulation } from "../../api/strategies";
+import type { Strategy } from "../../types/strategies";
 import { getParamDesc } from "../../utils/paramDescriptions";
 import SimulationResult from "./SimulationResult";
 

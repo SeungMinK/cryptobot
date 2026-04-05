@@ -36,7 +36,13 @@ def get_strategy_repo() -> StrategyRepository:
 
 @lru_cache
 def get_jwt_secret() -> str:
-    """JWT 시크릿 키. .env의 JWT_SECRET 또는 기본값."""
+    """JWT 시크릿 키. .env의 JWT_SECRET 필수."""
     import os
 
-    return os.getenv("JWT_SECRET", "cryptobot-dev-secret-change-in-production")
+    secret = os.getenv("JWT_SECRET", "")
+    if not secret:
+        import secrets
+
+        secret = secrets.token_urlsafe(32)
+        logging.getLogger(__name__).warning("JWT_SECRET 미설정 — 임시 시크릿 생성 (재시작 시 세션 만료)")
+    return secret

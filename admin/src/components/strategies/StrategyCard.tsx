@@ -10,7 +10,7 @@ interface Props {
   onDeactivate: () => void;
 }
 
-export default function StrategyCard({ strategy: s, hasSwitching, activeCoins, onEdit, onActivate, onDeactivate }: Props) {
+export default function StrategyCard({ strategy: s, hasSwitching: _hasSwitching, activeCoins, onEdit, onActivate: _onActivate, onDeactivate: _onDeactivate }: Props) {
   return (
     <div
       className="strategy-card"

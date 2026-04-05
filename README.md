@@ -9,7 +9,7 @@
   <br />
   10개 매매 전략 + Claude AI 시장분석 + 멀티코인 자동 선별
   <br />
-  <sub>로컬 실행: Admin localhost:5173 · API localhost:8000/api/docs</sub>
+  <a href="https://cryptobot-eight.vercel.app"><strong>Live Demo</strong></a> · <sub>API localhost:8000/api/docs</sub>
 </p>
 
 <p align="center">
@@ -17,7 +17,7 @@
   <img src="https://img.shields.io/badge/React-18-61dafb?logo=react" alt="React" />
   <img src="https://img.shields.io/badge/Claude_AI-Haiku_4.5-blueviolet?logo=anthropic" alt="Claude" />
   <img src="https://img.shields.io/badge/Exchange-Upbit-blue" alt="Upbit" />
-  <img src="https://img.shields.io/badge/tests-90_passed-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-101_passed-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
 

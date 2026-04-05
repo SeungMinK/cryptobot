@@ -46,6 +46,7 @@ class CryptoBot:
 
         self._scheduler = BlockingScheduler()
         self._tick_interval = int(self._config_mgr.get("tick_interval_seconds", "60"))
+        self._coin_highest_prices: dict[str, float | None] = {}  # 코인별 최고가 추적
 
     def start(self) -> None:
         """봇 시작."""
@@ -127,11 +128,17 @@ class CryptoBot:
         self._strategy_sel.current_strategy = strategy
         self._strategy_sel.current_strategy_name = name
         try:
+            # 코인별 최고가 복원 (전략 인스턴스 공유 문제 방지)
+            strategy._highest_price = self._coin_highest_prices.get(coin)
+
             active_trade = self._recorder.get_active_buy_trade(coin)
             if active_trade:
                 self._check_and_sell(active_trade, snapshot["price"], snapshot_id, snapshot, coin)
             else:
                 self._check_and_buy(snapshot, snapshot["price"], snapshot_id, coin)
+
+            # 코인별 최고가 저장
+            self._coin_highest_prices[coin] = strategy._highest_price
         finally:
             self._strategy_sel.current_strategy = orig
             self._strategy_sel.current_strategy_name = orig_name

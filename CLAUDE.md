@@ -107,9 +107,27 @@ logger = logging.getLogger(__name__)
 ### Git 규칙
 
 - 브랜치: `{이슈번호}/{타입}/{설명}` (예: `29/feature/fastapi-setup`)
-- 커밋 메시지: `feat:`, `fix:`, `refactor:`, `test:`, `docs:` 접두사 + `(#이슈번호)`
 - PR은 관련 이슈에 `Related: #번호`로 연결
 - 상세 컨벤션: `CONVENTIONS.md` 참조
+
+#### 커밋 메시지 접두사
+
+| 접두사 | 용도 | 이슈 필요 | 예시 |
+|--------|------|-----------|------|
+| `hotfix:` | **프로덕션 긴급 수정** — 봇 크래시, 매매 중단, 데이터 유실 등 즉시 배포 필요 | X (main 직접 커밋) | `hotfix: DataFrame bool 변환 에러` |
+| `fix:` | 일반 버그 수정 — 기능 오작동, UI 깨짐 등 | △ (규모에 따라) | `fix: Pagination prop 이름 불일치 (#96)` |
+| `feat:` | 새 기능 추가 | O | `feat: 대시보드에 최근 뉴스 섹션 추가` |
+| `improve:` | 기존 기능 개선 — UX 개선, 표시 정보 추가/변경 등 | X | `improve: AI 시장 분석 제목에 시간 표시` |
+| `refactor:` | 동작 변경 없는 코드 구조 개선 | O | `refactor: main.py 모듈 분리 (#90)` |
+| `perf:` | 성능 최적화 | △ | `perf: OHLCV 캐싱으로 API 호출 감소` |
+| `test:` | 테스트 추가/수정 | X | `test: 통합 테스트 15건 추가` |
+| `docs:` | 문서, README, 주석 | X | `docs: README 로드맵 업데이트` |
+| `chore:` | 설정, 빌드, 의존성 등 | X | `chore: .gitignore 업데이트` |
+
+**판단 기준:**
+- `hotfix:` vs `fix:` — 봇이 돌고 있는데 지금 당장 안 고치면 돈 잃거나 매매 못 하면 `hotfix:`
+- `feat:` vs `improve:` — 완전히 새로운 기능이면 `feat:`, 기존 기능의 UX/정보 개선이면 `improve:`
+- 이슈 없이 main 직접 커밋 가능: `hotfix:`, `improve:`, `test:`, `docs:`, `chore:`
 
 ## README.md 로드맵 관리 규칙
 

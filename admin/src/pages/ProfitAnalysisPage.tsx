@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  LineChart, Line, BarChart, Bar, AreaChart, Area,
+  BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie,
 } from "recharts";
 import { getBalanceHistory } from "../api/balance";
@@ -24,7 +24,7 @@ export default function ProfitAnalysisPage() {
   const [days, setDays] = useState(30);
   const [stats, setStats] = useState<TradeStats | null>(null);
   const [daily, setDaily] = useState<DailyReturn[]>([]);
-  const [history, setHistory] = useState<BalanceHistory[]>([]);
+  const [, setHistory] = useState<BalanceHistory[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -50,6 +50,9 @@ export default function ProfitAnalysisPage() {
       ]
     : [];
 
+  // 오늘 데이터
+  const today = daily.length > 0 ? daily[daily.length - 1] : null;
+
   return (
     <div>
       <div className="page-header">
@@ -66,60 +69,115 @@ export default function ProfitAnalysisPage() {
         ))}
       </div>
 
-      {/* KPI */}
+      {/* KPI — 전체 + 오늘 비교 */}
       {stats && (
         <div className="kpi-grid">
-          <StatCard label="총 거래" value={stats.total_trades.toString()} />
+          <StatCard
+            label="실질 수익"
+            value={formatKRW(stats.total_profit_krw)}
+            sub={`수수료 제외 후 순수익 (수수료 ${formatKRW(stats.total_fees)})`}
+            valueClass={stats.total_profit_krw >= 0 ? "positive" : "negative"}
+          />
           <StatCard
             label="승률"
-            value={formatPercent(stats.win_rate).replace("+", "")}
+            value={`${stats.win_rate.toFixed(1)}%`}
             sub={`${stats.wins}승 ${stats.losses}패`}
             valueClass={stats.win_rate >= 50 ? "positive" : "negative"}
           />
           <StatCard
             label="평균 수익률"
             value={formatPercent(stats.avg_profit_pct)}
+            sub={`${stats.total_trades}건 거래`}
             valueClass={stats.avg_profit_pct >= 0 ? "positive" : "negative"}
           />
           <StatCard
-            label="총 수익"
-            value={formatKRW(stats.total_profit_krw)}
-            sub={`수수료: ${formatKRW(stats.total_fees)}`}
-            valueClass={stats.total_profit_krw >= 0 ? "positive" : "negative"}
+            label="오늘"
+            value={today ? formatPercent(today.daily_return_pct) : "-"}
+            sub={today ? `${today.total_trades}건, 승률 ${today.win_rate?.toFixed(0) || 0}%` : "거래 없음"}
+            valueClass={today && today.daily_return_pct >= 0 ? "positive" : "negative"}
           />
         </div>
       )}
 
-      {/* Cumulative Return Line Chart */}
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div className="card-title">누적 수익률</div>
-        {history.length > 0 ? (
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={history}>
-              <XAxis dataKey="date" tick={{ fill: "#8b8fa3", fontSize: 11 }} />
-              <YAxis tick={{ fill: "#8b8fa3", fontSize: 11 }} tickFormatter={(v) => `${v.toFixed(1)}%`} />
-              <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(value) => [formatPercent(Number(value)), "누적 수익률"]} />
-              <Line type="monotone" dataKey="cumulative_return_pct" stroke="#4a9eff" strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="empty-state">데이터 없음</div>
-        )}
+      {/* 승/패 비율 — 전체 + 오늘 나란히 */}
+      <div className="grid-2" style={{ marginBottom: 24 }}>
+        <div className="card">
+          <div className="card-title">전체 승/패</div>
+          {winLossData.length > 0 && (stats?.wins ?? 0) + (stats?.losses ?? 0) > 0 ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+              <ResponsiveContainer width="50%" height={160}>
+                <PieChart>
+                  <Pie data={winLossData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value" label={({ name, value }) => `${name} ${value}`}>
+                    {winLossData.map((entry, index) => (
+                      <Cell key={index} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div>
+                <div style={{ fontSize: 28, fontWeight: 700 }} className={stats!.win_rate >= 50 ? "positive" : "negative"}>
+                  {stats!.win_rate.toFixed(1)}%
+                </div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{stats!.wins}승 {stats!.losses}패</div>
+              </div>
+            </div>
+          ) : (
+            <div className="empty-state">데이터 없음</div>
+          )}
+        </div>
+
+        <div className="card">
+          <div className="card-title">오늘 승/패</div>
+          {today && today.total_trades > 0 ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+              <ResponsiveContainer width="50%" height={160}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: "승", value: Math.round((today.win_rate || 0) / 100 * (today.total_trades || 0)), color: "#34d399" },
+                      { name: "패", value: (today.total_trades || 0) - Math.round((today.win_rate || 0) / 100 * (today.total_trades || 0)), color: "#f87171" },
+                    ].filter(d => d.value > 0)}
+                    cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value"
+                    label={({ name, value }) => `${name} ${value}`}
+                  >
+                    {[
+                      { color: "#34d399" },
+                      { color: "#f87171" },
+                    ].map((entry, index) => (
+                      <Cell key={index} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div>
+                <div style={{ fontSize: 28, fontWeight: 700 }} className={(today.win_rate || 0) >= 50 ? "positive" : "negative"}>
+                  {today.win_rate?.toFixed(1) || 0}%
+                </div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{today.total_trades}건 거래</div>
+                <div style={{ fontSize: 13, marginTop: 4 }} className={today.daily_pnl_krw >= 0 ? "positive" : "negative"}>
+                  {formatKRW(today.daily_pnl_krw)} ({formatPercent(today.daily_return_pct)})
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="empty-state">오늘 거래 없음</div>
+          )}
+        </div>
       </div>
 
-      {/* Daily PnL Table + Chart */}
+      {/* 일별 손익 — 차트 + 테이블 */}
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-title">일별 손익</div>
         {daily.length > 0 ? (
           <>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={daily}>
-                <XAxis dataKey="date" tick={{ fill: "#8b8fa3", fontSize: 10 }} />
-                <YAxis tick={{ fill: "#8b8fa3", fontSize: 11 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
-                <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(value) => [formatKRW(Number(value)), "손익"]} />
-                <Bar dataKey="daily_pnl_krw">
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={daily} barSize={daily.length > 14 ? 12 : 24}>
+                <XAxis dataKey="date" tick={{ fill: "#8b8fa3", fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
+                <YAxis tick={{ fill: "#8b8fa3", fontSize: 11 }} tickFormatter={(v) => formatPercent(v)} />
+                <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(value) => [formatPercent(Number(value)), "수익률"]} />
+                <Bar dataKey="daily_return_pct">
                   {daily.map((entry, index) => (
-                    <Cell key={index} fill={entry.daily_pnl_krw >= 0 ? "#34d399" : "#f87171"} />
+                    <Cell key={index} fill={entry.daily_return_pct >= 0 ? "#34d399" : "#f87171"} />
                   ))}
                 </Bar>
               </BarChart>
@@ -131,8 +189,8 @@ export default function ProfitAnalysisPage() {
                     <th>날짜</th>
                     <th>거래</th>
                     <th>승률</th>
-                    <th>손익</th>
                     <th>수익률</th>
+                    <th>손익</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -140,12 +198,14 @@ export default function ProfitAnalysisPage() {
                     <tr key={d.date}>
                       <td>{d.date}</td>
                       <td>{d.total_trades || "-"}</td>
-                      <td>{d.win_rate != null ? `${d.win_rate.toFixed(0)}%` : "-"}</td>
-                      <td className={d.daily_pnl_krw >= 0 ? "positive" : "negative"} style={{ fontWeight: 600 }}>
-                        {d.daily_pnl_krw != null ? `${d.daily_pnl_krw >= 0 ? "+" : ""}${formatKRW(d.daily_pnl_krw)}` : "-"}
+                      <td className={(d.win_rate || 0) >= 50 ? "positive" : d.win_rate ? "negative" : ""}>
+                        {d.win_rate != null ? `${d.win_rate.toFixed(0)}%` : "-"}
                       </td>
-                      <td className={d.daily_return_pct >= 0 ? "positive" : "negative"}>
+                      <td className={d.daily_return_pct >= 0 ? "positive" : "negative"} style={{ fontWeight: 600 }}>
                         {d.daily_return_pct != null ? formatPercent(d.daily_return_pct) : "-"}
+                      </td>
+                      <td className={d.daily_pnl_krw >= 0 ? "positive" : "negative"}>
+                        {d.daily_pnl_krw != null ? formatKRW(d.daily_pnl_krw) : "-"}
                       </td>
                     </tr>
                   ))}
@@ -158,52 +218,25 @@ export default function ProfitAnalysisPage() {
         )}
       </div>
 
-      <div className="grid-2">
-        {/* Win/Loss Pie Chart */}
-        <div className="card">
-          <div className="card-title">승/패 비율</div>
-          {winLossData.length > 0 && (stats?.wins ?? 0) + (stats?.losses ?? 0) > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={winLossData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  dataKey="value"
-                  label={({ name, value }) => `${name} ${value}`}
-                >
-                  {winLossData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip {...CHART_TOOLTIP_STYLE} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="empty-state">데이터 없음</div>
-          )}
-        </div>
-
-      </div>
-
-      {/* Asset Balance Trend */}
-      <div className="card" style={{ marginTop: 24 }}>
-        <div className="card-title">자산 잔고 추이</div>
-        {history.length > 0 ? (
-          <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={history}>
+      {/* 자산 잔고 추이 */}
+      <div className="card">
+        <div className="card-title">누적 수익률</div>
+        {daily.length > 0 ? (
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={daily.map((d, i) => ({
+              ...d,
+              cumulative_pct: daily.slice(0, i + 1).reduce((sum, x) => sum + (x.daily_return_pct || 0), 0),
+            }))}>
               <defs>
-                <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#a78bfa" stopOpacity={0} />
+                <linearGradient id="cumGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#4a9eff" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#4a9eff" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <XAxis dataKey="date" tick={{ fill: "#8b8fa3", fontSize: 11 }} />
-              <YAxis tick={{ fill: "#8b8fa3", fontSize: 11 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
-              <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(value) => [formatKRW(Number(value)), "총 자산"]} />
-              <Area type="monotone" dataKey="total_asset_value_krw" stroke="#a78bfa" fill="url(#balanceGradient)" />
+              <XAxis dataKey="date" tick={{ fill: "#8b8fa3", fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
+              <YAxis tick={{ fill: "#8b8fa3", fontSize: 11 }} tickFormatter={(v) => formatPercent(v)} />
+              <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(value) => [formatPercent(Number(value)), "누적 수익률"]} />
+              <Area type="monotone" dataKey="cumulative_pct" stroke="#4a9eff" fill="url(#cumGradient)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         ) : (

@@ -101,11 +101,13 @@ class GridTrading(BaseStrategy):
 
         if current_index > buy_index:
             profit_pct = (current_price - buy_price) / buy_price * 100
-            return Signal(
-                "sell",
-                0.6,
-                f"그리드 익절 #{buy_index}→#{current_index} (+{profit_pct:.1f}%)",
-            )
+            net_pnl = self._net_pnl_pct(profit_pct)
+            if net_pnl > 0:
+                return Signal(
+                    "sell",
+                    0.6,
+                    f"그리드 익절 #{buy_index}→#{current_index} (실질 +{net_pnl:.1f}%)",
+                )
 
         return Signal("hold", 0.0, "보유 유지")
 

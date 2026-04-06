@@ -108,21 +108,22 @@ class BBRSICombined(BaseStrategy):
 
         ma, upper, lower = bb
         profit_pct = (current_price - buy_price) / buy_price * 100
+        net_pnl = self._net_pnl_pct(profit_pct)
 
-        # RSI 정상 복귀 → 매도
-        if rsi >= self._rsi_overbought:
+        # RSI 정상 복귀 → 매도 (실질 수익 있을 때만)
+        if rsi >= self._rsi_overbought and net_pnl > 0:
             return Signal(
                 "sell", 0.7,
-                f"RSI({rsi:.0f}) 정상 복귀 (+{profit_pct:.1f}%)",
+                f"RSI({rsi:.0f}) 정상 복귀 (실질 +{net_pnl:.1f}%)",
                 trigger_value=round(rsi, 1),
             )
 
-        # 볼린저 중간선 도달 → 익절
-        if current_price >= ma and profit_pct > 0.1:
+        # 볼린저 중간선 도달 → 익절 (실질 수익 기준)
+        if current_price >= ma and net_pnl > 0:
             return Signal(
                 "sell", 0.6,
-                f"볼린저 중간선 도달 (+{profit_pct:.1f}%)",
+                f"볼린저 중간선 도달 (실질 +{net_pnl:.1f}%)",
                 trigger_value=round(ma, 2),
             )
 
-        return Signal("hold", 0.0, f"보유 유지 (RSI={rsi:.0f}, +{profit_pct:.1f}%)")
+        return Signal("hold", 0.0, f"보유 유지 (RSI={rsi:.0f}, 실질 {net_pnl:+.1f}%)")

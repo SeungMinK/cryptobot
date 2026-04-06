@@ -81,10 +81,11 @@ class BollingerBands(BaseStrategy):
         if prev_close >= prev_upper and current_price < curr_upper:
             return Signal("sell", 0.7, "볼린저 상단 반전", trigger_value=round(curr_upper, 2))
 
-        # 중심선 도달 시 익절
+        # 중심선 도달 시 익절 (수수료 차감 후 실질 수익 기준)
         if current_price >= middle.iloc[-1] and buy_price < middle.iloc[-1]:
             profit_pct = (current_price - buy_price) / buy_price * 100
-            if profit_pct > 1.0:
-                return Signal("sell", 0.5, f"중심선 익절 (+{profit_pct:.1f}%)")
+            net_pnl = self._net_pnl_pct(profit_pct)
+            if net_pnl > 1.0:
+                return Signal("sell", 0.5, f"중심선 익절 (실질 +{net_pnl:.1f}%)")
 
         return Signal("hold", 0.0, "보유 유지")

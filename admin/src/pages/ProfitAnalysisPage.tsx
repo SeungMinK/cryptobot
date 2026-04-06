@@ -107,12 +107,12 @@ export default function ProfitAnalysisPage() {
         )}
       </div>
 
-      <div className="grid-2">
-        {/* Daily PnL Bar Chart */}
-        <div className="card">
-          <div className="card-title">일별 손익</div>
-          {daily.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
+      {/* Daily PnL Table + Chart */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-title">일별 손익</div>
+        {daily.length > 0 ? (
+          <>
+            <ResponsiveContainer width="100%" height={200}>
               <BarChart data={daily}>
                 <XAxis dataKey="date" tick={{ fill: "#8b8fa3", fontSize: 10 }} />
                 <YAxis tick={{ fill: "#8b8fa3", fontSize: 11 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
@@ -124,11 +124,41 @@ export default function ProfitAnalysisPage() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-          ) : (
-            <div className="empty-state">데이터 없음</div>
-          )}
-        </div>
+            <div className="table-container" style={{ marginTop: 16 }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>날짜</th>
+                    <th>거래</th>
+                    <th>승률</th>
+                    <th>손익</th>
+                    <th>수익률</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...daily].reverse().map((d) => (
+                    <tr key={d.date}>
+                      <td>{d.date}</td>
+                      <td>{d.total_trades || "-"}</td>
+                      <td>{d.win_rate != null ? `${d.win_rate.toFixed(0)}%` : "-"}</td>
+                      <td className={d.daily_pnl_krw >= 0 ? "positive" : "negative"} style={{ fontWeight: 600 }}>
+                        {d.daily_pnl_krw != null ? `${d.daily_pnl_krw >= 0 ? "+" : ""}${formatKRW(d.daily_pnl_krw)}` : "-"}
+                      </td>
+                      <td className={d.daily_return_pct >= 0 ? "positive" : "negative"}>
+                        {d.daily_return_pct != null ? formatPercent(d.daily_return_pct) : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <div className="empty-state">데이터 없음</div>
+        )}
+      </div>
 
+      <div className="grid-2">
         {/* Win/Loss Pie Chart */}
         <div className="card">
           <div className="card-title">승/패 비율</div>
@@ -155,6 +185,7 @@ export default function ProfitAnalysisPage() {
             <div className="empty-state">데이터 없음</div>
           )}
         </div>
+
       </div>
 
       {/* Asset Balance Trend */}

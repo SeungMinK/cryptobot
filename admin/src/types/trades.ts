@@ -50,7 +50,10 @@ export interface DailyReturn {
   date: string;
   daily_pnl_pct: number;
   daily_pnl_krw: number;
+  daily_return_pct: number;
   trade_count: number;
+  total_trades: number;
+  win_rate: number;
 }
 
 export interface TradeFiltersState {

@@ -158,7 +158,10 @@ def get_daily_returns(
             DATE(timestamp) as date,
             SUM(CASE WHEN side='sell' THEN profit_pct ELSE 0 END) as daily_pnl_pct,
             SUM(CASE WHEN side='sell' THEN profit_krw ELSE 0 END) as daily_pnl_krw,
-            COUNT(*) as trade_count
+            COUNT(*) as total_trades,
+            COUNT(*) as trade_count,
+            SUM(CASE WHEN side='sell' AND profit_krw > 0 THEN 1 ELSE 0 END) as wins,
+            SUM(CASE WHEN side='sell' THEN 1 ELSE 0 END) as sells
         FROM trades
         WHERE timestamp >= datetime('now', ?)
         GROUP BY DATE(timestamp)
@@ -166,7 +169,15 @@ def get_daily_returns(
         """,
         (f"-{days} days",),
     ).fetchall()
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        d = dict(r)
+        sells = d.pop("sells", 0) or 0
+        wins = d.pop("wins", 0) or 0
+        d["win_rate"] = round(wins / sells * 100, 1) if sells > 0 else 0
+        d["daily_return_pct"] = d["daily_pnl_pct"]
+        result.append(d)
+    return result
 
 
 @router.get("/{trade_id}")

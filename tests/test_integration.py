@@ -75,7 +75,7 @@ class TestFeeGuard:
         result = s.check_trailing_stop(current_price=99.9, buy_price=99)  # 최고가 101 대비 -1.09%
         # pnl = (99.9-99)/99 = +0.91% > 수수료 0.1% → 매도 허용
         assert result is not None
-        assert "익절" in result.reason
+        assert "트레일링 스탑" in result.reason
 
     def test_stop_loss_ignores_fee(self):
         """손절은 수수료 무시하고 무조건 실행."""

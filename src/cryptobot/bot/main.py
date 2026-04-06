@@ -215,8 +215,9 @@ class CryptoBot:
             return
 
         pnl_pct = (price - buy_price) / buy_price * 100
-        if "손절" not in sig.reason and pnl_pct <= BaseStrategy.ROUND_TRIP_FEE_PCT:
-            self._recorder.record_signal(coin=coin, signal_type="sell", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=f"수수료 가드: {pnl_pct:+.2f}%", snapshot_id=snapshot_id, strategy_params_json=pj)
+        net_pnl = pnl_pct - BaseStrategy.ROUND_TRIP_FEE_PCT
+        if "손절" not in sig.reason and net_pnl <= 0:
+            self._recorder.record_signal(coin=coin, signal_type="sell", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=f"수수료 가드: 가격 {pnl_pct:+.2f}% 실질 {net_pnl:+.2f}%", snapshot_id=snapshot_id, strategy_params_json=pj)
             return
 
         order = self._trader.sell_market(coin)

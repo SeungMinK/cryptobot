@@ -19,7 +19,7 @@ class RiskLimits:
     max_daily_trades: int = 10  # 일일 최대 거래 횟수
     max_daily_loss_pct: float = -10.0  # 일일 최대 손실률 (%)
     max_position_size_krw: float = 1_000_000  # 최대 1회 매수 금액 (원)
-    min_balance_krw: float = 10_000  # 최소 유지 잔고 (원)
+    min_balance_krw: float = 5_000  # 최소 유지 잔고 (업비트 최소 주문금액)
     max_consecutive_losses: int = 3  # 연속 손실 시 매매 중단
     min_order_krw: float = 5_000  # 업비트 최소 주문 금액 (원)
 

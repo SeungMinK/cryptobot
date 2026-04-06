@@ -64,15 +64,14 @@ class HealthChecker:
 
             # 실제 업비트 보유 확인
             if self._trader and self._trader.is_ready:
-                import pyupbit
-
-                balances = pyupbit.get_balances()
                 upbit_coins = set()
-                if balances:
-                    for b in balances:
-                        if b["currency"] != "KRW" and float(b["balance"]) > 0:
-                            ticker = f"KRW-{b['currency']}"
-                            upbit_coins.add(ticker)
+                for coin in db_coins:
+                    try:
+                        bal = self._trader.get_balance_coin(coin)
+                        if bal > 0:
+                            upbit_coins.add(coin)
+                    except Exception:
+                        pass
 
                 db_only = db_coins - upbit_coins  # DB에만 있음 (매도 누락?)
                 upbit_only = upbit_coins - db_coins  # 업비트에만 있음 (매수 미기록?)

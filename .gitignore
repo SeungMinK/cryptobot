@@ -26,6 +26,9 @@ build/
 # 임시 문서 파일
 docs/temp/
 
+# 사업 계획 (비공개)
+docs/business/
+
 # IDE
 .idea/
 .vscode/

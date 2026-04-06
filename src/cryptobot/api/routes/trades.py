@@ -94,6 +94,7 @@ def get_trade_stats(
             SUM(fee_krw) as total_fees
         FROM trades
         WHERE timestamp >= datetime('now', ?)
+        AND (trigger_reason IS NULL OR trigger_reason NOT LIKE '[BUG]%')
         """,
         (f"-{days} days",),
     ).fetchone()
@@ -164,6 +165,7 @@ def get_daily_returns(
             SUM(CASE WHEN side='sell' THEN 1 ELSE 0 END) as sells
         FROM trades
         WHERE timestamp >= datetime('now', ?)
+        AND (trigger_reason IS NULL OR trigger_reason NOT LIKE '[BUG]%')
         GROUP BY DATE(timestamp)
         ORDER BY date
         """,

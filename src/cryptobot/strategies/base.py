@@ -49,7 +49,7 @@ class StrategyParams:
         10: 3.0,    # 10분 내 +3% 이상이면 매도
         30: 2.0,    # 30분 내 +2%
         60: 1.0,    # 60분 내 +1%
-        120: 0.15,  # 120분 내 +0.15% (수수료 이상이면 탈출)
+        120: 0.2,   # 120분 내 +0.2% (수수료+슬리피지 포함 실질 수익)
     })
 
 
@@ -94,8 +94,8 @@ class BaseStrategy(ABC):
             매도 신호 또는 hold
         """
 
-    # 업비트 수수료: 매수 0.05% + 매도 0.05% = 왕복 0.1% + 슬리피지 마진
-    ROUND_TRIP_FEE_PCT = 0.15
+    # 최소 매도 기준: 왕복 수수료 0.1% + 슬리피지 0.05% + 최소 실질 수익 0.05%
+    ROUND_TRIP_FEE_PCT = 0.2
 
     def check_trailing_stop(self, current_price: float, buy_price: float, hold_minutes: int | None = None) -> Signal | None:
         """공통 트레일링 스탑 + 손절 + ROI + 수수료 가드."""

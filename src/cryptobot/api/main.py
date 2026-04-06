@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from cryptobot.api.routes import auth, balance, coin_strategy, config, market, news, signals, strategies, trades
+from cryptobot.api.routes import auth, balance, coin_strategy, config, market, news, public, signals, strategies, trades
 from cryptobot.logging_config import setup_logging
 
 setup_logging("api", "INFO")
@@ -58,7 +58,8 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     return response
 
-# 라우트 등록 — NestJS의 imports: [AuthModule, TradeModule, ...]
+# 라우트 등록
+app.include_router(public.router)  # 공개 API (인증 불필요)
 app.include_router(auth.router)
 app.include_router(trades.router)
 app.include_router(balance.router)

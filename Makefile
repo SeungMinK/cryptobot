@@ -1,6 +1,6 @@
-.PHONY: start bot api web news install test lint
+.PHONY: start bot api web news tunnel install test lint
 
-# 전체 실행 (봇 + API + Admin)
+# 전체 실행 (봇 + API + Admin + 터널)
 start:
 	bash scripts/start_all.sh
 
@@ -16,6 +16,9 @@ web:
 
 news:
 	.venv/bin/python news-collector/collector.py
+
+tunnel:
+	cloudflared tunnel run cryptobot-api
 
 # 개발
 install:

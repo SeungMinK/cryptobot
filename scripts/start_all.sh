@@ -47,15 +47,27 @@ echo -e "${CYAN}[3/4] 뉴스 수집기 시작${NC}"
 sleep 1
 
 # 4. Admin 웹 (port 5173)
-echo -e "${CYAN}[4/4] Admin 웹서버 시작 (port 5173)${NC}"
+echo -e "${CYAN}[4/5] Admin 웹서버 시작 (port 5173)${NC}"
 cd admin && npm run dev 2>&1 | sed 's/^/  [WEB] /' &
 
 cd "$PROJECT_ROOT"
+
+sleep 1
+
+# 5. Cloudflare Tunnel (api.seungmink.dev)
+if command -v cloudflared &> /dev/null; then
+    echo -e "${CYAN}[5/5] Cloudflare Tunnel 시작 (api.seungmink.dev)${NC}"
+    cloudflared tunnel run cryptobot-api 2>&1 | sed 's/^/  [TUNNEL] /' &
+else
+    echo -e "${YELLOW}[5/5] cloudflared 미설치 — 터널 스킵${NC}"
+fi
 
 echo ""
 echo -e "${GREEN}=== 전체 실행 중 ===${NC}"
 echo -e "  API 서버:  http://localhost:8000"
 echo -e "  Admin 웹:  http://localhost:5173"
+echo -e "  공개 API:  https://api.seungmink.dev"
+echo -e "  공개 웹:   https://cryptobot-eight.vercel.app"
 echo -e "  종료: Ctrl+C"
 echo ""
 

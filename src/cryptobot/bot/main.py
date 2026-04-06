@@ -21,8 +21,8 @@ from cryptobot.bot.health_checker import HealthChecker
 from cryptobot.bot.monthly_audit import MonthlyAudit
 from cryptobot.bot.risk import RiskManager
 from cryptobot.bot.strategy_selector import StrategySelector
-from cryptobot.bot.weekly_reporter import WeeklyReporter
 from cryptobot.bot.trader import Trader
+from cryptobot.bot.weekly_reporter import WeeklyReporter
 from cryptobot.data.database import Database
 from cryptobot.data.recorder import DataRecorder
 from cryptobot.notifier.slack import SlackNotifier
@@ -216,7 +216,9 @@ class CryptoBot:
 
         pnl_pct = (price - buy_price) / buy_price * 100
         net_pnl = pnl_pct - BaseStrategy.ROUND_TRIP_FEE_PCT
-        if "손절" not in sig.reason and net_pnl <= 0:
+        # 수수료 가드: 익절 신호(ROI/트레일링)만 차단, 전략적 매도(RSI/볼린저/모멘텀)는 통과
+        is_profit_taking = "ROI" in sig.reason or "트레일링" in sig.reason or "중간선" in sig.reason or "중심선" in sig.reason or "그리드 익절" in sig.reason
+        if is_profit_taking and net_pnl <= 0:
             self._recorder.record_signal(coin=coin, signal_type="sell", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=f"수수료 가드: 가격 {pnl_pct:+.2f}% 실질 {net_pnl:+.2f}%", snapshot_id=snapshot_id, strategy_params_json=pj)
             return
 

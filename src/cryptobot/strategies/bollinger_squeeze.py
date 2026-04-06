@@ -83,11 +83,10 @@ class BollingerSqueeze(BaseStrategy):
         close = df["close"]
         bandwidth = self._calc_bandwidth(close)
 
-        # 모멘텀 약화: 밴드가 다시 수축하기 시작 (수수료 차감 후 기준)
+        # 모멘텀 약화: 밴드가 다시 수축하기 시작 (전략적 매도, 수수료 무관)
         if bandwidth.iloc[-1] < bandwidth.iloc[-2] < bandwidth.iloc[-3]:
             profit_pct = (current_price - buy_price) / buy_price * 100
             net_pnl = self._net_pnl_pct(profit_pct)
-            if net_pnl > 0:
-                return Signal("sell", 0.6, f"모멘텀 약화 — 밴드 재수축 (실질 +{net_pnl:.1f}%)")
+            return Signal("sell", 0.6, f"모멘텀 약화 — 밴드 재수축 (실질 {net_pnl:+.1f}%)")
 
         return Signal("hold", 0.0, "보유 유지")

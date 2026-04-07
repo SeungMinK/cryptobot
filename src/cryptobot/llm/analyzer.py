@@ -191,8 +191,8 @@ class LLMAnalyzer:
     # Haiku 4.5 가격 (2026-04 기준)
     PRICE_INPUT_PER_M = 0.80  # $0.80 / 1M 입력 토큰
     PRICE_OUTPUT_PER_M = 4.00  # $4.00 / 1M 출력 토큰
-    MIN_INTERVAL_HOURS = 2
-    MAX_DAILY_CALLS = 24
+    MIN_INTERVAL_HOURS = 0.5  # 30분
+    MAX_DAILY_CALLS = 60
     EMERGENCY_PRICE_CHANGE_PCT = 5.0  # 이 이상 급변 시 즉시 분석
 
     def _should_run(self, force: bool = False) -> bool:
@@ -220,7 +220,7 @@ class LLMAnalyzer:
             last = last.replace(tzinfo=timezone.utc)
         elapsed = (datetime.now(timezone.utc) - last).total_seconds() / 3600
         if elapsed < self.MIN_INTERVAL_HOURS:
-            logger.info("LLM 분석 스킵: 마지막 분석 %.1f시간 전 (최소 %d시간)", elapsed, self.MIN_INTERVAL_HOURS)
+            logger.info("LLM 분석 스킵: 마지막 분석 %.0f분 전 (최소 %.0f분)", elapsed * 60, self.MIN_INTERVAL_HOURS * 60)
             return False
         return True
 

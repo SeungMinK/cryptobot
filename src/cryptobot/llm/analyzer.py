@@ -949,9 +949,14 @@ class LLMAnalyzer:
                 (str(result["allow_trading"]).lower(), now),
             )
 
-        # 전략 파라미터 반영 (기존 값에 머지, 전체 교체 방지)
+        # 전략 활성화 + 파라미터 반영
         strategy = result.get("recommended_strategy")
         if strategy:
+            # 전략 전환 (is_active 업데이트)
+            from cryptobot.data.strategy_repository import StrategyRepository
+            repo = StrategyRepository(self._db)
+            repo.activate(strategy, source="llm", reason="LLM 분석에서 추천")
+
             # 기존 파라미터 로드
             row = self._db.execute("SELECT default_params_json FROM strategies WHERE name = ?", (strategy,)).fetchone()
             strategy_params = (

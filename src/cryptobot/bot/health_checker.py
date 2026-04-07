@@ -31,6 +31,7 @@ class HealthChecker:
         results["pending_orders"] = self._check_pending_orders()
         results["llm_cost"] = self._check_llm_cost()
         results["data_integrity"] = self._check_data_integrity()
+        results["strategy_consistency"] = self._check_strategy_consistency()
 
         # 전체 상태
         issues = [k for k, v in results.items() if v.get("status") == "warning"]
@@ -229,6 +230,49 @@ class HealthChecker:
             return {"status": "ok"}
         except Exception as e:
             logger.error("데이터 무결성 체크 실패: %s", e)
+            return {"status": "warning", "message": str(e)}
+
+    def _check_strategy_consistency(self) -> dict:
+        """LLM 추천 전략 vs 실제 활성 전략 일치 확인."""
+        try:
+            issues = []
+
+            # 최근 LLM 추천 전략
+            llm_row = self._db.execute(
+                "SELECT output_reasoning FROM llm_decisions ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+
+            # 현재 활성 전략
+            active_row = self._db.execute(
+                "SELECT name FROM strategies WHERE is_active = TRUE AND status = 'active' LIMIT 1"
+            ).fetchone()
+            active_name = dict(active_row)["name"] if active_row else "없음"
+
+            # LLM 추천 파라미터 vs DB 저장값
+            if active_row:
+                strategy_row = self._db.execute(
+                    "SELECT default_params_json FROM strategies WHERE name = ?",
+                    (active_name,),
+                ).fetchone()
+                if strategy_row:
+                    import json
+                    try:
+                        params = json.loads(dict(strategy_row)["default_params_json"] or "{}")
+                        # rsi_oversold, bb_std가 정상 범위인지
+                        rsi = params.get("rsi_oversold")
+                        if rsi is not None and (rsi < 20 or rsi > 45):
+                            issues.append(f"rsi_oversold={rsi} 범위 이탈 (20~45)")
+                        bb = params.get("bb_std")
+                        if bb is not None and (bb < 0.8 or bb > 2.5):
+                            issues.append(f"bb_std={bb} 범위 이탈 (0.8~2.5)")
+                    except json.JSONDecodeError:
+                        issues.append("전략 파라미터 JSON 파싱 실패")
+
+            if issues:
+                return {"status": "warning", "active": active_name, "issues": issues, "message": "; ".join(issues)}
+            return {"status": "ok", "active": active_name}
+        except Exception as e:
+            logger.error("전략 일관성 체크 실패: %s", e)
             return {"status": "warning", "message": str(e)}
 
     def _send_alert(self, results: dict) -> None:

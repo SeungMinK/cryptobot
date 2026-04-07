@@ -19,7 +19,6 @@ HARD_LIMITS = {
     "stop_loss_pct": (-20.0, -5.0),
     "trailing_stop_pct": (-10.0, -1.0),
     "max_position_per_coin_pct": (30.0, 80.0),
-    "max_coins": (1, 30),
     "min_balance_pct": (5.0, 10.0),  # 원금 대비 최소 유지 %
     "k_value": (0.2, 0.8),
     "bb_std": (0.8, 2.5),
@@ -72,7 +71,6 @@ ANALYSIS_PROMPT = """당신은 암호화폐 자동매매 봇의 시장 분석 �
 | stop_loss_pct | -20.0 ~ -5.0 | 손절률 (%) |
 | trailing_stop_pct | -10.0 ~ -1.0 | 트레일링 스탑 (%) |
 | max_position_per_coin_pct | 30 ~ 80 | 종목당 최대 포지션 (%) |
-| max_coins | 1 ~ 30 | 모니터링 코인 수 (매수 기회 탐색 범위, 보유 제한 아님. 많을수록 기회 포착↑) |
 | k_value | 0.2 ~ 0.8 | 변동성 돌파 계수 |
 | bb_std | 0.8 ~ 2.5 | 볼린저밴드 표준편차 배수 (낮을수록 밴드 좁음→매수 쉬움) |
 | rsi_oversold | 20 ~ 45 | RSI 과매도 기준 (높을수록 매수 조건 완화) |
@@ -149,7 +147,6 @@ ANALYSIS_PROMPT = """당신은 암호화폐 자동매매 봇의 시장 분석 �
     "stop_loss_pct": -5.0,
     "trailing_stop_pct": -3.0,
     "max_position_per_coin_pct": 50,
-    "max_coins": 10,
     "roi_10min": 3.0,
     "roi_30min": 2.0,
     "roi_60min": 1.0,
@@ -178,8 +175,7 @@ RETRY_PROMPT = """이전 응답에서 recommended_params에 다음 필드가 누
     "rsi_oversold": 35,
     "stop_loss_pct": -5.0,
     "trailing_stop_pct": -3.0,
-    "max_position_per_coin_pct": 50,
-    "max_coins": 5
+    "max_position_per_coin_pct": 50
   }}
 }}
 ```"""
@@ -831,7 +827,7 @@ class LLMAnalyzer:
         lines = []
 
         # bot_config 값
-        for key in ["stop_loss_pct", "trailing_stop_pct", "k_value", "max_position_per_coin_pct", "max_coins"]:
+        for key in ["stop_loss_pct", "trailing_stop_pct", "k_value", "max_position_per_coin_pct"]:
             row = self._db.execute("SELECT value FROM bot_config WHERE key = ?", (key,)).fetchone()
             if row:
                 lines.append(f"  {key}: {dict(row)['value']}")
@@ -855,7 +851,6 @@ class LLMAnalyzer:
         "trailing_stop_pct",
         "k_value",
         "max_position_per_coin_pct",
-        "max_coins",
         "roi_60min",
         "roi_120min",
     ]
@@ -957,7 +952,6 @@ class LLMAnalyzer:
             "trailing_stop_pct": "trailing_stop_pct",
             "k_value": "k_value",
             "max_position_per_coin_pct": "max_position_per_coin_pct",
-            "max_coins": "max_coins",
         }
         for param_key, config_key in config_keys.items():
             if param_key not in params:
@@ -1098,7 +1092,6 @@ class LLMAnalyzer:
             "trailing_stop_pct": params.get("trailing_stop_pct"),
             "k_value": params.get("k_value"),
             "max_position_per_coin_pct": params.get("max_position_per_coin_pct"),
-            "max_coins": params.get("max_coins"),
             "max_spread_pct": params.get("max_spread_pct"),
             "emergency_held_pct": params.get("emergency_held_pct"),
             "emergency_non_held_pct": params.get("emergency_non_held_pct"),

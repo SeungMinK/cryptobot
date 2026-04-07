@@ -182,6 +182,11 @@ class CryptoBot:
             self._recorder.record_signal(coin=coin, signal_type="buy", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=reason, snapshot_id=snapshot_id, strategy_params_json=pj)
             return
 
+        # 중복 매수 방지 — 매수 직전 재확인
+        if self._recorder.get_active_buy_trade(coin):
+            logger.warning("중복 매수 방지: %s 이미 보유 중", coin)
+            return
+
         order = self._trader.buy_market(coin, amount)
         if order.success:
             tid = self._recorder.record_trade(coin=coin, side="buy", price=order.price, amount=order.amount, total_krw=order.total_krw, fee_krw=order.fee_krw, strategy=sn, trigger_reason=sig.reason, trigger_value=sig.trigger_value, param_k_value=s.params.extra.get("k_value"), param_stop_loss=s.params.stop_loss_pct, param_trailing_stop=s.params.trailing_stop_pct, market_state_at_trade=snapshot.get("market_state"), btc_price_at_trade=price, rsi_at_trade=snapshot.get("rsi_14"))
@@ -247,6 +252,17 @@ class CryptoBot:
                 prefix = "🚨 *긴급 시장 분석*" if force else "📊 *LLM 시장 분석*"
                 self._notifier.send(f"{prefix}\n{r.get('market_summary_kr','')[:100]}")
                 self._config_mgr.refresh()
+                self._strategy_sel.refresh(self._notifier)
+                # 전략 적용 검증
+                recommended = r.get("recommended_strategy")
+                if recommended and recommended != self._strategy_sel.current_strategy_name:
+                    logger.warning(
+                        "전략 불일치: LLM 추천=%s, 실제=%s",
+                        recommended, self._strategy_sel.current_strategy_name,
+                    )
+                    self._notifier.send(
+                        f"⚠️ 전략 불일치: 추천={recommended}, 실제={self._strategy_sel.current_strategy_name}"
+                    )
         except Exception as e:
             logger.error("LLM 에러: %s", e, exc_info=True)
 

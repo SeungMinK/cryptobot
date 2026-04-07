@@ -33,6 +33,7 @@ class DataCollector:
         self._last_ohlcv_save_date: str = ""  # 일봉 저장 중복 방지
         self._last_ohlcv_fetch: float = 0  # OHLCV 캐시 타임스탬프
         self._ohlcv_cache_seconds: int = 3600  # 1시간 캐시
+        self._last_price: float = 0  # 가격 급변 감지용
 
     @property
     def latest_df(self) -> "pd.DataFrame | None":
@@ -76,10 +77,15 @@ class DataCollector:
             else:
                 df = self._latest_df
 
-            # 현재가 (이건 매 틱마다 필요)
+            # 현재가 (이건 매 틱마다 필요) + 가격 검증
             current_price = pyupbit.get_current_price(self._coin)
-            if current_price is None:
-                raise APIError(f"현재가 조회 실패: {self._coin}")
+            if current_price is None or current_price <= 0:
+                raise APIError(f"가격 검증 실패: {self._coin} = {current_price}")
+            if self._last_price and self._last_price > 0:
+                change_pct = abs(current_price - self._last_price) / self._last_price * 100
+                if change_pct > 20:
+                    logger.warning("가격 급변: %s %.1f%% (%s → %s)", self._coin, change_pct, self._last_price, current_price)
+            self._last_price = current_price
 
             # 기술적 지표 계산
             indicators = calculate_all(df)

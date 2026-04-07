@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  BarChart, Bar, AreaChart, Area,
+  AreaChart, Area,
   XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie,
 } from "recharts";
 import { getBalanceHistory } from "../api/balance";
@@ -165,24 +165,12 @@ export default function ProfitAnalysisPage() {
         </div>
       </div>
 
-      {/* 일별 손익 — 차트 + 테이블 */}
+      {/* 일별 손익 */}
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-title">일별 손익</div>
         {daily.length > 0 ? (
           <>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={daily} barSize={daily.length > 14 ? 12 : 24}>
-                <XAxis dataKey="date" tick={{ fill: "#8b8fa3", fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
-                <YAxis tick={{ fill: "#8b8fa3", fontSize: 11 }} tickFormatter={(v) => formatPercent(v)} />
-                <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(value) => [formatPercent(Number(value)), "수익률"]} />
-                <Bar dataKey="daily_return_pct">
-                  {daily.map((entry, index) => (
-                    <Cell key={index} fill={entry.daily_return_pct >= 0 ? "#34d399" : "#f87171"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="table-container" style={{ marginTop: 16 }}>
+            <div className="table-container">
               <table>
                 <thead>
                   <tr>

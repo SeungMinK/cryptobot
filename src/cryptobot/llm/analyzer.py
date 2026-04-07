@@ -968,12 +968,12 @@ class LLMAnalyzer:
                     except (ValueError, TypeError):
                         pass
 
-        # 전략 파라미터 기반 (rsi_oversold, bb_std 등)
+        # 전략 파라미터 기반 (rsi_oversold, bb_std 등) — 활성 전략에서 읽기
         strategy_keys = ["rsi_oversold", "bb_std"]
         for key in strategy_keys:
             if key not in params:
                 row = self._db.execute(
-                    "SELECT default_params_json FROM strategies WHERE name = 'bb_rsi_combined'"
+                    "SELECT default_params_json FROM strategies WHERE is_active = TRUE LIMIT 1"
                 ).fetchone()
                 if row and dict(row)["default_params_json"]:
                     try:

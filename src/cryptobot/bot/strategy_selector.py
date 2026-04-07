@@ -136,11 +136,15 @@ class StrategySelector:
         if strategy is None:
             return self.current_strategy, self.current_strategy_name
 
-        # 카테고리별 리스크 파라미터
+        # 카테고리별 리스크 파라미터 (공유 인스턴스 보호 — 매 틱 후 복원)
         row = self._db.execute(
             "SELECT * FROM coin_strategy_config WHERE category = ?", (coin_category,)
         ).fetchone()
         if row:
+            # 원본 저장 → _tick_coin의 finally에서 복원됨
+            strategy._orig_stop_loss = strategy.params.stop_loss_pct
+            strategy._orig_trailing = strategy.params.trailing_stop_pct
+            strategy._orig_position = strategy.params.position_size_pct
             strategy.params.stop_loss_pct = row["stop_loss_pct"]
             strategy.params.trailing_stop_pct = row["trailing_stop_pct"]
             strategy.params.position_size_pct = row["position_size_pct"]

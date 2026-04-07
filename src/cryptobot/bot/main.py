@@ -146,6 +146,11 @@ class CryptoBot:
             # 코인별 최고가 저장
             self._coin_highest_prices[coin] = strategy._highest_price
         finally:
+            # 카테고리별 파라미터 복원 (공유 인스턴스 보호)
+            if hasattr(strategy, "_orig_stop_loss"):
+                strategy.params.stop_loss_pct = strategy._orig_stop_loss
+                strategy.params.trailing_stop_pct = strategy._orig_trailing
+                strategy.params.position_size_pct = strategy._orig_position
             self._strategy_sel.current_strategy = orig
             self._strategy_sel.current_strategy_name = orig_name
 

@@ -119,12 +119,24 @@ class Trader:
             fee = krw_amount * self.FEE_RATE
             amount = (krw_amount - fee) / price
 
+            # 체결 검증 — 실제 잔고 확인
+            import time as _time
+            _time.sleep(0.5)  # 체결 대기
+            actual_balance = self.get_balance_coin(coin)
+            if actual_balance <= 0:
+                logger.error("매수 체결 검증 실패: %s 잔고=0 (주문 응답: %s)", coin, result)
+                return OrderResult(
+                    success=False, side="buy", coin=coin,
+                    price=0, amount=0, total_krw=0, fee_krw=0,
+                    error="체결 검증 실패: 잔고 0",
+                )
+
             return OrderResult(
                 success=True,
                 side="buy",
                 coin=coin,
                 price=price,
-                amount=amount,
+                amount=actual_balance,  # 실제 체결량 사용
                 total_krw=krw_amount,
                 fee_krw=fee,
                 raw_response=result,
@@ -165,6 +177,13 @@ class Trader:
             price = self.get_current_price(coin)
             result = self._upbit.sell_market_order(coin, amount)
             logger.info("매도 주문 실행: %s %.8f개", coin, amount)
+
+            # 체결 검증 — 매도 후 잔고 확인
+            import time as _time
+            _time.sleep(0.5)
+            remaining = self.get_balance_coin(coin)
+            if remaining > amount * 0.01:  # 1% 이상 남아있으면 미체결
+                logger.warning("매도 부분 체결: %s 잔여 %.8f개", coin, remaining)
 
             total_krw = price * amount
             fee = total_krw * self.FEE_RATE

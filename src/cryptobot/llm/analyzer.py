@@ -30,6 +30,8 @@ HARD_LIMITS = {
     "roi_60min": (0.3, 2.0),
     "roi_120min": (0.1, 1.0),
     "max_spread_pct": (0.1, 1.0),
+    "emergency_held_pct": (1.0, 10.0),
+    "emergency_non_held_pct": (3.0, 15.0),
 }
 
 # 분석 프롬프트
@@ -191,6 +193,16 @@ class LLMAnalyzer:
         self._api_key = os.getenv("ANTHROPIC_API_KEY", "")
         self._model = os.getenv("LLM_MODEL", "claude-haiku-4-5-20251001")
 
+    def _get_config_float(self, key: str, default: float) -> float:
+        """bot_config에서 float 값 조회."""
+        row = self._db.execute("SELECT value FROM bot_config WHERE key = ?", (key,)).fetchone()
+        if row:
+            try:
+                return float(dict(row)["value"])
+            except (ValueError, TypeError):
+                pass
+        return default
+
     @property
     def is_configured(self) -> bool:
         return bool(self._api_key)
@@ -293,9 +305,10 @@ class LLMAnalyzer:
             for r in rows:
                 d = dict(r)
                 change = abs(d["now_price"] - d["prev_price"]) / d["prev_price"] * 100
-                # 보유 코인: 3% 이상이면 긴급 (손절 관련)
-                # 비보유 코인: 7% 이상이면 긴급 (기회 포착)
-                threshold = 3.0 if d["coin"] in held_coins else 7.0
+                # 보유 코인: 낮은 기준 (손절 관련) / 비보유: 높은 기준 (기회 포착)
+                held_th = self._get_config_float("emergency_held_pct", 3.0)
+                non_held_th = self._get_config_float("emergency_non_held_pct", 7.0)
+                threshold = held_th if d["coin"] in held_coins else non_held_th
                 if change >= threshold:
                     logger.warning(
                         "시장 급변 감지: %s %.1f%% 변동 (기준 %.0f%%, %s)",
@@ -638,7 +651,7 @@ class LLMAnalyzer:
             """
             SELECT title, summary, sentiment_keyword, coins_mentioned, source
             FROM news_articles
-            WHERE collected_at >= MIN(?, datetime('now', '-6 hours'))
+            WHERE collected_at >= ?
             AND collected_at >= datetime('now', '-6 hours')
             ORDER BY published_at DESC
             LIMIT 30
@@ -1087,6 +1100,8 @@ class LLMAnalyzer:
             "max_position_per_coin_pct": params.get("max_position_per_coin_pct"),
             "max_coins": params.get("max_coins"),
             "max_spread_pct": params.get("max_spread_pct"),
+            "emergency_held_pct": params.get("emergency_held_pct"),
+            "emergency_non_held_pct": params.get("emergency_non_held_pct"),
         }
 
         for key, value in config_map.items():

@@ -87,20 +87,13 @@ class StrategySelector:
             self.current_strategy_name = strategy.info().name
 
     def refresh(self, notifier=None) -> None:
-        """전략 변경 감지 + 리스크 파라미터 실시간 반영."""
+        """전략 변경 감지 + 파라미터 실시간 반영 (전략 재생성)."""
         from cryptobot.data.strategy_repository import StrategyRepository
         repo = StrategyRepository(self._db)
         repo.complete_shutdown()
 
-        # 리스크 파라미터 반영
-        if self.current_strategy:
-            self.current_strategy.params.stop_loss_pct = float(self._config.get("stop_loss_pct", "-5.0"))
-            self.current_strategy.params.trailing_stop_pct = float(self._config.get("trailing_stop_pct", "-3.0"))
-            self.current_strategy.params.position_size_pct = float(self._config.get("position_size_pct", "100.0"))
-
-        # 리스크 매니저 한도 반영은 main에서 처리
-
-        # 틱 간격 변경은 main에서 처리
+        # 전략 인스턴스 전체 재생성 (LLM 파라미터 반영)
+        self._load_strategies()
 
         # 전략 전환 감지
         row = self._db.execute(
@@ -117,6 +110,11 @@ class StrategySelector:
                 logger.info("전략 전환: %s → %s", old, new_name)
                 if notifier:
                     notifier.notify_bot_status(f"전략 전환: {old} → {new_name}")
+        else:
+            # 같은 전략이어도 재생성된 인스턴스로 교체 (파라미터 반영)
+            updated = self.registry.get(self.current_strategy_name)
+            if updated:
+                self.current_strategy = updated
 
     def get_coin_strategy(self, coin: str, coin_category: str, collectors: dict) -> tuple[BaseStrategy | None, str]:
         """코인의 시장 상태에 맞는 전략 반환. LLM 추천 전략 우선."""

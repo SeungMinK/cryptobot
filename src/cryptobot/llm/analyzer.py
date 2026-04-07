@@ -530,12 +530,18 @@ class LLMAnalyzer:
         return "\n".join(lines)
 
     def _get_fear_greed_text(self) -> str:
-        """Fear & Greed 최신값."""
-        row = self._db.execute("SELECT * FROM fear_greed_index ORDER BY id DESC LIMIT 1").fetchone()
-        if row:
+        """Fear & Greed 최근 4건 (추세 파악용)."""
+        rows = self._db.execute(
+            "SELECT value, classification, timestamp FROM fear_greed_index ORDER BY id DESC LIMIT 4"
+        ).fetchall()
+        if not rows:
+            return "데이터 없음"
+        lines = []
+        for i, row in enumerate(rows):
             r = dict(row)
-            return f"값: {r['value']} ({r['classification']}) — 측정시간: {r['timestamp']}"
-        return "데이터 없음"
+            label = "현재" if i == 0 else f"{i}회 전"
+            lines.append(f"{label}: {r['value']} ({r['classification']}) — {r['timestamp']}")
+        return "\n".join(lines)
 
     def _get_market_text(self) -> str:
         """현재 시장 데이터."""

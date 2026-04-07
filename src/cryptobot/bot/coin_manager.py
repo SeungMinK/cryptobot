@@ -52,6 +52,7 @@ class CoinManager:
                 min_volume_krw=float(self._config.get("min_volume_krw", "1000000000")),
                 min_price_krw=float(self._config.get("min_price_krw", "1000")),
                 max_coins=int(self._config.get("max_coins", "5")),
+                max_spread_pct=float(self._config.get("max_spread_pct", "0.3")),
             )
             top_coins = scanner.scan_top_coins()
 

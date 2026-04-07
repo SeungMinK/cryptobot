@@ -27,13 +27,15 @@ class CoinScanner:
 
     def __init__(
         self,
-        min_volume_krw: float = 10_000_000_000,  # 최소 24시간 거래대금 100억
-        min_price_krw: float = 1_000,  # 최소 현재가 1,000원
-        max_coins: int = 5,  # 최대 선별 종목 수
+        min_volume_krw: float = 10_000_000_000,
+        min_price_krw: float = 1_000,
+        max_coins: int = 5,
+        max_spread_pct: float = 0.3,
     ) -> None:
         self._min_volume_krw = min_volume_krw
         self._min_price_krw = min_price_krw
         self._max_coins = max_coins
+        self._max_spread_pct = max_spread_pct
 
     def get_tradable_coins(self) -> list[str]:
         """업비트 KRW 마켓 종목 목록 조회.
@@ -97,7 +99,7 @@ class CoinScanner:
                             best_ask = units[0]["ask_price"]
                             best_bid = units[0]["bid_price"]
                             spread_pct = (best_ask - best_bid) / best_bid * 100
-                            if spread_pct > 0.3:  # 0.3% 초과면 제외
+                            if spread_pct > self._max_spread_pct:
                                 continue
                 except Exception as e:
                     logger.debug("호가 조회 실패 %s: %s", ticker, e)

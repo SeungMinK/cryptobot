@@ -187,9 +187,21 @@ class CryptoBot:
             logger.warning("중복 매수 방지: %s 이미 보유 중", coin)
             return
 
+        bal_before = bal  # 잔고 스냅샷
         order = self._trader.buy_market(coin, amount)
         if order.success:
             tid = self._recorder.record_trade(coin=coin, side="buy", price=order.price, amount=order.amount, total_krw=order.total_krw, fee_krw=order.fee_krw, strategy=sn, trigger_reason=sig.reason, trigger_value=sig.trigger_value, param_k_value=s.params.extra.get("k_value"), param_stop_loss=s.params.stop_loss_pct, param_trailing_stop=s.params.trailing_stop_pct, market_state_at_trade=snapshot.get("market_state"), btc_price_at_trade=price, rsi_at_trade=snapshot.get("rsi_14"))
+            # DB 쓰기 검증
+            verify = self._db.execute("SELECT id FROM trades WHERE id = ?", (tid,)).fetchone()
+            if not verify:
+                logger.error("DB 쓰기 검증 실패: trade_id=%s", tid)
+                self._notifier.notify_error(f"DB 쓰기 검증 실패: {coin} 매수 기록 누락")
+            # 잔고 일관성 체크
+            bal_after = self._trader.get_balance_krw() if self._trader.is_ready else bal_before
+            expected_diff = order.total_krw
+            actual_diff = bal_before - bal_after
+            if abs(actual_diff - expected_diff) > expected_diff * 0.05:
+                logger.warning("잔고 불일치: 예상 -%s, 실제 -%s", f"{expected_diff:,.0f}", f"{actual_diff:,.0f}")
             self._recorder.record_signal(coin=coin, signal_type="buy", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, executed=True, trade_id=tid, snapshot_id=snapshot_id, strategy_params_json=pj)
             if self._config_mgr.get_bool("slack_trade_notification", True):
                 self._notifier.notify_trade("buy", coin, order.price, order.amount, order.total_krw)
@@ -233,6 +245,11 @@ class CryptoBot:
             profit_krw = round((order.total_krw - order.fee_krw) - (active_trade["total_krw"] + bf), 2)
             profit_pct = round(profit_krw / (active_trade["total_krw"] + bf) * 100, 2) if (active_trade["total_krw"] + bf) > 0 else 0
             tid = self._recorder.record_trade(coin=coin, side="sell", price=order.price, amount=order.amount, total_krw=order.total_krw, fee_krw=order.fee_krw, strategy=sn, trigger_reason=sig.reason, trigger_value=sig.trigger_value, param_k_value=s.params.extra.get("k_value"), param_stop_loss=s.params.stop_loss_pct, param_trailing_stop=s.params.trailing_stop_pct, buy_trade_id=active_trade["id"], profit_pct=profit_pct, profit_krw=profit_krw, hold_duration_minutes=s._hold_minutes)
+            # DB 쓰기 검증
+            verify = self._db.execute("SELECT id FROM trades WHERE id = ?", (tid,)).fetchone()
+            if not verify:
+                logger.error("DB 쓰기 검증 실패: trade_id=%s", tid)
+                self._notifier.notify_error(f"DB 쓰기 검증 실패: {coin} 매도 기록 누락")
             self._recorder.record_signal(coin=coin, signal_type="sell", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, executed=True, trade_id=tid, snapshot_id=snapshot_id, strategy_params_json=pj)
             s.reset()
             if self._config_mgr.get_bool("slack_trade_notification", True):

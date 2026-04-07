@@ -53,11 +53,22 @@ class StrategySelector:
             if cls is None:
                 continue
             extra = json.loads(row["default_params_json"]) if row["default_params_json"] else {}
+            # ROI 테이블 (LLM 조절 가능)
+            roi_table = {10: 3.0, 30: 2.0, 60: 1.0, 120: 0.1}
+            roi_json = self._config.get("roi_table", "")
+            if roi_json:
+                try:
+                    custom_roi = json.loads(roi_json)
+                    roi_table = {int(k): float(v) for k, v in custom_roi.items()}
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
             params = StrategyParams(
                 stop_loss_pct=float(self._config.get("stop_loss_pct", "-5.0")),
                 trailing_stop_pct=float(self._config.get("trailing_stop_pct", "-3.0")),
                 position_size_pct=float(self._config.get("position_size_pct", "100.0")),
                 extra=extra,
+                roi_table=roi_table,
             )
             try:
                 self.registry.register(cls(params))

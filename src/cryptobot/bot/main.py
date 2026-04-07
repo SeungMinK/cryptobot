@@ -240,9 +240,12 @@ class CryptoBot:
             a = LLMAnalyzer(self._db)
             if not a.is_configured:
                 return
-            r = a.analyze()
+            # 시장 급변 감지 → 즉시 분석
+            force = a.check_emergency()
+            r = a.analyze(force=force)
             if r:
-                self._notifier.send(f"📊 *LLM 시장 분석*\n{r.get('market_summary_kr','')[:100]}")
+                prefix = "🚨 *긴급 시장 분석*" if force else "📊 *LLM 시장 분석*"
+                self._notifier.send(f"{prefix}\n{r.get('market_summary_kr','')[:100]}")
                 self._config_mgr.refresh()
         except Exception as e:
             logger.error("LLM 에러: %s", e, exc_info=True)

@@ -19,12 +19,16 @@ HARD_LIMITS = {
     "stop_loss_pct": (-20.0, -5.0),
     "trailing_stop_pct": (-10.0, -1.0),
     "max_position_per_coin_pct": (30.0, 80.0),
-    "max_coins": (3, 15),
+    "max_coins": (10, 30),
     "min_balance_pct": (5.0, 10.0),  # 원금 대비 최소 유지 %
     "k_value": (0.2, 0.8),
     "bb_std": (0.8, 2.5),
     "rsi_oversold": (20, 45),
     "aggression": (0.1, 1.0),
+    "roi_10min": (1.0, 5.0),
+    "roi_30min": (0.5, 3.0),
+    "roi_60min": (0.3, 2.0),
+    "roi_120min": (0.1, 1.0),
 }
 
 # 분석 프롬프트
@@ -65,10 +69,14 @@ ANALYSIS_PROMPT = """당신은 암호화폐 자동매매 봇의 시장 분석 �
 | stop_loss_pct | -20.0 ~ -5.0 | 손절률 (%) |
 | trailing_stop_pct | -10.0 ~ -1.0 | 트레일링 스탑 (%) |
 | max_position_per_coin_pct | 30 ~ 80 | 종목당 최대 포지션 (%) |
-| max_coins | 3 ~ 15 | 모니터링 코인 수 |
+| max_coins | 10 ~ 30 | 모니터링 코인 수 |
 | k_value | 0.2 ~ 0.8 | 변동성 돌파 계수 |
 | bb_std | 0.8 ~ 2.5 | 볼린저밴드 표준편차 배수 (낮을수록 밴드 좁음→매수 쉬움) |
 | rsi_oversold | 20 ~ 45 | RSI 과매도 기준 (높을수록 매수 조건 완화) |
+| roi_10min | 1.0 ~ 5.0 | 10분 보유 시 목표 수익률 (%) |
+| roi_30min | 0.5 ~ 3.0 | 30분 보유 시 목표 수익률 (%) |
+| roi_60min | 0.3 ~ 2.0 | 60분 보유 시 목표 수익률 (%) |
+| roi_120min | 0.1 ~ 1.0 | 120분 보유 시 목표 수익률 (%) — 손익비 개선 핵심 |
 
 ## 과거 전략별 실제 성과
 {param_stats_text}
@@ -130,7 +138,11 @@ ANALYSIS_PROMPT = """당신은 암호화폐 자동매매 봇의 시장 분석 �
     "stop_loss_pct": -5.0,
     "trailing_stop_pct": -3.0,
     "max_position_per_coin_pct": 50,
-    "max_coins": 5
+    "max_coins": 10,
+    "roi_10min": 3.0,
+    "roi_30min": 2.0,
+    "roi_60min": 1.0,
+    "roi_120min": 0.3
   }},
   "coin_recommendations": {{
     "add": [],
@@ -178,9 +190,25 @@ class LLMAnalyzer:
     PRICE_INPUT_PER_M = 0.80  # $0.80 / 1M 입력 토큰
     PRICE_OUTPUT_PER_M = 4.00  # $4.00 / 1M 출력 토큰
     MIN_INTERVAL_HOURS = 2
+    MAX_DAILY_CALLS = 24
+    EMERGENCY_PRICE_CHANGE_PCT = 5.0  # 이 이상 급변 시 즉시 분석
 
-    def _should_run(self) -> bool:
-        """마지막 분석으로부터 4시간 이상 지났는지 확인."""
+    def _should_run(self, force: bool = False) -> bool:
+        """분석 실행 여부 판단."""
+        # 일일 호출 제한
+        daily_count = self._db.execute(
+            "SELECT COUNT(*) FROM llm_decisions WHERE DATE(timestamp) = DATE('now')"
+        ).fetchone()[0] or 0
+        if daily_count >= self.MAX_DAILY_CALLS:
+            logger.warning("LLM 일일 호출 제한 도달: %d/%d", daily_count, self.MAX_DAILY_CALLS)
+            return False
+
+        # 강제 실행 (시장 급변)
+        if force:
+            logger.info("LLM 즉시 분석 (시장 급변 감지)")
+            return True
+
+        # 시간 간격 체크
         row = self._db.execute("SELECT timestamp FROM llm_decisions ORDER BY id DESC LIMIT 1").fetchone()
         if row is None:
             return True
@@ -194,6 +222,35 @@ class LLMAnalyzer:
             return False
         return True
 
+    def check_emergency(self) -> bool:
+        """시장 급변 감지 — 최근 스냅샷 대비 5% 이상 변동."""
+        try:
+            rows = self._db.execute(
+                """
+                SELECT m1.coin, m1.price as now_price, m2.price as prev_price
+                FROM market_snapshots m1
+                JOIN (
+                    SELECT coin, price FROM market_snapshots
+                    WHERE timestamp <= datetime('now', '-1 hour')
+                    AND id IN (SELECT MAX(id) FROM market_snapshots
+                               WHERE timestamp <= datetime('now', '-1 hour') GROUP BY coin)
+                ) m2 ON m1.coin = m2.coin
+                WHERE m1.id IN (SELECT MAX(id) FROM market_snapshots GROUP BY coin)
+                AND m2.price > 0
+                """
+            ).fetchall()
+
+            for r in rows:
+                d = dict(r)
+                change = abs(d["now_price"] - d["prev_price"]) / d["prev_price"] * 100
+                if change >= self.EMERGENCY_PRICE_CHANGE_PCT:
+                    logger.warning("시장 급변 감지: %s %.1f%% 변동", d["coin"], change)
+                    return True
+            return False
+        except Exception as e:
+            logger.debug("급변 감지 실패: %s", e)
+            return False
+
     def _calc_cost(self, input_tokens: int, output_tokens: int) -> float:
         """토큰 → USD 비용 계산."""
         return round(
@@ -201,13 +258,13 @@ class LLMAnalyzer:
             6,
         )
 
-    def analyze(self) -> dict | None:
+    def analyze(self, force: bool = False) -> dict | None:
         """시장 분석 실행. 뉴스 + 시장 데이터 → LLM → 결과 저장."""
         if not self.is_configured:
             logger.warning("LLM API 키 미설정 — 분석 스킵")
             return None
 
-        if not self._should_run():
+        if not self._should_run(force=force):
             return None
 
         try:
@@ -393,33 +450,37 @@ class LLMAnalyzer:
             return f"잔고 조회 실패: {e}"
 
     def _get_previous_feedback(self) -> str:
-        """이전 LLM 분석의 성과 피드백."""
-        prev = self._db.execute("SELECT * FROM llm_decisions ORDER BY id DESC LIMIT 1").fetchone()
-        if prev is None:
+        """최근 3건 LLM 분석 성과 피드백."""
+        rows = self._db.execute("SELECT * FROM llm_decisions ORDER BY id DESC LIMIT 3").fetchall()
+        if not rows:
             return "첫 분석 (이전 기록 없음)"
 
-        p = dict(prev)
-        pnl = p.get("evaluation_period_pnl_pct")
-        was_good = p.get("evaluation_was_good")
+        lines = []
+        for i, prev in enumerate(rows):
+            p = dict(prev)
+            pnl = p.get("evaluation_period_pnl_pct")
+            was_good = p.get("evaluation_was_good")
+            label = "직전" if i == 0 else f"{i+1}회 전"
 
-        lines = [
-            f"이전 분석: {p.get('timestamp', '?')}",
-            f"추천 전략: {p.get('output_market_state', '?')}",
-        ]
-        if pnl is not None:
-            lines.append(f"이전 권고 후 성과: {pnl:+,.0f}원 ({'좋았음' if was_good else '나빴음'})")
-        else:
-            lines.append("이전 권고 후 성과: 아직 평가 안 됨")
+            entry = f"[{label}] {p.get('timestamp', '?')} | {p.get('output_market_state', '?')}"
+            if pnl is not None:
+                entry += f" | 성과: {pnl:+,.0f}원 ({'좋았음' if was_good else '나빴음'})"
+            else:
+                entry += " | 성과: 미평가"
 
-        # before/after 정보
-        news_summary = p.get("input_news_summary")
-        if news_summary:
-            try:
-                ba = json.loads(news_summary)
-                if "before" in ba:
-                    lines.append(f"이전 변경: {ba.get('before', {})} → {ba.get('after', {})}")
-            except Exception as e:
-                logger.debug("파라미터 변환 실패: %s", e)
+            # before/after 변경 요약
+            news_summary = p.get("input_news_summary")
+            if news_summary:
+                try:
+                    ba = json.loads(news_summary)
+                    after = ba.get("after", {})
+                    changed = [f"{k}={v}" for k, v in after.items()]
+                    if changed:
+                        entry += f" | 설정: {', '.join(changed[:5])}"
+                except Exception:
+                    pass
+
+            lines.append(entry)
 
         return "\n".join(lines)
 
@@ -627,6 +688,8 @@ class LLMAnalyzer:
         "k_value",
         "max_position_per_coin_pct",
         "max_coins",
+        "roi_60min",
+        "roi_120min",
     ]
     MAX_RETRIES = 2
 
@@ -893,17 +956,32 @@ class LLMAnalyzer:
             )
 
             # LLM 추천값으로 머지 (있는 것만 덮어쓰기)
-            if "bb_std" in params:
-                strategy_params["bb_std"] = params["bb_std"]
-            if "rsi_oversold" in params:
-                strategy_params["rsi_oversold"] = params["rsi_oversold"]
-            if "k_value" in params:
-                strategy_params["k_value"] = params["k_value"]
+            for key in ["bb_std", "rsi_oversold", "k_value"]:
+                if key in params:
+                    strategy_params[key] = params[key]
 
             self._db.execute(
                 "UPDATE strategies SET default_params_json = ?, updated_at = ? WHERE name = ?",
                 (json.dumps(strategy_params), now, strategy),
             )
+
+        # ROI 테이블 반영
+        roi_keys = {"roi_10min": 10, "roi_30min": 30, "roi_60min": 60, "roi_120min": 120}
+        roi_changed = False
+        for key, minutes in roi_keys.items():
+            if key in params:
+                roi_changed = True
+        if roi_changed:
+            roi_table = {}
+            for key, minutes in roi_keys.items():
+                if key in params:
+                    roi_table[minutes] = params[key]
+            self._db.execute(
+                "INSERT OR REPLACE INTO bot_config (key, value, value_type, category, display_name, description) "
+                "VALUES ('roi_table', ?, 'string', 'strategy', 'ROI 테이블', 'LLM 조절 시간별 목표 수익률')",
+                (json.dumps(roi_table),),
+            )
+            logger.info("ROI 테이블 갱신: %s", roi_table)
 
         # 코인 추천 반영
         coin_recs = result.get("coin_recommendations", {})

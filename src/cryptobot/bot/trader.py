@@ -119,24 +119,24 @@ class Trader:
             fee = krw_amount * self.FEE_RATE
             amount = (krw_amount - fee) / price
 
-            # 체결 검증 — 실제 잔고 확인
-            import time as _time
-            _time.sleep(0.5)  # 체결 대기
-            actual_balance = self.get_balance_coin(coin)
-            if actual_balance <= 0:
-                logger.error("매수 체결 검증 실패: %s 잔고=0 (주문 응답: %s)", coin, result)
-                return OrderResult(
-                    success=False, side="buy", coin=coin,
-                    price=0, amount=0, total_krw=0, fee_krw=0,
-                    error="체결 검증 실패: 잔고 0",
-                )
+            # 체결 검증 — 실제 잔고 확인 (실패해도 주문은 이미 나갔으므로 기록 필수)
+            actual_balance = amount  # 기본값: 계산된 수량
+            try:
+                import time as _time
+                _time.sleep(0.5)
+                actual_balance = self.get_balance_coin(coin)
+                if actual_balance <= 0:
+                    logger.error("매수 체결 검증 실패: %s 잔고=0 (주문 응답: %s)", coin, result)
+                    actual_balance = amount  # 폴백: 계산된 수량으로 기록
+            except Exception as e:
+                logger.warning("매수 체결 검증 에러: %s — 계산량으로 기록", e)
 
             return OrderResult(
                 success=True,
                 side="buy",
                 coin=coin,
                 price=price,
-                amount=actual_balance,  # 실제 체결량 사용
+                amount=actual_balance,
                 total_krw=krw_amount,
                 fee_krw=fee,
                 raw_response=result,
@@ -178,12 +178,15 @@ class Trader:
             result = self._upbit.sell_market_order(coin, amount)
             logger.info("매도 주문 실행: %s %.8f개", coin, amount)
 
-            # 체결 검증 — 매도 후 잔고 확인
-            import time as _time
-            _time.sleep(0.5)
-            remaining = self.get_balance_coin(coin)
-            if remaining > amount * 0.01:  # 1% 이상 남아있으면 미체결
-                logger.warning("매도 부분 체결: %s 잔여 %.8f개", coin, remaining)
+            # 체결 검증 — 매도 후 잔고 확인 (실패해도 기록은 유지)
+            try:
+                import time as _time
+                _time.sleep(0.5)
+                remaining = self.get_balance_coin(coin)
+                if remaining > amount * 0.01:
+                    logger.warning("매도 부분 체결: %s 잔여 %.8f개", coin, remaining)
+            except Exception as e:
+                logger.warning("매도 체결 검증 에러: %s", e)
 
             total_krw = price * amount
             fee = total_krw * self.FEE_RATE

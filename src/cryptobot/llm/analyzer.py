@@ -955,7 +955,9 @@ class LLMAnalyzer:
             # 전략 전환 (is_active 업데이트)
             from cryptobot.data.strategy_repository import StrategyRepository
             repo = StrategyRepository(self._db)
-            repo.activate(strategy, source="llm", reason="LLM 분석에서 추천")
+            activated = repo.activate(strategy, source="llm", reason="LLM 분석에서 추천")
+            if not activated:
+                logger.warning("전략 활성화 실패: %s — 기존 전략 유지", strategy)
 
             # 기존 파라미터 로드
             row = self._db.execute("SELECT default_params_json FROM strategies WHERE name = ?", (strategy,)).fetchone()

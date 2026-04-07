@@ -233,40 +233,75 @@ class HealthChecker:
             return {"status": "warning", "message": str(e)}
 
     def _check_strategy_consistency(self) -> dict:
-        """LLM 추천 전략 vs 실제 활성 전략 일치 확인."""
+        """LLM 추천 vs DB 저장 vs 실제 신호 적용 — 3중 검증."""
         try:
+            import json
             issues = []
 
-            # 최근 LLM 추천 전략
-            llm_row = self._db.execute(
-                "SELECT output_reasoning FROM llm_decisions ORDER BY id DESC LIMIT 1"
-            ).fetchone()
-
-            # 현재 활성 전략
+            # 1. 활성 전략 확인
             active_row = self._db.execute(
                 "SELECT name FROM strategies WHERE is_active = TRUE AND status = 'active' LIMIT 1"
             ).fetchone()
             active_name = dict(active_row)["name"] if active_row else "없음"
 
-            # LLM 추천 파라미터 vs DB 저장값
+            # 2. DB 파라미터 범위 검증
             if active_row:
                 strategy_row = self._db.execute(
                     "SELECT default_params_json FROM strategies WHERE name = ?",
                     (active_name,),
                 ).fetchone()
                 if strategy_row:
-                    import json
                     try:
-                        params = json.loads(dict(strategy_row)["default_params_json"] or "{}")
-                        # rsi_oversold, bb_std가 정상 범위인지
-                        rsi = params.get("rsi_oversold")
+                        db_params = json.loads(dict(strategy_row)["default_params_json"] or "{}")
+                        rsi = db_params.get("rsi_oversold")
                         if rsi is not None and (rsi < 20 or rsi > 45):
                             issues.append(f"rsi_oversold={rsi} 범위 이탈 (20~45)")
-                        bb = params.get("bb_std")
+                        bb = db_params.get("bb_std")
                         if bb is not None and (bb < 0.8 or bb > 2.5):
                             issues.append(f"bb_std={bb} 범위 이탈 (0.8~2.5)")
                     except json.JSONDecodeError:
                         issues.append("전략 파라미터 JSON 파싱 실패")
+
+            # 3. LLM 설정값 vs 실제 신호에 적용된 값 비교
+            llm_row = self._db.execute(
+                "SELECT input_news_summary FROM llm_decisions ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            if llm_row and dict(llm_row)["input_news_summary"]:
+                try:
+                    ba = json.loads(dict(llm_row)["input_news_summary"])
+                    llm_after = ba.get("after", {})
+                    llm_strategy = ba.get("strategy")
+
+                    # 전략 불일치
+                    if llm_strategy and llm_strategy != active_name:
+                        issues.append(f"전략 불일치: LLM 추천={llm_strategy}, 활성={active_name}")
+
+                    # 최근 신호에 적용된 파라미터 확인
+                    recent_signal = self._db.execute(
+                        "SELECT strategy, strategy_params_json FROM trade_signals ORDER BY id DESC LIMIT 1"
+                    ).fetchone()
+                    if recent_signal:
+                        signal_strategy = dict(recent_signal)["strategy"]
+                        signal_params_json = dict(recent_signal)["strategy_params_json"]
+
+                        if signal_strategy != active_name:
+                            issues.append(f"신호 전략 불일치: 신호={signal_strategy}, 활성={active_name}")
+
+                        if signal_params_json and active_row:
+                            try:
+                                signal_params = json.loads(signal_params_json)
+                                # rsi_oversold 비교
+                                if "rsi_oversold" in db_params and "rsi_oversold" in signal_params:
+                                    if db_params["rsi_oversold"] != signal_params["rsi_oversold"]:
+                                        issues.append(
+                                            f"rsi_oversold 미반영: DB={db_params['rsi_oversold']}, "
+                                            f"신호={signal_params['rsi_oversold']}"
+                                        )
+                            except (json.JSONDecodeError, TypeError):
+                                pass
+
+                except (json.JSONDecodeError, TypeError):
+                    pass
 
             if issues:
                 return {"status": "warning", "active": active_name, "issues": issues, "message": "; ".join(issues)}

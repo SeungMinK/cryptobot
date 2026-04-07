@@ -79,7 +79,7 @@ export default function LLMPage() {
         />
         <StatCard
           label="분석 주기"
-          value="4시간"
+          value="동적 (30분~4시간)"
           sub={`총 ${decisions.length}회 분석`}
         />
         <StatCard
@@ -147,7 +147,7 @@ export default function LLMPage() {
             })}
           </div>
         ) : (
-          <div className="empty-state">분석 이력 없음 (4시간마다 자동 실행)</div>
+          <div className="empty-state">분석 이력 없음 (동적 주기로 자동 실행)</div>
         )}
       </div>
 

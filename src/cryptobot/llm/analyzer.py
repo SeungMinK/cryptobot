@@ -1067,7 +1067,6 @@ class LLMAnalyzer:
             "k_value",
             "allow_trading",
             "max_position_per_coin_pct",
-            "max_coins",
         ]
         for key in config_keys:
             row = self._db.execute("SELECT value FROM bot_config WHERE key = ?", (key,)).fetchone()

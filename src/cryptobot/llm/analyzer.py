@@ -191,12 +191,44 @@ class LLMAnalyzer:
     # Haiku 4.5 가격 (2026-04 기준)
     PRICE_INPUT_PER_M = 0.80  # $0.80 / 1M 입력 토큰
     PRICE_OUTPUT_PER_M = 4.00  # $4.00 / 1M 출력 토큰
-    MIN_INTERVAL_HOURS = 0.5  # 30분
-    MAX_DAILY_CALLS = 60
-    EMERGENCY_PRICE_CHANGE_PCT = 5.0  # 이 이상 급변 시 즉시 분석
+    MAX_DAILY_CALLS = 60  # 하드 리밋 (동적 주기 목표 ~30회, 긴급 분석 여유)
+    EMERGENCY_PRICE_CHANGE_PCT = 5.0
+
+    # 동적 주기 (시장 활동량에 따라)
+    INTERVAL_ACTIVE_MIN = 30  # 활발: 30분
+    INTERVAL_NORMAL_MIN = 120  # 보통: 2시간
+    INTERVAL_QUIET_MIN = 240  # 한산: 4시간
+
+    def _get_dynamic_interval_minutes(self) -> int:
+        """시장 활동량에 따른 LLM 호출 간격(분) 결정."""
+        # 최근 1시간 매매 건수
+        trade_count = self._db.execute(
+            "SELECT COUNT(*) FROM trades WHERE timestamp >= datetime('now', '-1 hour')"
+        ).fetchone()[0] or 0
+
+        # 최근 1시간 뉴스 건수
+        news_count = self._db.execute(
+            "SELECT COUNT(*) FROM news_articles WHERE collected_at >= datetime('now', '-1 hour')"
+        ).fetchone()[0] or 0
+
+        # 보유 포지션 수
+        position_count = self._db.execute(
+            """SELECT COUNT(*) FROM trades t WHERE side='buy'
+            AND NOT EXISTS (SELECT 1 FROM trades s WHERE s.buy_trade_id = t.id AND s.side='sell')"""
+        ).fetchone()[0] or 0
+
+        # 활발: 매매 2건+ OR 뉴스 3건+ OR 포지션 3개+
+        if trade_count >= 2 or news_count >= 3 or position_count >= 3:
+            return self.INTERVAL_ACTIVE_MIN
+
+        # 한산: 매매 0건 AND 뉴스 0건 AND 포지션 0개
+        if trade_count == 0 and news_count == 0 and position_count == 0:
+            return self.INTERVAL_QUIET_MIN
+
+        return self.INTERVAL_NORMAL_MIN
 
     def _should_run(self, force: bool = False) -> bool:
-        """분석 실행 여부 판단."""
+        """분석 실행 여부 판단 (동적 주기)."""
         # 일일 호출 제한
         daily_count = self._db.execute(
             "SELECT COUNT(*) FROM llm_decisions WHERE DATE(timestamp) = DATE('now')"
@@ -210,7 +242,7 @@ class LLMAnalyzer:
             logger.info("LLM 즉시 분석 (시장 급변 감지)")
             return True
 
-        # 시간 간격 체크
+        # 동적 간격 체크
         row = self._db.execute("SELECT timestamp FROM llm_decisions ORDER BY id DESC LIMIT 1").fetchone()
         if row is None:
             return True
@@ -218,10 +250,14 @@ class LLMAnalyzer:
         last = datetime.fromisoformat(dict(row)["timestamp"])
         if last.tzinfo is None:
             last = last.replace(tzinfo=timezone.utc)
-        elapsed = (datetime.now(timezone.utc) - last).total_seconds() / 3600
-        if elapsed < self.MIN_INTERVAL_HOURS:
-            logger.info("LLM 분석 스킵: 마지막 분석 %.0f분 전 (최소 %.0f분)", elapsed * 60, self.MIN_INTERVAL_HOURS * 60)
+        elapsed_min = (datetime.now(timezone.utc) - last).total_seconds() / 60
+        interval = self._get_dynamic_interval_minutes()
+
+        if elapsed_min < interval:
+            logger.info("LLM 스킵: %.0f분 전 (다음: %d분 간격)", elapsed_min, interval)
             return False
+
+        logger.info("LLM 분석 실행: %.0f분 경과 (%d분 간격, 활동 기반)", elapsed_min, interval)
         return True
 
     def check_emergency(self) -> bool:
@@ -569,19 +605,30 @@ class LLMAnalyzer:
         return "\n".join(lines)
 
     def _get_news_text(self) -> str:
-        """최근 4시간 뉴스를 텍스트로."""
+        """마지막 LLM 호출 이후 뉴스 (최소 1시간, 최대 6시간)."""
+        # 마지막 분석 시간 기준
+        last_row = self._db.execute(
+            "SELECT timestamp FROM llm_decisions ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if last_row:
+            since = dict(last_row)["timestamp"]
+        else:
+            since = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
         rows = self._db.execute(
             """
             SELECT title, summary, sentiment_keyword, coins_mentioned, source
             FROM news_articles
-            WHERE collected_at >= datetime('now', '-4 hours')
+            WHERE collected_at >= MIN(?, datetime('now', '-6 hours'))
+            AND collected_at >= datetime('now', '-6 hours')
             ORDER BY published_at DESC
-            LIMIT 20
-            """
+            LIMIT 30
+            """,
+            (since,),
         ).fetchall()
 
         if not rows:
-            return "최근 4시간 뉴스 없음"
+            return "최근 뉴스 없음"
 
         lines = []
         for i, r in enumerate(rows, 1):

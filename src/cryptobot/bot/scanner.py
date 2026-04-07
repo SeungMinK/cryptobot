@@ -71,8 +71,8 @@ class CoinScanner:
                 if t not in self.EXCLUDED_COINS and all_prices.get(t, 0) >= self._min_price_krw
             ]
 
-            # 상위 30개만 OHLCV 조회 (API 호출 제한)
-            candidates = candidates[:30]
+            # 상위 50개 OHLCV 조회 (30개 모니터링 커버)
+            candidates = candidates[:50]
 
             results = []
             import time as _time

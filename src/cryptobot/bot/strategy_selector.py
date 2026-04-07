@@ -80,7 +80,8 @@ class StrategySelector:
         row = self._db.execute(
             "SELECT name FROM strategies WHERE is_active = TRUE AND status = 'active' LIMIT 1"
         ).fetchone()
-        strategy = self.registry.get(row["name"]) if row else self.registry.get("bb_rsi_combined")
+        fallback = self._config.get("fallback_strategy", "bb_rsi_combined")
+        strategy = self.registry.get(row["name"]) if row else self.registry.get(fallback)
         if strategy:
             self.current_strategy = strategy
             self.current_strategy_name = strategy.info().name
@@ -105,7 +106,8 @@ class StrategySelector:
         row = self._db.execute(
             "SELECT name FROM strategies WHERE is_active = TRUE AND status = 'active' LIMIT 1"
         ).fetchone()
-        new_name = row["name"] if row else "bb_rsi_combined"
+        fallback = self._config.get("fallback_strategy", "bb_rsi_combined")
+        new_name = row["name"] if row else fallback
         if new_name != self.current_strategy_name:
             new_strategy = self.registry.get(new_name)
             if new_strategy:
@@ -117,18 +119,22 @@ class StrategySelector:
                     notifier.notify_bot_status(f"전략 전환: {old} → {new_name}")
 
     def get_coin_strategy(self, coin: str, coin_category: str, collectors: dict) -> tuple[BaseStrategy | None, str]:
-        """코인의 시장 상태에 맞는 전략 반환."""
-        collector = collectors.get(coin)
-        snapshot = collector.get_latest_snapshot() if collector else None
-        market_state = snapshot.get("market_state", "sideways") if snapshot else "sideways"
-
-        if market_state in ("sideways", "bearish"):
-            strategy = self.registry.get("bb_rsi_combined")
+        """코인의 시장 상태에 맞는 전략 반환. LLM 추천 전략 우선."""
+        # LLM 추천 전략 우선 사용
+        strategy = self.current_strategy
+        if strategy is not None:
+            # 현재 활성 전략(LLM이 선택한 전략) 사용
+            pass
         else:
+            # 폴백: 시장 상태 기반 자동 선택
+            collector = collectors.get(coin)
+            snapshot = collector.get_latest_snapshot() if collector else None
+            market_state = snapshot.get("market_state", "sideways") if snapshot else "sideways"
             strategy = self.registry.select_by_market(market_state)
 
+        fallback = self._config.get("fallback_strategy", "bb_rsi_combined")
         if strategy is None:
-            strategy = self.registry.get("bb_rsi_combined")
+            strategy = self.registry.get(fallback)
         if strategy is None:
             return self.current_strategy, self.current_strategy_name
 

@@ -965,21 +965,32 @@ class LLMAnalyzer:
                 (json.dumps(strategy_params), now, strategy),
             )
 
-        # ROI 테이블 반영
+        # ROI 테이블 반영 (기본값에 덮어쓰기)
         roi_keys = {"roi_10min": 10, "roi_30min": 30, "roi_60min": 60, "roi_120min": 120}
-        roi_changed = False
-        for key, minutes in roi_keys.items():
-            if key in params:
-                roi_changed = True
+        roi_changed = any(key in params for key in roi_keys)
         if roi_changed:
-            roi_table = {}
+            roi_table = {10: 3.0, 30: 2.0, 60: 1.0, 120: 0.1}  # 기본값
+            # 기존 DB 값 로드
+            existing = self._db.execute(
+                "SELECT value FROM bot_config WHERE key = 'roi_table'"
+            ).fetchone()
+            if existing and dict(existing)["value"]:
+                try:
+                    roi_table.update(
+                        {int(k): float(v) for k, v in json.loads(dict(existing)["value"]).items()}
+                    )
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            # LLM 추천값 머지
             for key, minutes in roi_keys.items():
                 if key in params:
                     roi_table[minutes] = params[key]
             self._db.execute(
-                "INSERT OR REPLACE INTO bot_config (key, value, value_type, category, display_name, description) "
-                "VALUES ('roi_table', ?, 'string', 'strategy', 'ROI 테이블', 'LLM 조절 시간별 목표 수익률')",
-                (json.dumps(roi_table),),
+                "INSERT OR REPLACE INTO bot_config "
+                "(key, value, value_type, category, display_name, description, updated_at) "
+                "VALUES ('roi_table', ?, 'string', 'strategy', 'ROI 테이블', "
+                "'LLM 조절 시간별 목표 수익률', ?)",
+                (json.dumps(roi_table), now),
             )
             logger.info("ROI 테이블 갱신: %s", roi_table)
 

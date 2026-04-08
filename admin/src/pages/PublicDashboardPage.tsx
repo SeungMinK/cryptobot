@@ -338,9 +338,33 @@ export default function PublicDashboardPage() {
         </div>
       )}
 
+      {/* 배너 */}
+      <a href="https://github.com/SeungMinK/cryptobot" target="_blank" rel="noopener noreferrer" style={{
+        display: "block", marginBottom: 24, padding: "16px 24px", borderRadius: 12,
+        background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
+        color: "#ffffff", textDecoration: "none",
+        border: "1px solid #475569",
+        transition: "all 0.2s",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>CryptoBot — Open Source</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+              AI 기반 자동매매 봇 · 10개 전략 · Claude AI 시장분석 · 실시간 성과 공개
+            </div>
+          </div>
+          <div style={{
+            padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+            background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
+          }}>
+            GitHub →
+          </div>
+        </div>
+      </a>
+
       {/* 푸터 */}
       <div style={{ textAlign: "center", padding: "24px 0 8px", color: "var(--text-muted)", fontSize: 11 }}>
-        Powered by Claude AI + {strategies.length} Trading Strategies — <a href="https://github.com/SeungMinK/cryptobot" target="_blank" rel="noopener noreferrer" style={{ color: "#4a9eff", textDecoration: "none" }}>GitHub</a>
+        Powered by Claude AI + {strategies.length} Trading Strategies
       </div>
     </div>
   );

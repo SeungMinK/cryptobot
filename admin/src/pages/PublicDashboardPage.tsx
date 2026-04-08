@@ -1,10 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from "recharts";
-import { useAuth } from "../context/AuthContext";
 import { formatPercent, formatDateTime } from "../utils/format";
 import { getMarketStateKR } from "../utils/indicatorDescriptions";
 
@@ -14,7 +12,6 @@ const TOOLTIP_STYLE = {
 };
 
 export default function PublicDashboardPage() {
-  const { isAuthenticated } = useAuth();
   const [summary, setSummary] = useState<any>(null);
   const [trades, setTrades] = useState<any[]>([]);
   const [analysis, setAnalysis] = useState<any[]>([]);
@@ -76,15 +73,8 @@ export default function PublicDashboardPage() {
         color: "#ffffff",
         boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>CryptoBot</h1>
-          {!isAuthenticated && (
-            <Link to="/login" style={{
-              padding: "8px 16px", borderRadius: 8, fontSize: 12,
-              background: "rgba(74, 158, 255, 0.15)", color: "#4a9eff",
-              textDecoration: "none", border: "1px solid rgba(74, 158, 255, 0.3)",
-            }}>관리자</Link>
-          )}
         </div>
 
         {summary && (
@@ -125,11 +115,11 @@ export default function PublicDashboardPage() {
             <button onClick={() => setShowAllTrades(!showAllTrades)} style={{
               background: "none", border: "none", color: "var(--accent-blue)",
               cursor: "pointer", fontSize: 12, fontWeight: 600,
-            }}>{showAllTrades ? "접기" : `전체 보기 (${trades.length}건)`}</button>
+            }}>{showAllTrades ? "접기" : "전체 보기"}</button>
           )}
         </div>
         {trades.length > 0 ? (
-          <div className="table-container">
+          <div className="table-container" style={showAllTrades ? { maxHeight: 280, overflowY: "auto" } : {}}>
             <table>
               <thead><tr><th>시간</th><th>종목</th><th>방향</th><th>전략</th><th>수익률</th><th>보유</th></tr></thead>
               <tbody>

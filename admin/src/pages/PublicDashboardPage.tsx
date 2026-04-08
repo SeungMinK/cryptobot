@@ -28,6 +28,7 @@ export default function PublicDashboardPage() {
   const [newsExpanded, setNewsExpanded] = useState(false);
   const [newsIndex, setNewsIndex] = useState(0);
   const [analysisIndex, setAnalysisIndex] = useState(0);
+  const [showAllStrategies, setShowAllStrategies] = useState(false);
 
   const fetchAll = useCallback(() => {
     const base = API.replace(/\/api$/, "");
@@ -417,57 +418,28 @@ export default function PublicDashboardPage() {
         </div>
       </a>
 
-      {/* 일별 성과 */}
-      {dailyReturns.length > 0 && (
-        <div className="card" style={{ marginBottom: 24, position: "relative" }}>
-          <div className="card-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>일별 성과</span>
-            {dailyReturns.length > 3 && (
-              <button onClick={() => setShowAllDaily(!showAllDaily)} style={{
-                background: "none", border: "none", cursor: "pointer",
-                fontSize: 22, color: "#6b7fa3", lineHeight: 1,
-                transform: showAllDaily ? "rotate(-90deg)" : "rotate(90deg)",
-                transition: "transform 0.3s",
-              }}>›</button>
-            )}
-          </div>
-          <div style={{ overflowY: showAllDaily ? "auto" : "hidden", maxHeight: showAllDaily ? 200 : 200, overflowX: "hidden" }}>
-            <table style={{ width: "100%", tableLayout: "fixed" }}>
-              <colgroup>
-                <col style={{ width: "30%" }} />
-                <col style={{ width: "15%" }} />
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "20%" }} />
-                <col style={{ width: "17%" }} />
-              </colgroup>
-              <thead><tr><th>날짜</th><th>거래</th><th>승률</th><th>수익률</th><th>손익비</th></tr></thead>
-              <tbody>
-                {(showAllDaily ? [...dailyReturns].reverse().slice(0, 50) : [...dailyReturns].reverse().slice(0, 3)).map((d: any) => (
-                  <tr key={d.date}>
-                    <td>{d.date}</td>
-                    <td>{d.total_trades || "-"}</td>
-                    <td className={(d.win_rate || 0) >= 50 ? "positive" : d.win_rate ? "negative" : ""}>{d.win_rate != null ? `${d.win_rate.toFixed(0)}%` : "-"}</td>
-                    <td className={d.daily_pnl_pct >= 0 ? "positive" : "negative"} style={{ fontWeight: 600 }}>{formatPercent(d.daily_pnl_pct)}</td>
-                    <td style={{ color: "var(--text-muted)" }}>{d.risk_reward ? `1:${d.risk_reward}` : "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
       {/* 매매 전략 */}
       {strategies.length > 0 && (() => {
-        const active = strategies.find((s: any) => s.is_active);
-        const activeStat = active ? strategyStats.find((ss: any) => ss.strategy === active.name) : null;
+        const actives = strategies.filter((s: any) => s.is_active);
         const others = strategies.filter((s: any) => !s.is_active);
         return (
           <div className="card" style={{ marginBottom: 24 }}>
-            <div className="card-title">매매 전략</div>
+            <div className="card-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>매매 전략</span>
+              {others.length > 0 && (
+                <button onClick={() => setShowAllStrategies(!showAllStrategies)} style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  fontSize: 22, color: "#6b7fa3", lineHeight: 1,
+                  transform: showAllStrategies ? "rotate(-90deg)" : "rotate(90deg)",
+                  transition: "transform 0.3s",
+                }}>›</button>
+              )}
+            </div>
 
-            {/* 현재 활성 전략 — 강조 카드 */}
-            {active && (
+            {/* 운영 중 전략 (N개 가능) */}
+            {actives.map((active: any) => {
+              const activeStat = strategyStats.find((ss: any) => ss.strategy === active.name);
+              return (
               <div style={{
                 padding: 16, borderRadius: 12, marginBottom: 16,
                 background: "linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)",
@@ -502,10 +474,12 @@ export default function PublicDashboardPage() {
                   </div>
                 )}
               </div>
-            )}
+              );
+            })}
 
-            {/* 나머지 전략 — 컴팩트 리스트 */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
+            {/* 나머지 전략 — 전체보기 시만 표시 */}
+            {showAllStrategies && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8, marginTop: 12 }}>
               {others.map((s: any) => {
                 const stat = strategyStats.find((ss: any) => ss.strategy === s.name);
                 return (
@@ -530,9 +504,50 @@ export default function PublicDashboardPage() {
                 );
               })}
             </div>
+            )}
           </div>
         );
       })()}
+
+      {/* 일별 성과 */}
+      {dailyReturns.length > 0 && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>일별 성과</span>
+            {dailyReturns.length > 3 && (
+              <button onClick={() => setShowAllDaily(!showAllDaily)} style={{
+                background: "none", border: "none", cursor: "pointer",
+                fontSize: 22, color: "#6b7fa3", lineHeight: 1,
+                transform: showAllDaily ? "rotate(-90deg)" : "rotate(90deg)",
+                transition: "transform 0.3s",
+              }}>›</button>
+            )}
+          </div>
+          <div style={{ overflowY: showAllDaily ? "auto" : "hidden", maxHeight: 200, overflowX: "hidden" }}>
+            <table style={{ width: "100%", tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: "30%" }} />
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "20%" }} />
+                <col style={{ width: "17%" }} />
+              </colgroup>
+              <thead><tr><th>날짜</th><th>거래</th><th>승률</th><th>수익률</th><th>손익비</th></tr></thead>
+              <tbody>
+                {(showAllDaily ? [...dailyReturns].reverse().slice(0, 50) : [...dailyReturns].reverse().slice(0, 3)).map((d: any) => (
+                  <tr key={d.date}>
+                    <td>{d.date}</td>
+                    <td>{d.total_trades || "-"}</td>
+                    <td className={(d.win_rate || 0) >= 50 ? "positive" : d.win_rate ? "negative" : ""}>{d.win_rate != null ? `${d.win_rate.toFixed(0)}%` : "-"}</td>
+                    <td className={d.daily_pnl_pct >= 0 ? "positive" : "negative"} style={{ fontWeight: 600 }}>{formatPercent(d.daily_pnl_pct)}</td>
+                    <td style={{ color: "var(--text-muted)" }}>{d.risk_reward ? `1:${d.risk_reward}` : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* 누적 수익률 차트 (하단 위치) */}
       {cumData.length > 1 && (

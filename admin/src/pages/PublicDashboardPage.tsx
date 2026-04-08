@@ -60,7 +60,7 @@ export default function PublicDashboardPage() {
     if (news.length <= 1 || newsExpanded) return;
     const timer = setInterval(() => {
       setNewsIndex((prev) => (prev + 1) % news.length);
-    }, 4000);
+    }, 5000);
     return () => clearInterval(timer);
   }, [news.length, newsExpanded]);
 
@@ -143,45 +143,50 @@ export default function PublicDashboardPage() {
       {/* 뉴스 티커 */}
       {news.length > 0 && (
         <div style={{ marginBottom: 12, position: "relative" }}>
-          {/* 한줄 티커 */}
-          {!newsExpanded && (
-            <div style={{
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "10px 16px", borderRadius: 10,
-              background: "#ffffff", border: "1px solid var(--border)",
-              cursor: "pointer",
-            }} onClick={() => setNewsExpanded(true)}>
-              <span className={`badge ${(news[newsIndex]?.sentiment_keyword === "positive" ? "badge-green" : news[newsIndex]?.sentiment_keyword === "negative" ? "badge-red" : "badge-yellow")}`} style={{ fontSize: 9, flexShrink: 0 }}>
-                {news[newsIndex]?.sentiment_keyword === "positive" ? "긍정" : news[newsIndex]?.sentiment_keyword === "negative" ? "부정" : "중립"}
-              </span>
-              <span style={{ fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {news[newsIndex]?.title}
-              </span>
-              <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>{news[newsIndex]?.source}</span>
-              <span style={{ fontSize: 16, color: "var(--text-muted)", flexShrink: 0, transform: "rotate(90deg)", lineHeight: 1 }}>›</span>
-            </div>
-          )}
+          <style>{`
+            @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+            .news-item { animation: slideUp 0.5s ease-out; }
+          `}</style>
 
-          {/* 펼침 오버레이 */}
+          {/* 한줄 티커 — 고정 높이 */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "10px 16px", borderRadius: 10,
+            background: "#ffffff", border: "1px solid var(--border)",
+            height: 42, overflow: "hidden",
+          }}>
+            <span className={`badge ${(news[newsIndex]?.sentiment_keyword === "positive" ? "badge-green" : news[newsIndex]?.sentiment_keyword === "negative" ? "badge-red" : "badge-yellow")}`} style={{ fontSize: 9, flexShrink: 0 }}>
+              {news[newsIndex]?.sentiment_keyword === "positive" ? "긍정" : news[newsIndex]?.sentiment_keyword === "negative" ? "부정" : "중립"}
+            </span>
+            <span key={newsIndex} className="news-item" style={{ fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {news[newsIndex]?.title}
+            </span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>{news[newsIndex]?.source}</span>
+            <button onClick={() => setNewsExpanded(!newsExpanded)} style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: 16, color: "var(--text-muted)", flexShrink: 0,
+              transform: newsExpanded ? "rotate(-90deg)" : "rotate(90deg)",
+              transition: "transform 0.3s",
+              padding: "0 2px",
+            }}>›</button>
+          </div>
+
+          {/* 펼침 오버레이 — position absolute, 아래로 덮기 */}
           {newsExpanded && (
             <div style={{
+              position: "absolute", top: 44, left: 0, right: 0, zIndex: 20,
               background: "#ffffff", border: "1px solid var(--border)", borderRadius: 12,
-              boxShadow: "0 8px 32px rgba(0,0,0,0.1)", zIndex: 10,
-              maxHeight: 360, overflowY: "auto",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.12)",
+              maxHeight: 320, overflowY: "auto",
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--border)", position: "sticky", top: 0, background: "#ffffff" }}>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>최근 뉴스</span>
-                <button onClick={() => setNewsExpanded(false)} style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  fontSize: 16, color: "var(--text-muted)", transform: "rotate(-90deg)",
-                }}>›</button>
-              </div>
               {news.map((n: any, i: number) => (
                 <a key={i} href={n.url} target="_blank" rel="noopener noreferrer" style={{
                   display: "flex", alignItems: "flex-start", gap: 10,
                   padding: "10px 16px", textDecoration: "none", color: "inherit",
                   borderBottom: i < news.length - 1 ? "1px solid var(--border)" : "none",
-                }}>
+                  transition: "background 0.15s",
+                }} onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
+                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                   <span className={`badge ${n.sentiment_keyword === "positive" ? "badge-green" : n.sentiment_keyword === "negative" ? "badge-red" : "badge-yellow"}`} style={{ fontSize: 9, flexShrink: 0, marginTop: 2 }}>
                     {n.sentiment_keyword === "positive" ? "긍정" : n.sentiment_keyword === "negative" ? "부정" : "중립"}
                   </span>

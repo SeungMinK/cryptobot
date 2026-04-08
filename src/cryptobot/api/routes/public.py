@@ -215,9 +215,12 @@ def get_public_daily_returns(request: Request, days: int = Query(30, ge=1, le=90
             ROUND(SUM(CASE WHEN side='sell' THEN profit_pct ELSE 0 END), 2) as daily_pnl_pct,
             COUNT(*) as total_trades,
             SUM(CASE WHEN side='sell' AND profit_krw > 0 THEN 1 ELSE 0 END) as wins,
-            SUM(CASE WHEN side='sell' THEN 1 ELSE 0 END) as sells
+            SUM(CASE WHEN side='sell' THEN 1 ELSE 0 END) as sells,
+            ROUND(AVG(CASE WHEN side='sell' AND profit_pct > 0 THEN profit_pct END), 2) as avg_win,
+            ROUND(AVG(CASE WHEN side='sell' AND profit_pct <= 0 THEN profit_pct END), 2) as avg_loss
         FROM trades
         WHERE timestamp >= datetime('now', ?)
+        AND (trigger_reason IS NULL OR trigger_reason NOT LIKE '[BUG]%')
         GROUP BY DATE(timestamp) ORDER BY date
         """,
         (f"-{days} days",),
@@ -228,7 +231,10 @@ def get_public_daily_returns(request: Request, days: int = Query(30, ge=1, le=90
         d = dict(r)
         sells = d.pop("sells", 0) or 0
         wins = d.pop("wins", 0) or 0
+        avg_w = d.pop("avg_win", 0) or 0
+        avg_l = abs(d.pop("avg_loss", 0) or 0)
         d["win_rate"] = round(wins / sells * 100, 1) if sells > 0 else 0
+        d["risk_reward"] = round(avg_l / avg_w, 1) if avg_w > 0 else 0
         result.append(d)
     return result
 

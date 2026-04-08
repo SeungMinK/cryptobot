@@ -70,15 +70,15 @@ export default function PublicDashboardPage() {
     <div>
       {/* 히어로 */}
       <div style={{
-        background: "linear-gradient(135deg, #0d1a33 0%, #162040 50%, #1a1545 100%)",
+        background: "linear-gradient(135deg, #1e293b 0%, #1e3a5f 50%, #312e81 100%)",
         borderRadius: 16, padding: "32px 28px", marginBottom: 28,
-        border: "1px solid rgba(45, 140, 240, 0.2)",
-        boxShadow: "0 8px 32px rgba(45, 140, 240, 0.08)",
+        color: "#ffffff",
+        boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700 }}>CryptoBot</h1>
-            <p style={{ margin: "6px 0 0", color: "var(--text-muted)", fontSize: 14 }}>
+            <p style={{ margin: "6px 0 0", color: "rgba(255,255,255,0.6)", fontSize: 14 }}>
               AI 기반 코인 자동매매 — 실시간 성과 공개
             </p>
           </div>
@@ -94,28 +94,28 @@ export default function PublicDashboardPage() {
         {summary && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginTop: 24 }}>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>전체 승률</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>전체 승률</div>
               <div style={{ fontSize: 28, fontWeight: 700 }} className={summary.win_rate >= 50 ? "positive" : "negative"}>
                 {summary.win_rate.toFixed(1)}%
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>오늘 {summary.today_win_rate.toFixed(0)}%</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>오늘 {summary.today_win_rate.toFixed(0)}%</div>
             </div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>손익비</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>손익비</div>
               <div style={{ fontSize: 28, fontWeight: 700 }}>
                 {summary.risk_reward_ratio ? `1:${summary.risk_reward_ratio}` : "-"}
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                 승 {formatPercent(summary.avg_win_pct || 0)} / 패 {formatPercent(summary.avg_loss_pct || 0)}
               </div>
             </div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>총 거래</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>총 거래</div>
               <div style={{ fontSize: 28, fontWeight: 700 }}>{summary.total_trades}</div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>오늘 {summary.today_trades}건</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>오늘 {summary.today_trades}건</div>
             </div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>공포/탐욕</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>공포/탐욕</div>
               <div style={{ fontSize: 28, fontWeight: 700, color: fgColor }}>{fg ? fg.value : "-"}</div>
               <div style={{ fontSize: 11, color: fgColor }}>{fgLabel}</div>
             </div>
@@ -150,7 +150,7 @@ export default function PublicDashboardPage() {
           <div className="card-title">일별 성과</div>
           <div className="table-container">
             <table>
-              <thead><tr><th>날짜</th><th>거래</th><th>승률</th><th>수익률</th></tr></thead>
+              <thead><tr><th>날짜</th><th>거래</th><th>승률</th><th>수익률</th><th>손익비</th></tr></thead>
               <tbody>
                 {[...dailyReturns].reverse().map((d: any) => (
                   <tr key={d.date}>
@@ -158,6 +158,7 @@ export default function PublicDashboardPage() {
                     <td>{d.total_trades || "-"}</td>
                     <td className={(d.win_rate || 0) >= 50 ? "positive" : d.win_rate ? "negative" : ""}>{d.win_rate != null ? `${d.win_rate.toFixed(0)}%` : "-"}</td>
                     <td className={d.daily_pnl_pct >= 0 ? "positive" : "negative"} style={{ fontWeight: 600 }}>{formatPercent(d.daily_pnl_pct)}</td>
+                    <td style={{ color: "var(--text-muted)" }}>{d.risk_reward ? `1:${d.risk_reward}` : "-"}</td>
                   </tr>
                 ))}
               </tbody>

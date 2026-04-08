@@ -1,15 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { formatPercent, formatDateTime } from "../utils/format";
 import { getMarketStateKR } from "../utils/indicatorDescriptions";
 
 const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-const TOOLTIP_STYLE = {
-  contentStyle: { background: "#1e2130", border: "1px solid #2a2d3e", borderRadius: 8, color: "#e4e6f0" },
-};
 
 export default function PublicDashboardPage() {
   const [summary, setSummary] = useState<any>(null);
@@ -103,11 +99,6 @@ export default function PublicDashboardPage() {
   const fgLabel = fg ? (fg.classification === "Extreme Fear" ? "극도 공포" : fg.classification === "Fear" ? "공포" : fg.classification === "Neutral" ? "중립" : fg.classification === "Greed" ? "탐욕" : "극도 탐욕") : "";
   const fgColor = fg && fg.value <= 25 ? "#f87171" : fg && fg.value >= 75 ? "#34d399" : "#fbbf24";
 
-  // 누적 수익률 계산
-  const cumData = dailyReturns.map((d: any, i: number) => ({
-    ...d,
-    cumulative: dailyReturns.slice(0, i + 1).reduce((s: number, x: any) => s + (x.daily_pnl_pct || 0), 0),
-  }));
 
   return (
     <div>
@@ -546,27 +537,6 @@ export default function PublicDashboardPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-
-      {/* 누적 수익률 차트 (하단 위치) */}
-      {cumData.length > 1 && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-title">누적 수익률 추이</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={cumData}>
-              <defs>
-                <linearGradient id="pubCumGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2563eb" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#2563eb" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="date" tick={{ fill: "#94a3b8", fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} />
-              <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v: number) => `${v.toFixed(1)}%`} />
-              <Tooltip {...TOOLTIP_STYLE} formatter={(value) => [formatPercent(Number(value)), "누적 수익률"]} />
-              <Area type="monotone" dataKey="cumulative" stroke="#2563eb" fill="url(#pubCumGrad)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
         </div>
       )}
 

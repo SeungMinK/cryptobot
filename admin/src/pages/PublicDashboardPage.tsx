@@ -55,7 +55,29 @@ export default function PublicDashboardPage() {
     return () => clearInterval(interval);
   }, [fetchAll]);
 
-  if (loading) return <div className="loading">로딩 중...</div>;
+  if (loading) return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: 16 }}>
+      <div style={{ display: "flex", gap: 6 }}>
+        {[0, 1, 2].map((i) => (
+          <div key={i} style={{
+            width: 10, height: 10, borderRadius: "50%", background: "var(--accent-blue)",
+            animation: `bounce 1.2s ease-in-out ${i * 0.15}s infinite`,
+          }} />
+        ))}
+      </div>
+      <span style={{ color: "var(--text-muted)", fontSize: 14 }}>AI가 시장을 분석하고 있습니다</span>
+      <style>{`@keyframes bounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }`}</style>
+    </div>
+  );
+
+  if (!summary && !loading) return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: 12 }}>
+      <div style={{ fontSize: 36, animation: "pulse 2s ease-in-out infinite" }}>📡</div>
+      <span style={{ color: "var(--text-secondary)", fontSize: 16, fontWeight: 600 }}>서버와 연결 중입니다</span>
+      <span style={{ color: "var(--text-muted)", fontSize: 13 }}>잠시만 기다려주세요 — 곧 실시간 데이터가 표시됩니다</span>
+      <style>{`@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }`}</style>
+    </div>
+  );
 
   const fgLabel = fg ? (fg.classification === "Extreme Fear" ? "극도 공포" : fg.classification === "Fear" ? "공포" : fg.classification === "Neutral" ? "중립" : fg.classification === "Greed" ? "탐욕" : "극도 탐욕") : "";
   const fgColor = fg && fg.value <= 25 ? "#f87171" : fg && fg.value >= 75 ? "#34d399" : "#fbbf24";

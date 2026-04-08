@@ -161,7 +161,8 @@ export default function PublicDashboardPage() {
               from { opacity: 0; transform: translateY(12px); }
               to { opacity: 1; transform: translateY(0); }
             }
-            .analysis-enter { animation: fadeSlideIn 0.8s ease-out; }
+            .analysis-enter-1 { animation: fadeSlideIn 0.5s ease-out; }
+            .analysis-enter-2 { animation: fadeSlideIn 1.0s ease-out 0.15s both; }
           `}</style>
 
           {/* 한줄 티커 — 고정 높이, 연한 블루 배경 */}
@@ -240,7 +241,7 @@ export default function PublicDashboardPage() {
                 const stateBorder = (state: string) =>
                   state === "bullish" ? "#bbf7d0" : state === "bearish" ? "#fecaca" : "#fde68a";
                 return slots.map((a: any, i: number) => (
-                  <div key={`${i}-${a?.timestamp}`} className={i > 0 ? "analysis-enter" : ""} style={{
+                  <div key={`${i}-${a?.timestamp}`} className={i === 1 ? "analysis-enter-1" : i === 2 ? "analysis-enter-2" : ""} style={{
                     borderRadius: 10, overflow: "hidden", marginBottom: i < slots.length - 1 ? 10 : 0,
                     border: `1px solid ${stateBorder(a.market_state)}`,
                   }}>

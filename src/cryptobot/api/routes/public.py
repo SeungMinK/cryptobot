@@ -96,7 +96,7 @@ def get_public_trades(request: Request, limit: int = Query(20, ge=1, le=50)):
     rows = db.execute(
         """
         SELECT coin, side, strategy, trigger_reason, profit_pct,
-            timestamp, hold_duration_minutes
+            price, timestamp, hold_duration_minutes
         FROM trades
         ORDER BY id DESC LIMIT ?
         """,
@@ -110,6 +110,7 @@ def get_public_trades(request: Request, limit: int = Query(20, ge=1, le=50)):
             "strategy": dict(r)["strategy"],
             "trigger_reason": dict(r)["trigger_reason"],
             "profit_pct": dict(r)["profit_pct"] if dict(r)["side"] == "sell" else None,
+            "price": dict(r)["price"],
             "timestamp": dict(r)["timestamp"],
             "hold_minutes": dict(r)["hold_duration_minutes"],
         }

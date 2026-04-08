@@ -321,16 +321,26 @@ export default function PublicDashboardPage() {
           )}
         </div>
         {trades.length > 0 ? (
-          <div className="table-container" style={{ overflowY: showAllTrades ? "auto" : "visible", maxHeight: showAllTrades ? 360 : "none", scrollbarGutter: "stable" }}>
-            <table>
-              <thead><tr><th>시간</th><th>종목</th><th>방향</th><th>전략</th><th>수익률</th><th>보유</th></tr></thead>
+          <div style={{ overflowY: showAllTrades ? "auto" : "visible", maxHeight: showAllTrades ? 360 : "none", overflowX: "hidden" }}>
+            <table style={{ width: "100%", tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "10%" }} />
+              </colgroup>
+              <thead><tr><th>시간</th><th>종목</th><th>방향</th><th>전략</th><th>단가</th><th>수익률</th><th>보유</th></tr></thead>
               <tbody>
                 {(showAllTrades ? trades.slice(0, 50) : trades.slice(0, 5)).map((t: any, i: number) => (
                   <tr key={i}>
                     <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{formatDateTime(t.timestamp).replace(/\d{4}\. /, "")}</td>
                     <td style={{ fontWeight: 600 }}>{t.coin?.replace("KRW-", "")}</td>
                     <td><span className={`badge ${t.side === "buy" ? "badge-green" : "badge-red"}`} style={{ fontSize: 10 }}>{t.side === "buy" ? "매수" : "매도"}</span></td>
-                    <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.strategy?.replace(/_/g, " ")}</td>
+                    <td style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.strategy?.replace(/_/g, " ")}</td>
+                    <td style={{ fontSize: 11 }}>{t.price ? Number(t.price).toLocaleString() : "-"}</td>
                     <td className={t.profit_pct != null ? (t.profit_pct >= 0 ? "positive" : "negative") : ""} style={{ fontWeight: 600 }}>{t.profit_pct != null ? formatPercent(t.profit_pct) : "-"}</td>
                     <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.hold_minutes != null ? `${t.hold_minutes}분` : "-"}</td>
                   </tr>
@@ -377,8 +387,15 @@ export default function PublicDashboardPage() {
               }}>›</button>
             )}
           </div>
-          <div className="table-container" style={{ overflowY: showAllDaily ? "auto" : "visible", maxHeight: showAllDaily ? 360 : "none", scrollbarGutter: "stable" }}>
-            <table>
+          <div style={{ overflowY: showAllDaily ? "auto" : "visible", maxHeight: showAllDaily ? 360 : "none", overflowX: "hidden" }}>
+            <table style={{ width: "100%", tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: "30%" }} />
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "20%" }} />
+                <col style={{ width: "17%" }} />
+              </colgroup>
               <thead><tr><th>날짜</th><th>거래</th><th>승률</th><th>수익률</th><th>손익비</th></tr></thead>
               <tbody>
                 {(showAllDaily ? [...dailyReturns].reverse().slice(0, 50) : [...dailyReturns].reverse().slice(0, 3)).map((d: any) => (

@@ -137,21 +137,26 @@ def get_public_portfolio(request: Request):
 
     coin_total = sum(dict(r)["total_krw"] for r in rows)
 
-    # KRW 잔고 비중 계산
+    # KRW 잔고 — Trader 또는 DB 기반 역산
+    krw = 0
     try:
         from cryptobot.bot.trader import Trader
         trader = Trader()
-        krw = trader.get_balance_krw() if trader.is_ready else 0
+        if trader.is_ready:
+            krw = trader.get_balance_krw()
     except Exception:
-        krw = 0
+        pass
+    # Trader 안 되면 초기자금(100000) - 코인투자액으로 추정
+    if krw <= 0:
+        initial = 100000
+        krw = max(0, initial - coin_total)
 
     grand_total = coin_total + krw
     if grand_total <= 0:
         return {"positions": [], "total_coins": 0}
 
     positions = []
-    if krw > 0:
-        positions.append({"coin": "KRW", "weight_pct": round(krw / grand_total * 100, 1)})
+    positions.append({"coin": "KRW", "weight_pct": round(krw / grand_total * 100, 1)})
     for r in rows:
         d = dict(r)
         pct = round(d["total_krw"] / grand_total * 100, 1)

@@ -26,6 +26,7 @@ export default function PublicDashboardPage() {
   const [monitoringCoins, setMonitoringCoins] = useState<any[]>([]);
   const [strategies, setStrategies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAllTrades, setShowAllTrades] = useState(false);
 
   const fetchAll = useCallback(() => {
     const base = API.replace(/\/api$/, "");
@@ -71,17 +72,12 @@ export default function PublicDashboardPage() {
       {/* 히어로 */}
       <div style={{
         background: "linear-gradient(135deg, #1e293b 0%, #1e3a5f 50%, #312e81 100%)",
-        borderRadius: 16, padding: "32px 28px", marginBottom: 28,
+        borderRadius: 16, padding: "20px 28px", marginBottom: 24,
         color: "#ffffff",
         boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700 }}>CryptoBot</h1>
-            <p style={{ margin: "6px 0 0", color: "rgba(255,255,255,0.6)", fontSize: 14 }}>
-              AI 기반 코인 자동매매 — 실시간 성과 공개
-            </p>
-          </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>CryptoBot</h1>
           {!isAuthenticated && (
             <Link to="/login" style={{
               padding: "8px 16px", borderRadius: 8, fontSize: 12,
@@ -121,26 +117,37 @@ export default function PublicDashboardPage() {
         )}
       </div>
 
-      {/* 누적 수익률 차트 */}
-      {cumData.length > 1 && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-title">누적 수익률 추이</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={cumData}>
-              <defs>
-                <linearGradient id="pubCumGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#4a9eff" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#4a9eff" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="date" tick={{ fill: "#8b8fa3", fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} />
-              <YAxis tick={{ fill: "#8b8fa3", fontSize: 11 }} tickFormatter={(v: number) => `${v.toFixed(1)}%`} />
-              <Tooltip {...TOOLTIP_STYLE} formatter={(value) => [formatPercent(Number(value)), "누적 수익률"]} />
-              <Area type="monotone" dataKey="cumulative" stroke="#4a9eff" fill="url(#pubCumGrad)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
+      {/* 최근 매매 (상단 위치) */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>최근 매매</span>
+          {trades.length > 5 && (
+            <button onClick={() => setShowAllTrades(!showAllTrades)} style={{
+              background: "none", border: "none", color: "var(--accent-blue)",
+              cursor: "pointer", fontSize: 12, fontWeight: 600,
+            }}>{showAllTrades ? "접기" : `전체 보기 (${trades.length}건)`}</button>
+          )}
         </div>
-      )}
+        {trades.length > 0 ? (
+          <div className="table-container">
+            <table>
+              <thead><tr><th>시간</th><th>종목</th><th>방향</th><th>전략</th><th>수익률</th><th>보유</th></tr></thead>
+              <tbody>
+                {(showAllTrades ? trades : trades.slice(0, 5)).map((t: any, i: number) => (
+                  <tr key={i}>
+                    <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{formatDateTime(t.timestamp).replace(/\d{4}\. /, "")}</td>
+                    <td style={{ fontWeight: 600 }}>{t.coin?.replace("KRW-", "")}</td>
+                    <td><span className={`badge ${t.side === "buy" ? "badge-green" : "badge-red"}`} style={{ fontSize: 10 }}>{t.side === "buy" ? "매수" : "매도"}</span></td>
+                    <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.strategy?.replace(/_/g, " ")}</td>
+                    <td className={t.profit_pct != null ? (t.profit_pct >= 0 ? "positive" : "negative") : ""} style={{ fontWeight: 600 }}>{t.profit_pct != null ? formatPercent(t.profit_pct) : "-"}</td>
+                    <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.hold_minutes != null ? `${t.hold_minutes}분` : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <div className="empty-state">매매 내역 없음</div>}
+      </div>
 
       {/* GitHub 배너 */}
       <a href="https://github.com/SeungMinK/cryptobot" target="_blank" rel="noopener noreferrer" style={{
@@ -326,29 +333,26 @@ export default function PublicDashboardPage() {
         </div>
       )}
 
-      {/* 최근 매매 */}
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div className="card-title">최근 매매</div>
-        {trades.length > 0 ? (
-          <div className="table-container">
-            <table>
-              <thead><tr><th>시간</th><th>종목</th><th>방향</th><th>전략</th><th>수익률</th><th>보유</th></tr></thead>
-              <tbody>
-                {trades.map((t: any, i: number) => (
-                  <tr key={i}>
-                    <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{formatDateTime(t.timestamp).replace(/\d{4}\. /, "")}</td>
-                    <td style={{ fontWeight: 600 }}>{t.coin?.replace("KRW-", "")}</td>
-                    <td><span className={`badge ${t.side === "buy" ? "badge-green" : "badge-red"}`} style={{ fontSize: 10 }}>{t.side === "buy" ? "매수" : "매도"}</span></td>
-                    <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.strategy?.replace(/_/g, " ")}</td>
-                    <td className={t.profit_pct != null ? (t.profit_pct >= 0 ? "positive" : "negative") : ""} style={{ fontWeight: 600 }}>{t.profit_pct != null ? formatPercent(t.profit_pct) : "-"}</td>
-                    <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.hold_minutes != null ? `${t.hold_minutes}분` : "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : <div className="empty-state">매매 내역 없음</div>}
-      </div>
+      {/* 누적 수익률 차트 (하단 위치) */}
+      {cumData.length > 1 && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card-title">누적 수익률 추이</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={cumData}>
+              <defs>
+                <linearGradient id="pubCumGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#2563eb" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#2563eb" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="date" tick={{ fill: "#94a3b8", fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} />
+              <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={(v: number) => `${v.toFixed(1)}%`} />
+              <Tooltip {...TOOLTIP_STYLE} formatter={(value) => [formatPercent(Number(value)), "누적 수익률"]} />
+              <Area type="monotone" dataKey="cumulative" stroke="#2563eb" fill="url(#pubCumGrad)" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* 뉴스 */}
       {news.length > 0 && (

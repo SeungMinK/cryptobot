@@ -148,11 +148,11 @@ export default function PublicDashboardPage() {
             .news-item { animation: slideUp 0.5s ease-out; }
           `}</style>
 
-          {/* 한줄 티커 — 고정 높이 */}
+          {/* 한줄 티커 — 고정 높이, 연한 블루 배경 */}
           <div style={{
             display: "flex", alignItems: "center", gap: 10,
             padding: "10px 16px", borderRadius: 10,
-            background: "#ffffff", border: "1px solid var(--border)",
+            background: "#f0f7ff", border: "1px solid #d4e5f7",
             height: 42, overflow: "hidden",
           }}>
             <span className={`badge ${(news[newsIndex]?.sentiment_keyword === "positive" ? "badge-green" : news[newsIndex]?.sentiment_keyword === "negative" ? "badge-red" : "badge-yellow")}`} style={{ fontSize: 9, flexShrink: 0 }}>
@@ -161,13 +161,13 @@ export default function PublicDashboardPage() {
             <span key={newsIndex} className="news-item" style={{ fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {news[newsIndex]?.title}
             </span>
-            <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>{news[newsIndex]?.source}</span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0, marginRight: 8 }}>{news[newsIndex]?.source}</span>
             <button onClick={() => setNewsExpanded(!newsExpanded)} style={{
               background: "none", border: "none", cursor: "pointer",
-              fontSize: 16, color: "var(--text-muted)", flexShrink: 0,
+              fontSize: 22, color: "#6b7fa3", flexShrink: 0,
               transform: newsExpanded ? "rotate(-90deg)" : "rotate(90deg)",
               transition: "transform 0.3s",
-              padding: "0 2px",
+              padding: "0 4px", lineHeight: 1,
             }}>›</button>
           </div>
 
@@ -204,34 +204,63 @@ export default function PublicDashboardPage() {
       )}
 
       {/* 최근 매매 (상단 위치) */}
-      <div className="card" style={{ marginBottom: 24 }}>
+      <div className="card" style={{ marginBottom: 24, position: "relative" }}>
         <div className="card-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>최근 매매</span>
           {trades.length > 5 && (
             <button onClick={() => setShowAllTrades(!showAllTrades)} style={{
-              background: "none", border: "none", color: "var(--accent-blue)",
-              cursor: "pointer", fontSize: 12, fontWeight: 600,
-            }}>{showAllTrades ? "접기" : "전체 보기"}</button>
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: 22, color: "#6b7fa3", lineHeight: 1,
+              transform: showAllTrades ? "rotate(-90deg)" : "rotate(90deg)",
+              transition: "transform 0.3s",
+            }}>›</button>
           )}
         </div>
         {trades.length > 0 ? (
-          <div className="table-container" style={showAllTrades ? { maxHeight: 280, overflowY: "auto" } : {}}>
-            <table>
-              <thead><tr><th>시간</th><th>종목</th><th>방향</th><th>전략</th><th>수익률</th><th>보유</th></tr></thead>
-              <tbody>
-                {(showAllTrades ? trades : trades.slice(0, 5)).map((t: any, i: number) => (
-                  <tr key={i}>
-                    <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{formatDateTime(t.timestamp).replace(/\d{4}\. /, "")}</td>
-                    <td style={{ fontWeight: 600 }}>{t.coin?.replace("KRW-", "")}</td>
-                    <td><span className={`badge ${t.side === "buy" ? "badge-green" : "badge-red"}`} style={{ fontSize: 10 }}>{t.side === "buy" ? "매수" : "매도"}</span></td>
-                    <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.strategy?.replace(/_/g, " ")}</td>
-                    <td className={t.profit_pct != null ? (t.profit_pct >= 0 ? "positive" : "negative") : ""} style={{ fontWeight: 600 }}>{t.profit_pct != null ? formatPercent(t.profit_pct) : "-"}</td>
-                    <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.hold_minutes != null ? `${t.hold_minutes}분` : "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* 기본 5건 */}
+            <div className="table-container">
+              <table>
+                <thead><tr><th>시간</th><th>종목</th><th>방향</th><th>전략</th><th>수익률</th><th>보유</th></tr></thead>
+                <tbody>
+                  {trades.slice(0, 5).map((t: any, i: number) => (
+                    <tr key={i}>
+                      <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{formatDateTime(t.timestamp).replace(/\d{4}\. /, "")}</td>
+                      <td style={{ fontWeight: 600 }}>{t.coin?.replace("KRW-", "")}</td>
+                      <td><span className={`badge ${t.side === "buy" ? "badge-green" : "badge-red"}`} style={{ fontSize: 10 }}>{t.side === "buy" ? "매수" : "매도"}</span></td>
+                      <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.strategy?.replace(/_/g, " ")}</td>
+                      <td className={t.profit_pct != null ? (t.profit_pct >= 0 ? "positive" : "negative") : ""} style={{ fontWeight: 600 }}>{t.profit_pct != null ? formatPercent(t.profit_pct) : "-"}</td>
+                      <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.hold_minutes != null ? `${t.hold_minutes}분` : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* 펼침 오버레이 — 아래로 덮기 */}
+            {showAllTrades && trades.length > 5 && (
+              <div style={{
+                position: "absolute", top: "100%", left: 0, right: 0, zIndex: 15,
+                background: "#ffffff", border: "1px solid var(--border)", borderRadius: "0 0 12px 12px",
+                borderTop: "none", boxShadow: "0 12px 40px rgba(0,0,0,0.1)",
+                maxHeight: 300, overflowY: "auto",
+              }}>
+                <table style={{ width: "100%" }}>
+                  <tbody>
+                    {trades.slice(5).map((t: any, i: number) => (
+                      <tr key={i}>
+                        <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{formatDateTime(t.timestamp).replace(/\d{4}\. /, "")}</td>
+                        <td style={{ fontWeight: 600 }}>{t.coin?.replace("KRW-", "")}</td>
+                        <td><span className={`badge ${t.side === "buy" ? "badge-green" : "badge-red"}`} style={{ fontSize: 10 }}>{t.side === "buy" ? "매수" : "매도"}</span></td>
+                        <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.strategy?.replace(/_/g, " ")}</td>
+                        <td className={t.profit_pct != null ? (t.profit_pct >= 0 ? "positive" : "negative") : ""} style={{ fontWeight: 600 }}>{t.profit_pct != null ? formatPercent(t.profit_pct) : "-"}</td>
+                        <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.hold_minutes != null ? `${t.hold_minutes}분` : "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         ) : <div className="empty-state">매매 내역 없음</div>}
       </div>
 

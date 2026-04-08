@@ -263,69 +263,58 @@ export default function PublicDashboardPage() {
         </div>
       </div>
 
-      <div className="grid-2" style={{ marginBottom: 24 }}>
-        {/* 전략별 성과 */}
-        {strategyStats.length > 0 && (
-          <div className="card">
-            <div className="card-title">전략별 성과</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {strategyStats.map((s: any) => (
-                <div key={s.strategy} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{s.strategy.replace(/_/g, " ")}</div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{s.trades}건 거래</div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div className={s.win_rate >= 50 ? "positive" : "negative"} style={{ fontWeight: 600 }}>{s.win_rate}%</div>
-                    <div style={{ fontSize: 11 }} className={s.avg_pct >= 0 ? "positive" : "negative"}>{formatPercent(s.avg_pct)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+      {/* 모니터링 코인 */}
+      {monitoringCoins.length > 0 && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card-title">모니터링 중 ({monitoringCoins.length}개 코인)</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {monitoringCoins.map((c: any) => (
+              <div key={c.coin} style={{
+                padding: "6px 12px", borderRadius: 8, fontSize: 12,
+                background: c.market_state === "bullish" ? "#ecfdf5" : c.market_state === "bearish" ? "#fef2f2" : "#f8fafc",
+                border: `1px solid ${c.market_state === "bullish" ? "#a7f3d0" : c.market_state === "bearish" ? "#fecaca" : "var(--border)"}`,
+              }}>
+                <span style={{ fontWeight: 600 }}>{c.coin.replace("KRW-", "")}</span>
+                {c.rsi && <span style={{ marginLeft: 4, color: "var(--text-muted)", fontSize: 10 }}>RSI {c.rsi}</span>}
+              </div>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* 모니터링 코인 */}
-        {monitoringCoins.length > 0 && (
-          <div className="card">
-            <div className="card-title">모니터링 중 ({monitoringCoins.length}개 코인)</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {monitoringCoins.map((c: any) => (
-                <div key={c.coin} style={{
-                  padding: "6px 10px", borderRadius: 8, fontSize: 12,
-                  background: "var(--bg-secondary)",
-                  border: `1px solid ${c.market_state === "bullish" ? "rgba(34,197,94,0.3)" : c.market_state === "bearish" ? "rgba(248,113,113,0.3)" : "var(--border)"}`,
-                }}>
-                  <span style={{ fontWeight: 600 }}>{c.coin.replace("KRW-", "")}</span>
-                  {c.rsi && <span style={{ marginLeft: 4, color: "var(--text-muted)", fontSize: 10 }}>RSI {c.rsi}</span>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 매매 전략 소개 */}
+      {/* 매매 전략 + 성과 */}
       {strategies.length > 0 && (
         <div className="card" style={{ marginBottom: 24 }}>
           <div className="card-title">매매 전략 ({strategies.length}개)</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
-            {strategies.map((s: any) => (
-              <div key={s.name} style={{
-                padding: 12, borderRadius: 8, background: "var(--bg-secondary)",
-                border: s.is_active ? "1px solid rgba(74, 158, 255, 0.4)" : "1px solid var(--border)",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>{s.display_name}</span>
-                  {s.is_active && <span className="badge badge-blue" style={{ fontSize: 9 }}>활성</span>}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: 12 }}>
+            {strategies.map((s: any) => {
+              const stat = strategyStats.find((ss: any) => ss.strategy === s.name);
+              return (
+                <div key={s.name} style={{
+                  padding: 14, borderRadius: 10, background: "#f8fafc",
+                  border: s.is_active ? "2px solid var(--accent-blue)" : "1px solid var(--border)",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ fontWeight: 700, fontSize: 14 }}>{s.display_name}</span>
+                    {s.is_active && <span className="badge badge-blue" style={{ fontSize: 9 }}>활성</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5, marginBottom: 8 }}>{s.description}</div>
+                  {stat ? (
+                    <div style={{ display: "flex", gap: 12, fontSize: 12, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+                      <span>{stat.trades}건</span>
+                      <span className={stat.win_rate >= 50 ? "positive" : "negative"} style={{ fontWeight: 600 }}>승률 {stat.win_rate}%</span>
+                      <span className={stat.avg_pct >= 0 ? "positive" : "negative"}>{formatPercent(stat.avg_pct)}</span>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", borderTop: "1px solid var(--border)", paddingTop: 8 }}>매매 기록 없음</div>
+                  )}
+                  <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+                    <span className="badge badge-purple" style={{ fontSize: 9 }}>{s.category}</span>
+                    <span className="badge badge-yellow" style={{ fontSize: 9 }}>{s.difficulty}</span>
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5 }}>{s.description}</div>
-                <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
-                  <span className="badge badge-purple" style={{ fontSize: 9 }}>{s.category}</span>
-                  <span className="badge badge-yellow" style={{ fontSize: 9 }}>{s.difficulty}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

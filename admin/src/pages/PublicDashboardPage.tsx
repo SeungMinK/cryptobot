@@ -24,6 +24,8 @@ export default function PublicDashboardPage() {
   const [strategies, setStrategies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAllTrades, setShowAllTrades] = useState(false);
+  const [newsExpanded, setNewsExpanded] = useState(false);
+  const [newsIndex, setNewsIndex] = useState(0);
 
   const fetchAll = useCallback(() => {
     const base = API.replace(/\/api$/, "");
@@ -63,6 +65,15 @@ export default function PublicDashboardPage() {
     ...d,
     cumulative: dailyReturns.slice(0, i + 1).reduce((s: number, x: any) => s + (x.daily_pnl_pct || 0), 0),
   }));
+
+  // 뉴스 자동 롤링
+  useEffect(() => {
+    if (news.length <= 1 || newsExpanded) return;
+    const timer = setInterval(() => {
+      setNewsIndex((prev) => (prev + 1) % news.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [news.length, newsExpanded]);
 
   return (
     <div>
@@ -106,6 +117,64 @@ export default function PublicDashboardPage() {
           </div>
         )}
       </div>
+
+      {/* 뉴스 티커 */}
+      {news.length > 0 && (
+        <div style={{ marginBottom: 12, position: "relative" }}>
+          {/* 한줄 티커 */}
+          {!newsExpanded && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "10px 16px", borderRadius: 10,
+              background: "#ffffff", border: "1px solid var(--border)",
+              cursor: "pointer",
+            }} onClick={() => setNewsExpanded(true)}>
+              <span className={`badge ${(news[newsIndex]?.sentiment_keyword === "positive" ? "badge-green" : news[newsIndex]?.sentiment_keyword === "negative" ? "badge-red" : "badge-yellow")}`} style={{ fontSize: 9, flexShrink: 0 }}>
+                {news[newsIndex]?.sentiment_keyword === "positive" ? "긍정" : news[newsIndex]?.sentiment_keyword === "negative" ? "부정" : "중립"}
+              </span>
+              <span style={{ fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {news[newsIndex]?.title}
+              </span>
+              <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>{news[newsIndex]?.source}</span>
+              <span style={{ fontSize: 16, color: "var(--text-muted)", flexShrink: 0, transform: "rotate(90deg)", lineHeight: 1 }}>›</span>
+            </div>
+          )}
+
+          {/* 펼침 오버레이 */}
+          {newsExpanded && (
+            <div style={{
+              background: "#ffffff", border: "1px solid var(--border)", borderRadius: 12,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.1)", zIndex: 10,
+              maxHeight: 360, overflowY: "auto",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--border)", position: "sticky", top: 0, background: "#ffffff" }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>최근 뉴스</span>
+                <button onClick={() => setNewsExpanded(false)} style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  fontSize: 16, color: "var(--text-muted)", transform: "rotate(-90deg)",
+                }}>›</button>
+              </div>
+              {news.map((n: any, i: number) => (
+                <a key={i} href={n.url} target="_blank" rel="noopener noreferrer" style={{
+                  display: "flex", alignItems: "flex-start", gap: 10,
+                  padding: "10px 16px", textDecoration: "none", color: "inherit",
+                  borderBottom: i < news.length - 1 ? "1px solid var(--border)" : "none",
+                }}>
+                  <span className={`badge ${n.sentiment_keyword === "positive" ? "badge-green" : n.sentiment_keyword === "negative" ? "badge-red" : "badge-yellow"}`} style={{ fontSize: 9, flexShrink: 0, marginTop: 2 }}>
+                    {n.sentiment_keyword === "positive" ? "긍정" : n.sentiment_keyword === "negative" ? "부정" : "중립"}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, lineHeight: 1.5 }}>{n.title}</div>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+                      {n.source} · {formatDateTime(n.published_at).replace(/\d{4}\. /, "")}
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 최근 매매 (상단 위치) */}
       <div className="card" style={{ marginBottom: 24 }}>
@@ -341,29 +410,6 @@ export default function PublicDashboardPage() {
               <Area type="monotone" dataKey="cumulative" stroke="#2563eb" fill="url(#pubCumGrad)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* 뉴스 */}
-      {news.length > 0 && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-title">최근 뉴스</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {news.map((n: any, i: number) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: i < news.length - 1 ? "1px solid var(--border)" : "none" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", gap: 6, marginBottom: 3 }}>
-                    <span className={`badge ${n.sentiment_keyword === "positive" ? "badge-green" : n.sentiment_keyword === "negative" ? "badge-red" : "badge-yellow"}`} style={{ fontSize: 9 }}>
-                      {n.sentiment_keyword === "positive" ? "긍정" : n.sentiment_keyword === "negative" ? "부정" : "중립"}
-                    </span>
-                    <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{n.source}</span>
-                  </div>
-                  <a href={n.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--text-primary)", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{n.title}</a>
-                </div>
-                <span style={{ fontSize: 10, color: "var(--text-muted)", whiteSpace: "nowrap", marginLeft: 12 }}>{formatDateTime(n.published_at).replace(/\d{4}\. /, "")}</span>
-              </div>
-            ))}
-          </div>
         </div>
       )}
 

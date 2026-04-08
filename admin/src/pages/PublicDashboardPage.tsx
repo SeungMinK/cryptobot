@@ -70,9 +70,10 @@ export default function PublicDashboardPage() {
     <div>
       {/* 히어로 */}
       <div style={{
-        background: "linear-gradient(135deg, #1a1d2e 0%, #2a2d4e 100%)",
+        background: "linear-gradient(135deg, #0d1a33 0%, #162040 50%, #1a1545 100%)",
         borderRadius: 16, padding: "32px 28px", marginBottom: 28,
-        border: "1px solid rgba(74, 158, 255, 0.15)",
+        border: "1px solid rgba(45, 140, 240, 0.2)",
+        boxShadow: "0 8px 32px rgba(45, 140, 240, 0.08)",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>

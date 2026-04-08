@@ -1,21 +1,21 @@
 :root {
-  /* Modern Dark Theme — inspired by Linear, Vercel, Binance */
-  --bg-primary: #0a0e1a;
-  --bg-secondary: #111827;
-  --bg-card: #1a2332;
-  --bg-hover: #243044;
-  --border: #2d3a4f;
-  --border-color: #2d3a4f;
+  /* Vibrant Dark Theme — Binance/Coinbase inspired */
+  --bg-primary: #0b0f19;
+  --bg-secondary: #131a2a;
+  --bg-card: #172033;
+  --bg-hover: #1e2d45;
+  --border: #1f3054;
+  --border-color: #1f3054;
 
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-primary: #ffffff;
+  --text-secondary: #a0b4d0;
+  --text-muted: #5a7299;
 
-  --accent-blue: #3b82f6;
-  --accent-green: #10b981;
-  --accent-red: #ef4444;
-  --accent-yellow: #f59e0b;
-  --accent-purple: #8b5cf6;
+  --accent-blue: #2d8cf0;
+  --accent-green: #00d4aa;
+  --accent-red: #ff4d6a;
+  --accent-yellow: #ffb800;
+  --accent-purple: #a855f7;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -131,7 +131,7 @@ a:hover { text-decoration: underline; }
 }
 
 .kpi-card {
-  background: linear-gradient(135deg, var(--bg-card) 0%, rgba(59, 130, 246, 0.04) 100%);
+  background: linear-gradient(135deg, #172033 0%, #1a2844 100%);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 18px 20px;
@@ -139,9 +139,9 @@ a:hover { text-decoration: underline; }
 }
 
 .kpi-card:hover {
-  border-color: rgba(59, 130, 246, 0.3);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border-color: rgba(45, 140, 240, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(45, 140, 240, 0.12);
 }
 
 .kpi-label {
@@ -193,33 +193,33 @@ tr:hover { background: rgba(59, 130, 246, 0.04); }
 }
 
 .badge-green {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: rgba(0, 212, 170, 0.15);
+  color: #00d4aa;
+  border: 1px solid rgba(0, 212, 170, 0.3);
 }
 
 .badge-red {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(255, 77, 106, 0.15);
+  color: #ff4d6a;
+  border: 1px solid rgba(255, 77, 106, 0.3);
 }
 
 .badge-blue {
-  background: rgba(59, 130, 246, 0.12);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  background: rgba(45, 140, 240, 0.15);
+  color: #2d8cf0;
+  border: 1px solid rgba(45, 140, 240, 0.3);
 }
 
 .badge-yellow {
-  background: rgba(245, 158, 11, 0.12);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  background: rgba(255, 184, 0, 0.15);
+  color: #ffb800;
+  border: 1px solid rgba(255, 184, 0, 0.3);
 }
 
 .badge-purple {
-  background: rgba(139, 92, 246, 0.12);
-  color: #8b5cf6;
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.3);
 }
 
 /* Buttons */
@@ -241,16 +241,16 @@ tr:hover { background: rgba(59, 130, 246, 0.04); }
 }
 
 .btn-primary {
-  background: var(--accent-blue);
-  border-color: var(--accent-blue);
+  background: linear-gradient(135deg, #2d8cf0, #1a6dd1);
+  border-color: #2d8cf0;
   color: #fff;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 4px 14px rgba(45, 140, 240, 0.35);
 }
 
 .btn-primary:hover {
-  background: #2563eb;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+  background: linear-gradient(135deg, #3d9cff, #2d8cf0);
+  box-shadow: 0 6px 20px rgba(45, 140, 240, 0.45);
   transform: translateY(-1px);
 }
 

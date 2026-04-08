@@ -27,13 +27,14 @@ export default function PublicDashboardPage() {
   const [showAllDaily, setShowAllDaily] = useState(false);
   const [newsExpanded, setNewsExpanded] = useState(false);
   const [newsIndex, setNewsIndex] = useState(0);
+  const [analysisIndex, setAnalysisIndex] = useState(0);
 
   const fetchAll = useCallback(() => {
     const base = API.replace(/\/api$/, "");
     Promise.all([
       fetch(`${base}/api/public/summary`).then(r => r.json()).catch(() => null),
       fetch(`${base}/api/public/trades?limit=20`).then(r => r.json()).catch(() => []),
-      fetch(`${base}/api/public/analysis?limit=3`).then(r => r.json()).catch(() => []),
+      fetch(`${base}/api/public/analysis?limit=7`).then(r => r.json()).catch(() => []),
       fetch(`${base}/api/public/news?limit=20`).then(r => r.json()).catch(() => ({ news: [], fear_greed: null })),
       fetch(`${base}/api/public/portfolio`).then(r => r.json()).catch(() => ({ positions: [] })),
       fetch(`${base}/api/public/daily-returns?days=14`).then(r => r.json()).catch(() => []),
@@ -64,6 +65,15 @@ export default function PublicDashboardPage() {
     }, 5000);
     return () => clearInterval(timer);
   }, [news.length, newsExpanded]);
+
+  // AI 분석 롤링 (1번 고정, 2~3번 슬롯 순환)
+  useEffect(() => {
+    if (analysis.length <= 3) return;
+    const timer = setInterval(() => {
+      setAnalysisIndex((prev) => (prev + 1) % (analysis.length - 1));
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [analysis.length]);
 
   if (loading) return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: 16 }}>
@@ -206,26 +216,41 @@ export default function PublicDashboardPage() {
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24, alignItems: "start" }}>
-        {/* AI 분석 */}
+        {/* AI 분석 — 1번 고정 + 2~3번 롤링 */}
         <div className="card">
           <div className="card-title">AI 시장 분석</div>
           {analysis.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {analysis.map((a: any, i: number) => (
-                <div key={i} style={{
-                  padding: 12, borderRadius: 8,
-                  background: i === 0 ? "rgba(74, 158, 255, 0.06)" : "transparent",
-                  border: i === 0 ? "1px solid rgba(74, 158, 255, 0.12)" : "none",
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                    <span className={`badge ${a.market_state === "bullish" ? "badge-green" : a.market_state === "bearish" ? "badge-red" : "badge-yellow"}`}>
-                      {getMarketStateKR(a.market_state)}
-                    </span>
-                    <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{formatDateTime(a.timestamp)}</span>
+              {(() => {
+                // 1번: 항상 최신 (index 0)
+                // 2번, 3번: 순환 (index 1~6에서 2개씩)
+                const slots = [analysis[0]];
+                if (analysis.length > 1) {
+                  const pool = analysis.slice(1);
+                  const idx2 = analysisIndex % pool.length;
+                  const idx3 = (analysisIndex + 1) % pool.length;
+                  slots.push(pool[idx2]);
+                  if (pool.length > 1) slots.push(pool[idx3]);
+                }
+                return slots.map((a: any, i: number) => (
+                  <div key={`${i}-${a?.timestamp}`} className={i > 0 ? "news-item" : ""} style={{
+                    padding: 12, borderRadius: 8,
+                    background: i === 0 ? "rgba(37, 99, 235, 0.06)" : "transparent",
+                    border: i === 0 ? "1px solid rgba(37, 99, 235, 0.15)" : "none",
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <span className={`badge ${a.market_state === "bullish" ? "badge-green" : a.market_state === "bearish" ? "badge-red" : "badge-yellow"}`}>
+                          {getMarketStateKR(a.market_state)}
+                        </span>
+                        {i === 0 && <span style={{ fontSize: 9, color: "var(--accent-blue)", fontWeight: 600 }}>LATEST</span>}
+                      </div>
+                      <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{formatDateTime(a.timestamp)}</span>
+                    </div>
+                    <div style={{ fontSize: 13, lineHeight: 1.7, color: i === 0 ? "var(--text-primary)" : "var(--text-muted)" }}>{a.summary}</div>
                   </div>
-                  <div style={{ fontSize: 13, lineHeight: 1.7, color: i === 0 ? "var(--text-primary)" : "var(--text-muted)" }}>{a.summary}</div>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
           ) : <div className="empty-state">분석 데이터 없음</div>}
         </div>

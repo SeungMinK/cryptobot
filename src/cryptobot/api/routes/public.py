@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/public", tags=["public"])
 
 # Rate limit (IP당 30회/분)
 _rate_limits: dict[str, list[float]] = defaultdict(list)
-RATE_LIMIT = 30
+RATE_LIMIT = 100
 RATE_WINDOW = 60
 
 

@@ -161,7 +161,7 @@ export default function PublicDashboardPage() {
               from { opacity: 0; transform: translateY(12px); }
               to { opacity: 1; transform: translateY(0); }
             }
-            .analysis-enter-1 { animation: fadeSlideIn 0.6s ease-out; }
+            .analysis-enter-1 { animation: fadeSlideIn 0.8s ease-out; }
             .analysis-enter-2 { animation: fadeSlideIn 1.0s ease-out 1.2s both; }
           `}</style>
 

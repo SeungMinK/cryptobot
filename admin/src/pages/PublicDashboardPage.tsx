@@ -142,22 +142,24 @@ export default function PublicDashboardPage() {
         </div>
       )}
 
-      {/* 배너 */}
+      {/* GitHub 배너 */}
       <a href="https://github.com/SeungMinK/cryptobot" target="_blank" rel="noopener noreferrer" style={{
-        display: "block", marginBottom: 24, padding: "16px 24px", borderRadius: 12,
-        background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
-        color: "#ffffff", textDecoration: "none", border: "1px solid #475569",
+        display: "block", marginBottom: 24, padding: "18px 24px", borderRadius: 12,
+        background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #312e81 100%)",
+        color: "#ffffff", textDecoration: "none",
+        boxShadow: "0 4px 16px rgba(15, 23, 42, 0.15)",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>CryptoBot — Open Source</div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
-              AI 기반 자동매매 봇 · {strategies.length}개 전략 · Claude AI 시장분석 · 실시간 성과 공개
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>100% 오픈소스 · 직접 만든 AI 트레이딩 봇</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
+              Claude AI 시장분석 · {strategies.length}개 매매 전략 · 실시간 파라미터 자동 조절 · Python + React
             </div>
           </div>
           <div style={{
-            padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-            background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
+            padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+            background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)",
+            whiteSpace: "nowrap",
           }}>GitHub →</div>
         </div>
       </a>
@@ -184,6 +186,28 @@ export default function PublicDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* 블로그 배너 */}
+      <a href="https://seung-min.tistory.com/61" target="_blank" rel="noopener noreferrer" style={{
+        display: "block", marginBottom: 24, padding: "18px 24px", borderRadius: 12,
+        background: "linear-gradient(135deg, #059669 0%, #0d9488 50%, #0891b2 100%)",
+        color: "#ffffff", textDecoration: "none",
+        boxShadow: "0 4px 16px rgba(5, 150, 105, 0.15)",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>개발 과정이 궁금하다면?</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+              AI 트레이딩 봇을 만들면서 겪은 시행착오, 버그 수정, 수익률 개선기를 블로그에 기록합니다
+            </div>
+          </div>
+          <div style={{
+            padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+            background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)",
+            whiteSpace: "nowrap",
+          }}>Blog →</div>
+        </div>
+      </a>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 16, marginBottom: 24 }}>
         {/* AI 분석 */}

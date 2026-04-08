@@ -44,13 +44,18 @@ def get_public_summary(request: Request):
         SELECT
             COUNT(*) as total_sells,
             SUM(CASE WHEN profit_krw > 0 THEN 1 ELSE 0 END) as wins,
-            ROUND(AVG(profit_pct), 2) as avg_profit_pct
+            ROUND(AVG(profit_pct), 2) as avg_profit_pct,
+            ROUND(AVG(CASE WHEN profit_pct > 0 THEN profit_pct END), 2) as avg_win_pct,
+            ROUND(AVG(CASE WHEN profit_pct <= 0 THEN profit_pct END), 2) as avg_loss_pct
         FROM trades WHERE side = 'sell'
+        AND (trigger_reason IS NULL OR trigger_reason NOT LIKE '[BUG]%')
         """
     ).fetchone()
     r = dict(row) if row else {}
     total = r.get("total_sells", 0) or 0
     wins = r.get("wins", 0) or 0
+    avg_win = r.get("avg_win_pct") or 0
+    avg_loss = abs(r.get("avg_loss_pct") or 0)
 
     # 오늘 성과
     today_row = db.execute(
@@ -66,10 +71,15 @@ def get_public_summary(request: Request):
     today_sells = t.get("sells", 0) or 0
     today_wins = t.get("wins", 0) or 0
 
+    rr_ratio = round(avg_loss / avg_win, 1) if avg_win > 0 else 0
+
     return {
         "total_trades": total,
         "win_rate": round(wins / total * 100, 1) if total > 0 else 0,
         "avg_profit_pct": r.get("avg_profit_pct", 0) or 0,
+        "avg_win_pct": round(avg_win, 2),
+        "avg_loss_pct": round(-avg_loss, 2),
+        "risk_reward_ratio": rr_ratio,
         "today_trades": today_sells,
         "today_win_rate": round(today_wins / today_sells * 100, 1) if today_sells > 0 else 0,
         "today_avg_pct": t.get("avg_pct", 0) or 0,

@@ -100,11 +100,13 @@ export default function PublicDashboardPage() {
               <div style={{ fontSize: 11, color: "var(--text-muted)" }}>오늘 {summary.today_win_rate.toFixed(0)}%</div>
             </div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>평균 수익률</div>
-              <div style={{ fontSize: 28, fontWeight: 700 }} className={summary.avg_profit_pct >= 0 ? "positive" : "negative"}>
-                {formatPercent(summary.avg_profit_pct)}
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>손익비</div>
+              <div style={{ fontSize: 28, fontWeight: 700 }}>
+                {summary.risk_reward_ratio ? `1:${summary.risk_reward_ratio}` : "-"}
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>오늘 {formatPercent(summary.today_avg_pct)}</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                승 {formatPercent(summary.avg_win_pct || 0)} / 패 {formatPercent(summary.avg_loss_pct || 0)}
+              </div>
             </div>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>총 거래</div>

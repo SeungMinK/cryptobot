@@ -92,7 +92,7 @@ export default function PublicDashboardPage() {
         </div>
 
         {summary && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginTop: 24 }}>
+          <div className="kpi-grid" style={{ marginTop: 24, marginBottom: 0 }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>전체 승률</div>
               <div style={{ fontSize: 28, fontWeight: 700 }} className={summary.win_rate >= 50 ? "positive" : "negative"}>
@@ -209,7 +209,7 @@ export default function PublicDashboardPage() {
         </div>
       </a>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 16, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 16, marginBottom: 24 }}>
         {/* AI 분석 */}
         <div className="card">
           <div className="card-title">AI 시장 분석</div>

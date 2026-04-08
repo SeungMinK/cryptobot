@@ -415,3 +415,19 @@ input:focus, select:focus {
 /* Colors */
 .positive { color: var(--accent-green); }
 .negative { color: var(--accent-red); }
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .main-content { margin-left: 0; padding: 16px; }
+  .sidebar { display: none; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr; }
+  .strategy-grid { grid-template-columns: 1fr; }
+  .page-header h1 { font-size: 20px; }
+  .kpi-value { font-size: 20px; }
+  .filters-bar { flex-direction: column; }
+  .modal-content, .modal { width: 95vw; padding: 16px; }
+  .login-box { width: 90vw; padding: 24px; }
+  td, th { padding: 8px 6px; font-size: 12px; }
+}

@@ -177,13 +177,12 @@ export default function PublicDashboardPage() {
               position: "absolute", top: 44, left: 0, right: 0, zIndex: 20,
               background: "#ffffff", border: "1px solid var(--border)", borderRadius: 12,
               boxShadow: "0 12px 40px rgba(0,0,0,0.12)",
-              maxHeight: 320, overflowY: "auto",
             }}>
-              {news.map((n: any, i: number) => (
+              {news.slice(0, 10).map((n: any, i: number) => (
                 <a key={i} href={n.url} target="_blank" rel="noopener noreferrer" style={{
                   display: "flex", alignItems: "flex-start", gap: 10,
                   padding: "10px 16px", textDecoration: "none", color: "inherit",
-                  borderBottom: i < news.length - 1 ? "1px solid var(--border)" : "none",
+                  borderBottom: i < Math.min(news.length, 10) - 1 ? "1px solid var(--border)" : "none",
                   transition: "background 0.15s",
                 }} onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
@@ -264,25 +263,25 @@ export default function PublicDashboardPage() {
         ) : <div className="empty-state">매매 내역 없음</div>}
       </div>
 
-      {/* GitHub 배너 */}
-      <a href="https://github.com/SeungMinK/cryptobot" target="_blank" rel="noopener noreferrer" style={{
+      {/* 블로그 배너 */}
+      <a href="https://seung-min.tistory.com/61" target="_blank" rel="noopener noreferrer" style={{
         display: "block", marginBottom: 24, padding: "18px 24px", borderRadius: 12,
-        background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #312e81 100%)",
+        background: "linear-gradient(135deg, #059669 0%, #0d9488 50%, #0891b2 100%)",
         color: "#ffffff", textDecoration: "none",
-        boxShadow: "0 4px 16px rgba(15, 23, 42, 0.15)",
+        boxShadow: "0 4px 16px rgba(5, 150, 105, 0.15)",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>100% 오픈소스 · 직접 만든 AI 트레이딩 봇</div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
-              Claude AI 시장분석 · {strategies.length}개 매매 전략 · 실시간 파라미터 자동 조절 · Python + React
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>개발 과정이 궁금하다면?</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+              AI 트레이딩 봇을 만들면서 겪은 시행착오, 버그 수정, 수익률 개선기를 블로그에 기록합니다
             </div>
           </div>
           <div style={{
             padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600,
-            background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)",
+            background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)",
             whiteSpace: "nowrap",
-          }}>GitHub →</div>
+          }}>Blog →</div>
         </div>
       </a>
 
@@ -309,25 +308,25 @@ export default function PublicDashboardPage() {
         </div>
       )}
 
-      {/* 블로그 배너 */}
-      <a href="https://seung-min.tistory.com/61" target="_blank" rel="noopener noreferrer" style={{
+      {/* GitHub 배너 */}
+      <a href="https://github.com/SeungMinK/cryptobot" target="_blank" rel="noopener noreferrer" style={{
         display: "block", marginBottom: 24, padding: "18px 24px", borderRadius: 12,
-        background: "linear-gradient(135deg, #059669 0%, #0d9488 50%, #0891b2 100%)",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #312e81 100%)",
         color: "#ffffff", textDecoration: "none",
-        boxShadow: "0 4px 16px rgba(5, 150, 105, 0.15)",
+        boxShadow: "0 4px 16px rgba(15, 23, 42, 0.15)",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>개발 과정이 궁금하다면?</div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
-              AI 트레이딩 봇을 만들면서 겪은 시행착오, 버그 수정, 수익률 개선기를 블로그에 기록합니다
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>100% 오픈소스 · 직접 만든 AI 트레이딩 봇</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
+              Claude AI 시장분석 · {strategies.length}개 매매 전략 · 실시간 파라미터 자동 조절 · Python + React
             </div>
           </div>
           <div style={{
             padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600,
-            background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)",
+            background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)",
             whiteSpace: "nowrap",
-          }}>Blog →</div>
+          }}>GitHub →</div>
         </div>
       </a>
 

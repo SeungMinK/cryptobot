@@ -35,22 +35,21 @@ a:hover { text-decoration: underline; }
 
 .sidebar {
   width: 220px;
-  background: #1e293b;
-  border-right: none;
+  background: #ffffff;
+  border-right: 1px solid var(--border);
   padding: 20px 0;
   position: fixed;
   top: 0; left: 0; bottom: 0;
   display: flex;
   flex-direction: column;
-  color: #e2e8f0;
 }
 
 .sidebar-logo {
   padding: 4px 20px 20px;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid var(--border);
   font-size: 18px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--accent-blue);
 }
 
 .sidebar-nav { flex: 1; padding: 12px 0; }
@@ -60,33 +59,34 @@ a:hover { text-decoration: underline; }
   align-items: center;
   gap: 10px;
   padding: 10px 20px;
-  color: #94a3b8;
+  color: var(--text-secondary);
   font-size: 14px;
   transition: all 0.2s;
 }
 
 .sidebar-link:hover {
-  background: rgba(255,255,255,0.08);
-  color: #ffffff;
+  background: var(--bg-hover);
+  color: var(--text-primary);
   text-decoration: none;
 }
 
 .sidebar-link.active {
-  color: #ffffff;
-  background: rgba(37, 99, 235, 0.25);
-  border-right: 3px solid #3b82f6;
+  color: var(--accent-blue);
+  background: #eff6ff;
+  border-right: 3px solid var(--accent-blue);
+  font-weight: 600;
 }
 
 .sidebar-footer {
   padding: 16px 20px;
-  border-top: 1px solid rgba(255,255,255,0.1);
+  border-top: 1px solid var(--border);
 }
 
 .sidebar-footer button {
   background: none; border: none;
-  color: #94a3b8; cursor: pointer; font-size: 13px;
+  color: var(--text-secondary); cursor: pointer; font-size: 13px;
 }
-.sidebar-footer button:hover { color: #ffffff; }
+.sidebar-footer button:hover { color: var(--text-primary); }
 
 .main-content {
   margin-left: 220px;

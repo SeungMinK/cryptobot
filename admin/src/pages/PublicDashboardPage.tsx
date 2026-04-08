@@ -167,7 +167,7 @@ export default function PublicDashboardPage() {
         </div>
       )}
 
-      <div className="grid-2" style={{ marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 16, marginBottom: 24 }}>
         {/* AI 분석 */}
         <div className="card">
           <div className="card-title">AI 시장 분석</div>
@@ -197,12 +197,12 @@ export default function PublicDashboardPage() {
           <div className="card-title">포트폴리오 비중</div>
           {portfolio.length > 0 ? (
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <ResponsiveContainer width="55%" height={180}>
+              <ResponsiveContainer width="60%" height={220}>
                 <PieChart>
                   <Pie data={portfolio.map((p: any) => ({ name: p.coin?.replace("KRW-", ""), value: p.weight_pct }))}
-                    cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value"
-                    label={({ name, value }: any) => `${name} ${value}%`} labelLine={false}
-                    style={{ fontSize: 10 }}
+                    cx="50%" cy="50%" innerRadius={40} outerRadius={70} dataKey="value"
+                    label={({ name, value }: any) => `${name} ${value}%`} labelLine={true}
+                    style={{ fontSize: 11 }}
                   >
                     {portfolio.map((_: any, i: number) => (
                       <Cell key={i} fill={["#4a9eff", "#6366f1", "#34d399", "#f59e0b", "#f87171", "#a78bfa", "#ec4899", "#06b6d4"][i % 8]} />

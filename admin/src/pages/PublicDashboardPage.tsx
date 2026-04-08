@@ -101,13 +101,11 @@ export default function PublicDashboardPage() {
               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>오늘 {summary.today_win_rate.toFixed(0)}%</div>
             </div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>손익비</div>
-              <div style={{ fontSize: 28, fontWeight: 700 }}>
-                {summary.risk_reward_ratio ? `1:${summary.risk_reward_ratio}` : "-"}
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>평균 수익률</div>
+              <div style={{ fontSize: 28, fontWeight: 700 }} className={summary.avg_profit_pct >= 0 ? "positive" : "negative"}>
+                {formatPercent(summary.avg_profit_pct)}
               </div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-                승 {formatPercent(summary.avg_win_pct || 0)} / 패 {formatPercent(summary.avg_loss_pct || 0)}
-              </div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>오늘 {formatPercent(summary.today_avg_pct)}</div>
             </div>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>총 거래</div>
@@ -143,6 +141,26 @@ export default function PublicDashboardPage() {
           </ResponsiveContainer>
         </div>
       )}
+
+      {/* 배너 */}
+      <a href="https://github.com/SeungMinK/cryptobot" target="_blank" rel="noopener noreferrer" style={{
+        display: "block", marginBottom: 24, padding: "16px 24px", borderRadius: 12,
+        background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
+        color: "#ffffff", textDecoration: "none", border: "1px solid #475569",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>CryptoBot — Open Source</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+              AI 기반 자동매매 봇 · {strategies.length}개 전략 · Claude AI 시장분석 · 실시간 성과 공개
+            </div>
+          </div>
+          <div style={{
+            padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+            background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
+          }}>GitHub →</div>
+        </div>
+      </a>
 
       {/* 일별 성과 테이블 */}
       {dailyReturns.length > 0 && (
@@ -337,30 +355,6 @@ export default function PublicDashboardPage() {
           </div>
         </div>
       )}
-
-      {/* 배너 */}
-      <a href="https://github.com/SeungMinK/cryptobot" target="_blank" rel="noopener noreferrer" style={{
-        display: "block", marginBottom: 24, padding: "16px 24px", borderRadius: 12,
-        background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
-        color: "#ffffff", textDecoration: "none",
-        border: "1px solid #475569",
-        transition: "all 0.2s",
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>CryptoBot — Open Source</div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
-              AI 기반 자동매매 봇 · 10개 전략 · Claude AI 시장분석 · 실시간 성과 공개
-            </div>
-          </div>
-          <div style={{
-            padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-            background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
-          }}>
-            GitHub →
-          </div>
-        </div>
-      </a>
 
       {/* 푸터 */}
       <div style={{ textAlign: "center", padding: "24px 0 8px", color: "var(--text-muted)", fontSize: 11 }}>

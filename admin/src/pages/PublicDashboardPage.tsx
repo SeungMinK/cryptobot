@@ -28,7 +28,6 @@ export default function PublicDashboardPage() {
   const [newsExpanded, setNewsExpanded] = useState(false);
   const [newsIndex, setNewsIndex] = useState(0);
   const [analysisIndex, setAnalysisIndex] = useState(0);
-  const [showAllCoins, setShowAllCoins] = useState(false);
 
   const fetchAll = useCallback(() => {
     const base = API.replace(/\/api$/, "");
@@ -72,7 +71,7 @@ export default function PublicDashboardPage() {
     if (analysis.length <= 3) return;
     const timer = setInterval(() => {
       setAnalysisIndex((prev) => (prev + 1) % (analysis.length - 1));
-    }, 5000);
+    }, 12000);
     return () => clearInterval(timer);
   }, [analysis.length]);
 
@@ -157,7 +156,10 @@ export default function PublicDashboardPage() {
         <div style={{ marginBottom: 12, position: "relative" }}>
           <style>{`
             @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+            @keyframes slideOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-100%); opacity: 0; } }
+            @keyframes slideIn { from { transform: translateY(50%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
             .news-item { animation: slideUp 0.5s ease-out; }
+            .analysis-enter { animation: slideIn 0.6s ease-out; }
           `}</style>
 
           {/* 한줄 티커 — 고정 높이, 연한 블루 배경 */}
@@ -217,14 +219,12 @@ export default function PublicDashboardPage() {
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24, alignItems: "stretch" }}>
-        {/* AI 분석 — 1번 고정 + 2~3번 롤링 */}
-        <div className="card">
+        {/* AI 분석 — 1번 고정 + 2~3번 롤링, 시장 상태 배경색 */}
+        <div className="card" style={{ display: "flex", flexDirection: "column" }}>
           <div className="card-title">AI 시장 분석</div>
           {analysis.length > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
               {(() => {
-                // 1번: 항상 최신 (index 0)
-                // 2번, 3번: 순환 (index 1~6에서 2개씩)
                 const slots = [analysis[0]];
                 if (analysis.length > 1) {
                   const pool = analysis.slice(1);
@@ -233,22 +233,36 @@ export default function PublicDashboardPage() {
                   slots.push(pool[idx2]);
                   if (pool.length > 1) slots.push(pool[idx3]);
                 }
+                const stateColor = (state: string) =>
+                  state === "bullish" ? "#f0fdf4" : state === "bearish" ? "#fef2f2" : "#fffbeb";
+                const stateBorder = (state: string) =>
+                  state === "bullish" ? "#bbf7d0" : state === "bearish" ? "#fecaca" : "#fde68a";
                 return slots.map((a: any, i: number) => (
-                  <div key={`${i}-${a?.timestamp}`} className={i > 0 ? "news-item" : ""} style={{
-                    padding: 12, borderRadius: 8,
-                    background: i === 0 ? "rgba(37, 99, 235, 0.06)" : "transparent",
-                    border: i === 0 ? "1px solid rgba(37, 99, 235, 0.15)" : "none",
+                  <div key={`${i}-${a?.timestamp}`} className={i > 0 ? "analysis-enter" : ""} style={{
+                    borderBottom: i < slots.length - 1 ? "2px solid #334155" : "none",
                   }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    {/* 제목 한줄 — 시장 상태 배경색 */}
+                    <div style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "8px 12px",
+                      background: stateColor(a.market_state),
+                      borderLeft: `3px solid ${stateBorder(a.market_state)}`,
+                    }}>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                         <span className={`badge ${a.market_state === "bullish" ? "badge-green" : a.market_state === "bearish" ? "badge-red" : "badge-yellow"}`}>
                           {getMarketStateKR(a.market_state)}
                         </span>
-                        {i === 0 && <span style={{ fontSize: 9, color: "var(--accent-blue)", fontWeight: 600 }}>LATEST</span>}
+                        {i === 0 && <span style={{ fontSize: 9, color: "var(--accent-blue)", fontWeight: 700 }}>LATEST</span>}
                       </div>
                       <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{formatDateTime(a.timestamp)}</span>
                     </div>
-                    <div style={{ fontSize: 13, lineHeight: 1.7, color: i === 0 ? "var(--text-primary)" : "var(--text-muted)" }}>{a.summary}</div>
+                    {/* 본문 — 흰색 배경 */}
+                    <div style={{
+                      padding: "10px 12px",
+                      fontSize: 13, lineHeight: 1.7,
+                      fontWeight: i === 0 ? 600 : 400,
+                      color: i === 0 ? "var(--text-primary)" : "var(--text-muted)",
+                    }}>{a.summary}</div>
                   </div>
                 ));
               })()}
@@ -294,22 +308,8 @@ export default function PublicDashboardPage() {
           {/* 모니터링 코인 */}
           {monitoringCoins.length > 0 && (
             <div className="card" style={{ flex: 1 }}>
-              <div className="card-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span>모니터링 중 ({monitoringCoins.length}개)</span>
-                {monitoringCoins.length > 12 && (
-                  <button onClick={() => setShowAllCoins(!showAllCoins)} style={{
-                    background: "none", border: "none", cursor: "pointer",
-                    fontSize: 22, color: "#6b7fa3", lineHeight: 1,
-                    transform: showAllCoins ? "rotate(-90deg)" : "rotate(90deg)",
-                    transition: "transform 0.3s",
-                  }}>›</button>
-                )}
-              </div>
-              <div style={{
-                display: "flex", flexWrap: "wrap", gap: 6,
-                maxHeight: showAllCoins ? 200 : 80, overflowY: showAllCoins ? "auto" : "hidden",
-                overflowX: "hidden", transition: "max-height 0.3s",
-              }}>
+              <div className="card-title">모니터링 중 ({monitoringCoins.length}개)</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {monitoringCoins.map((c: any) => (
                   <div key={c.coin} style={{
                     padding: "5px 10px", borderRadius: 8, fontSize: 11,

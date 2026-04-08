@@ -19,7 +19,7 @@ export default function PublicDashboardPage() {
   const [monitoringCoins, setMonitoringCoins] = useState<any[]>([]);
   const [strategies, setStrategies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAllTrades, setShowAllTrades] = useState(false);
+  const [showAllTrades, setShowAllTrades] = useState(true);
   const [tradeFilter, setTradeFilter] = useState<string | null>(null);
   const [showAllDaily, setShowAllDaily] = useState(false);
   const [newsExpanded, setNewsExpanded] = useState(false);

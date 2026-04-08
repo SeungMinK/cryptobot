@@ -55,6 +55,15 @@ export default function PublicDashboardPage() {
     return () => clearInterval(interval);
   }, [fetchAll]);
 
+  // 뉴스 자동 롤링 (모든 훅은 early return 전에)
+  useEffect(() => {
+    if (news.length <= 1 || newsExpanded) return;
+    const timer = setInterval(() => {
+      setNewsIndex((prev) => (prev + 1) % news.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [news.length, newsExpanded]);
+
   if (loading) return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: 16 }}>
       <div style={{ display: "flex", gap: 6 }}>
@@ -87,15 +96,6 @@ export default function PublicDashboardPage() {
     ...d,
     cumulative: dailyReturns.slice(0, i + 1).reduce((s: number, x: any) => s + (x.daily_pnl_pct || 0), 0),
   }));
-
-  // 뉴스 자동 롤링
-  useEffect(() => {
-    if (news.length <= 1 || newsExpanded) return;
-    const timer = setInterval(() => {
-      setNewsIndex((prev) => (prev + 1) % news.length);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [news.length, newsExpanded]);
 
   return (
     <div>

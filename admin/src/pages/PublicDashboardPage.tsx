@@ -156,10 +156,12 @@ export default function PublicDashboardPage() {
         <div style={{ marginBottom: 12, position: "relative" }}>
           <style>{`
             @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-            @keyframes slideOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-100%); opacity: 0; } }
-            @keyframes slideIn { from { transform: translateY(50%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
             .news-item { animation: slideUp 0.5s ease-out; }
-            .analysis-enter { animation: slideIn 0.6s ease-out; }
+            @keyframes fadeSlideIn {
+              from { opacity: 0; transform: translateY(12px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            .analysis-enter { animation: fadeSlideIn 0.8s ease-out; }
           `}</style>
 
           {/* 한줄 티커 — 고정 높이, 연한 블루 배경 */}
@@ -239,14 +241,14 @@ export default function PublicDashboardPage() {
                   state === "bullish" ? "#bbf7d0" : state === "bearish" ? "#fecaca" : "#fde68a";
                 return slots.map((a: any, i: number) => (
                   <div key={`${i}-${a?.timestamp}`} className={i > 0 ? "analysis-enter" : ""} style={{
-                    borderBottom: i < slots.length - 1 ? "2px solid #334155" : "none",
+                    borderRadius: 10, overflow: "hidden", marginBottom: i < slots.length - 1 ? 10 : 0,
+                    border: `1px solid ${stateBorder(a.market_state)}`,
                   }}>
                     {/* 제목 한줄 — 시장 상태 배경색 */}
                     <div style={{
                       display: "flex", justifyContent: "space-between", alignItems: "center",
                       padding: "8px 12px",
                       background: stateColor(a.market_state),
-                      borderLeft: `3px solid ${stateBorder(a.market_state)}`,
                     }}>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                         <span className={`badge ${a.market_state === "bullish" ? "badge-green" : a.market_state === "bearish" ? "badge-red" : "badge-yellow"}`}>
@@ -256,9 +258,9 @@ export default function PublicDashboardPage() {
                       </div>
                       <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{formatDateTime(a.timestamp)}</span>
                     </div>
-                    {/* 본문 — 흰색 배경 */}
+                    {/* 본문 */}
                     <div style={{
-                      padding: "10px 12px",
+                      padding: "10px 12px", background: "#ffffff",
                       fontSize: 13, lineHeight: 1.7,
                       fontWeight: i === 0 ? 600 : 400,
                       color: i === 0 ? "var(--text-primary)" : "var(--text-muted)",
@@ -362,7 +364,7 @@ export default function PublicDashboardPage() {
           )}
         </div>
         {trades.length > 0 ? (
-          <div style={{ overflowY: showAllTrades ? "auto" : "visible", maxHeight: showAllTrades ? 360 : "none", overflowX: "hidden" }}>
+          <div style={{ overflowY: showAllTrades ? "auto" : "hidden", maxHeight: showAllTrades ? 240 : 240, overflowX: "hidden" }}>
             <table style={{ width: "100%", tableLayout: "fixed" }}>
               <colgroup>
                 <col style={{ width: "18%" }} />
@@ -428,7 +430,7 @@ export default function PublicDashboardPage() {
               }}>›</button>
             )}
           </div>
-          <div style={{ overflowY: showAllDaily ? "auto" : "visible", maxHeight: showAllDaily ? 360 : "none", overflowX: "hidden" }}>
+          <div style={{ overflowY: showAllDaily ? "auto" : "hidden", maxHeight: showAllDaily ? 200 : 200, overflowX: "hidden" }}>
             <table style={{ width: "100%", tableLayout: "fixed" }}>
               <colgroup>
                 <col style={{ width: "30%" }} />

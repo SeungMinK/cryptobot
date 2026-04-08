@@ -457,42 +457,82 @@ export default function PublicDashboardPage() {
         </div>
       )}
 
-      {/* 매매 전략 + 성과 */}
-      {strategies.length > 0 && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-title">매매 전략 ({strategies.length}개)</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: 12 }}>
-            {strategies.map((s: any) => {
-              const stat = strategyStats.find((ss: any) => ss.strategy === s.name);
-              return (
-                <div key={s.name} style={{
-                  padding: 14, borderRadius: 10, background: "#f8fafc",
-                  border: s.is_active ? "2px solid var(--accent-blue)" : "1px solid var(--border)",
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ fontWeight: 700, fontSize: 14 }}>{s.display_name}</span>
-                    {s.is_active && <span className="badge badge-blue" style={{ fontSize: 9 }}>활성</span>}
+      {/* 매매 전략 */}
+      {strategies.length > 0 && (() => {
+        const active = strategies.find((s: any) => s.is_active);
+        const activeStat = active ? strategyStats.find((ss: any) => ss.strategy === active.name) : null;
+        const others = strategies.filter((s: any) => !s.is_active);
+        return (
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="card-title">매매 전략</div>
+
+            {/* 현재 활성 전략 — 강조 카드 */}
+            {active && (
+              <div style={{
+                padding: 16, borderRadius: 12, marginBottom: 16,
+                background: "linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)",
+                border: "1px solid #bfdbfe",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px rgba(34,197,94,0.5)" }} />
+                    <span style={{ fontWeight: 700, fontSize: 16 }}>{active.display_name}</span>
+                    <span style={{ fontSize: 10, color: "#22c55e", fontWeight: 600 }}>운영 중</span>
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5, marginBottom: 8 }}>{s.description}</div>
-                  {stat ? (
-                    <div style={{ display: "flex", gap: 12, fontSize: 12, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
-                      <span>{stat.trades}건</span>
-                      <span className={stat.win_rate >= 50 ? "positive" : "negative"} style={{ fontWeight: 600 }}>승률 {stat.win_rate}%</span>
-                      <span className={stat.avg_pct >= 0 ? "positive" : "negative"}>{formatPercent(stat.avg_pct)}</span>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", borderTop: "1px solid var(--border)", paddingTop: 8 }}>매매 기록 없음</div>
-                  )}
-                  <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
-                    <span className="badge badge-purple" style={{ fontSize: 9 }}>{s.category}</span>
-                    <span className="badge badge-yellow" style={{ fontSize: 9 }}>{s.difficulty}</span>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <span className="badge badge-purple" style={{ fontSize: 9 }}>{active.category}</span>
+                    <span className="badge badge-yellow" style={{ fontSize: 9 }}>{active.difficulty}</span>
                   </div>
                 </div>
-              );
-            })}
+                <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: 10 }}>{active.description}</div>
+                {activeStat && (
+                  <div style={{ display: "flex", gap: 20, fontSize: 13 }}>
+                    <div>
+                      <span style={{ color: "var(--text-muted)", fontSize: 11 }}>거래 </span>
+                      <span style={{ fontWeight: 700 }}>{activeStat.trades}건</span>
+                    </div>
+                    <div>
+                      <span style={{ color: "var(--text-muted)", fontSize: 11 }}>승률 </span>
+                      <span style={{ fontWeight: 700 }} className={activeStat.win_rate >= 50 ? "positive" : "negative"}>{activeStat.win_rate}%</span>
+                    </div>
+                    <div>
+                      <span style={{ color: "var(--text-muted)", fontSize: 11 }}>평균 </span>
+                      <span style={{ fontWeight: 700 }} className={activeStat.avg_pct >= 0 ? "positive" : "negative"}>{formatPercent(activeStat.avg_pct)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 나머지 전략 — 컴팩트 리스트 */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
+              {others.map((s: any) => {
+                const stat = strategyStats.find((ss: any) => ss.strategy === s.name);
+                return (
+                  <div key={s.name} style={{
+                    padding: "10px 12px", borderRadius: 8,
+                    background: "#f8fafc", border: "1px solid var(--border)",
+                  }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 3 }}>{s.display_name}</div>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 6 }}>{s.description.slice(0, 40)}{s.description.length > 40 ? "..." : ""}</div>
+                    <div style={{ display: "flex", gap: 8, fontSize: 11 }}>
+                      {stat ? (
+                        <>
+                          <span>{stat.trades}건</span>
+                          <span className={stat.win_rate >= 50 ? "positive" : "negative"} style={{ fontWeight: 600 }}>{stat.win_rate}%</span>
+                        </>
+                      ) : (
+                        <span style={{ color: "var(--text-muted)" }}>대기 중</span>
+                      )}
+                      <span className="badge badge-purple" style={{ fontSize: 8 }}>{s.category}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 누적 수익률 차트 (하단 위치) */}
       {cumData.length > 1 && (

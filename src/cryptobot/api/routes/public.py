@@ -169,7 +169,7 @@ def get_public_analysis(request: Request, limit: int = Query(3, ge=1, le=10)):
 
 
 @router.get("/news")
-def get_public_news(request: Request, limit: int = Query(10, ge=1, le=30)):
+def get_public_news(request: Request, limit: int = Query(20, ge=1, le=50)):
     """최근 뉴스 + F&G — 공개 데이터."""
     if not _check_rate_limit(request):
         return JSONResponse(status_code=429, content={"detail": "Too many requests"})
@@ -221,3 +221,79 @@ def get_public_daily_returns(request: Request, days: int = Query(30, ge=1, le=90
         d["win_rate"] = round(wins / sells * 100, 1) if sells > 0 else 0
         result.append(d)
     return result
+
+
+@router.get("/monitoring-coins")
+def get_public_monitoring_coins(request: Request):
+    """현재 모니터링 중인 코인 + RSI/시장 상태."""
+    if not _check_rate_limit(request):
+        return JSONResponse(status_code=429, content={"detail": "Too many requests"})
+
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT coin, price, rsi_14, market_state
+        FROM market_snapshots
+        WHERE id IN (SELECT MAX(id) FROM market_snapshots GROUP BY coin)
+        AND timestamp >= datetime('now', '-10 minutes')
+        ORDER BY coin
+        """
+    ).fetchall()
+    return [
+        {
+            "coin": dict(r)["coin"],
+            "price": dict(r)["price"],
+            "rsi": round(dict(r)["rsi_14"], 0) if dict(r)["rsi_14"] else None,
+            "market_state": dict(r)["market_state"],
+        }
+        for r in rows
+    ]
+
+
+@router.get("/strategies")
+def get_public_strategies(request: Request):
+    """사용 가능한 전략 목록 (파라미터 비공개)."""
+    if not _check_rate_limit(request):
+        return JSONResponse(status_code=429, content={"detail": "Too many requests"})
+
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT name, display_name, description, category, market_states,
+            timeframe, difficulty, is_active
+        FROM strategies WHERE is_available = TRUE ORDER BY is_active DESC, name
+        """
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+@router.get("/strategy-stats")
+def get_public_strategy_stats(request: Request):
+    """전략별 성과 — 승률, 평균 수익률."""
+    if not _check_rate_limit(request):
+        return JSONResponse(status_code=429, content={"detail": "Too many requests"})
+
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT strategy,
+            COUNT(*) as trades,
+            SUM(CASE WHEN profit_krw > 0 THEN 1 ELSE 0 END) as wins,
+            ROUND(AVG(profit_pct), 2) as avg_pct
+        FROM trades WHERE side = 'sell'
+        AND trigger_reason NOT LIKE '[BUG]%'
+        GROUP BY strategy ORDER BY trades DESC
+        """
+    ).fetchall()
+
+    return [
+        {
+            "strategy": dict(r)["strategy"],
+            "trades": dict(r)["trades"],
+            "win_rate": round(
+                (dict(r)["wins"] or 0) / dict(r)["trades"] * 100, 1
+            ) if dict(r)["trades"] > 0 else 0,
+            "avg_pct": dict(r)["avg_pct"] or 0,
+        }
+        for r in rows
+    ]

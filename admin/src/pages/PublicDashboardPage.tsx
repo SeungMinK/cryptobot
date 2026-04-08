@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
 } from "recharts";
 import { useAuth } from "../context/AuthContext";
 import { formatPercent, formatDateTime } from "../utils/format";
@@ -234,33 +233,31 @@ export default function PublicDashboardPage() {
           ) : <div className="empty-state">분석 데이터 없음</div>}
         </div>
 
-        {/* 포트폴리오 파이차트 */}
+        {/* 포트폴리오 비중 */}
         <div className="card">
           <div className="card-title">포트폴리오 비중</div>
           {portfolio.length > 0 ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <ResponsiveContainer width="60%" height={220}>
-                <PieChart>
-                  <Pie data={portfolio.map((p: any) => ({ name: p.coin?.replace("KRW-", ""), value: p.weight_pct }))}
-                    cx="50%" cy="50%" innerRadius={40} outerRadius={70} dataKey="value"
-                    label={({ name, value }: any) => `${name} ${value}%`} labelLine={true}
-                    style={{ fontSize: 11 }}
-                  >
-                    {portfolio.map((_: any, i: number) => (
-                      <Cell key={i} fill={["#4a9eff", "#6366f1", "#34d399", "#f59e0b", "#f87171", "#a78bfa", "#ec4899", "#06b6d4"][i % 8]} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {portfolio.map((p: any, i: number) => (
-                  <div key={p.coin} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: 2, background: ["#4a9eff", "#6366f1", "#34d399", "#f59e0b", "#f87171", "#a78bfa", "#ec4899", "#06b6d4"][i % 8] }} />
-                    <span style={{ fontWeight: 600 }}>{p.coin?.replace("KRW-", "")}</span>
-                    <span style={{ color: "var(--text-muted)" }}>{p.weight_pct}%</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {portfolio.map((p: any, i: number) => {
+                const colors = ["#2563eb", "#7c3aed", "#059669", "#d97706", "#dc2626", "#8b5cf6", "#ec4899", "#0891b2"];
+                return (
+                  <div key={p.coin} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontWeight: 600, fontSize: 13, minWidth: 50, color: colors[i % 8] }}>
+                      {p.coin?.replace("KRW-", "")}
+                    </span>
+                    <div style={{ flex: 1, background: "#f1f5f9", borderRadius: 6, height: 22, overflow: "hidden" }}>
+                      <div style={{
+                        width: `${Math.max(p.weight_pct, 4)}%`, background: colors[i % 8],
+                        borderRadius: 6, height: "100%",
+                        display: "flex", alignItems: "center", paddingLeft: 8,
+                      }}>
+                        {p.weight_pct >= 12 && <span style={{ fontSize: 10, color: "#fff", fontWeight: 600 }}>{p.weight_pct}%</span>}
+                      </div>
+                    </div>
+                    {p.weight_pct < 12 && <span style={{ fontSize: 12, fontWeight: 600, color: colors[i % 8], minWidth: 35 }}>{p.weight_pct}%</span>}
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           ) : <div className="empty-state">보유 포지션 없음</div>}
         </div>

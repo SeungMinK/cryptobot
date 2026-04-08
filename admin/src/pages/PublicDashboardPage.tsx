@@ -20,6 +20,7 @@ export default function PublicDashboardPage() {
   const [strategies, setStrategies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAllTrades, setShowAllTrades] = useState(false);
+  const [tradeFilter, setTradeFilter] = useState<string | null>(null);
   const [showAllDaily, setShowAllDaily] = useState(false);
   const [newsExpanded, setNewsExpanded] = useState(false);
   const [newsIndex, setNewsIndex] = useState(0);
@@ -30,7 +31,7 @@ export default function PublicDashboardPage() {
     const base = API.replace(/\/api$/, "");
     Promise.all([
       fetch(`${base}/api/public/summary`).then(r => r.json()).catch(() => null),
-      fetch(`${base}/api/public/trades?limit=20`).then(r => r.json()).catch(() => []),
+      fetch(`${base}/api/public/trades?limit=100`).then(r => r.json()).catch(() => []),
       fetch(`${base}/api/public/analysis?limit=7`).then(r => r.json()).catch(() => []),
       fetch(`${base}/api/public/news?limit=20`).then(r => r.json()).catch(() => ({ news: [], fear_greed: null })),
       fetch(`${base}/api/public/portfolio`).then(r => r.json()).catch(() => ({ positions: [] })),
@@ -346,7 +347,15 @@ export default function PublicDashboardPage() {
       {/* 최근 매매 */}
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>최근 매매</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span>최근 매매</span>
+            {tradeFilter && (
+              <span style={{ fontSize: 11, color: "var(--accent-blue)", fontWeight: 600, cursor: "pointer" }}
+                onClick={() => setTradeFilter(null)}>
+                {tradeFilter.replace("KRW-", "")} ✕
+              </span>
+            )}
+          </div>
           {trades.length > 5 && (
             <button onClick={() => setShowAllTrades(!showAllTrades)} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -370,17 +379,21 @@ export default function PublicDashboardPage() {
               </colgroup>
               <thead><tr><th>시간</th><th>종목</th><th>방향</th><th>전략</th><th>단가</th><th>수익률</th><th>보유</th></tr></thead>
               <tbody>
-                {(showAllTrades ? trades.slice(0, 50) : trades.slice(0, 5)).map((t: any, i: number) => (
+                {(() => {
+                  const filtered = tradeFilter ? trades.filter((t: any) => t.coin === tradeFilter) : trades;
+                  return (showAllTrades ? filtered.slice(0, 50) : filtered.slice(0, 5)).map((t: any, i: number) => (
                   <tr key={i}>
                     <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{formatDateTime(t.timestamp).replace(/\d{4}\. /, "")}</td>
-                    <td style={{ fontWeight: 600 }}>{t.coin?.replace("KRW-", "")}</td>
+                    <td style={{ fontWeight: 600, cursor: "pointer", color: tradeFilter === t.coin ? "var(--accent-blue)" : "inherit" }}
+                      onClick={() => setTradeFilter(tradeFilter === t.coin ? null : t.coin)}>{t.coin?.replace("KRW-", "")}</td>
                     <td><span className={`badge ${t.side === "buy" ? "badge-green" : "badge-red"}`} style={{ fontSize: 10 }}>{t.side === "buy" ? "매수" : "매도"}</span></td>
                     <td style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.strategy?.replace(/_/g, " ")}</td>
                     <td style={{ fontSize: 11 }}>{t.price ? Number(t.price).toLocaleString() : "-"}</td>
                     <td className={t.profit_pct != null ? (t.profit_pct >= 0 ? "positive" : "negative") : ""} style={{ fontWeight: 600 }}>{t.profit_pct != null ? formatPercent(t.profit_pct) : "-"}</td>
                     <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.hold_minutes != null ? `${t.hold_minutes}분` : "-"}</td>
                   </tr>
-                ))}
+                ));
+                })()}
               </tbody>
             </table>
           </div>

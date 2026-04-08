@@ -87,7 +87,7 @@ def get_public_summary(request: Request):
 
 
 @router.get("/trades")
-def get_public_trades(request: Request, limit: int = Query(20, ge=1, le=50)):
+def get_public_trades(request: Request, limit: int = Query(20, ge=1, le=100)):
     """최근 매매 — 금액 제거, 비중(%)만."""
     if not _check_rate_limit(request):
         return JSONResponse(status_code=429, content={"detail": "Too many requests"})

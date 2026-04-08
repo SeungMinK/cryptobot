@@ -28,6 +28,7 @@ export default function PublicDashboardPage() {
   const [newsExpanded, setNewsExpanded] = useState(false);
   const [newsIndex, setNewsIndex] = useState(0);
   const [analysisIndex, setAnalysisIndex] = useState(0);
+  const [showAllCoins, setShowAllCoins] = useState(false);
 
   const fetchAll = useCallback(() => {
     const base = API.replace(/\/api$/, "");
@@ -215,7 +216,7 @@ export default function PublicDashboardPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24, alignItems: "stretch" }}>
         {/* AI 분석 — 1번 고정 + 2~3번 롤링 */}
         <div className="card">
           <div className="card-title">AI 시장 분석</div>
@@ -255,31 +256,32 @@ export default function PublicDashboardPage() {
           ) : <div className="empty-state">분석 데이터 없음</div>}
         </div>
 
-        {/* 오른쪽: 포트폴리오 + 모니터링 세로 스택 */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* 오른쪽: 포트폴리오 + 모니터링 — AI분석과 높이 맞춤 */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
           {/* 포트폴리오 비중 — 도넛 차트 */}
-          <div className="card">
+          <div className="card" style={{ flex: 1 }}>
             <div className="card-title">포트폴리오 비중</div>
             {portfolio.length > 0 ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <ResponsiveContainer width="50%" height={160}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <ResponsiveContainer width="55%" height={200}>
                   <PieChart>
                     <Pie
                       data={portfolio.map((p: any) => ({ name: p.coin?.replace("KRW-", ""), value: p.weight_pct }))}
-                      cx="50%" cy="50%" innerRadius={35} outerRadius={60} dataKey="value"
-                      label={({ name, value }: any) => `${name} ${value}%`}
-                      labelLine={true} style={{ fontSize: 10 }}
+                      cx="50%" cy="50%" innerRadius={40} outerRadius={68} dataKey="value"
+                      label={({ name, value }: any) => value >= 5 ? `${name}` : ""}
+                      labelLine={false} style={{ fontSize: 10 }}
                     >
                       {portfolio.map((_: any, i: number) => (
-                        <Cell key={i} fill={["#2563eb", "#7c3aed", "#059669", "#d97706", "#dc2626", "#8b5cf6", "#ec4899", "#0891b2"][i % 8]} />
+                        <Cell key={i} fill={["#94a3b8", "#2563eb", "#7c3aed", "#059669", "#d97706", "#dc2626", "#8b5cf6", "#ec4899", "#0891b2"][i % 9]} />
                       ))}
                     </Pie>
+                    <Tooltip formatter={(value: any) => [`${value}%`, "비중"]} />
                   </PieChart>
                 </ResponsiveContainer>
-                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   {portfolio.map((p: any, i: number) => (
                     <div key={p.coin} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: 2, background: ["#2563eb", "#7c3aed", "#059669", "#d97706", "#dc2626", "#8b5cf6", "#ec4899", "#0891b2"][i % 8] }} />
+                      <div style={{ width: 8, height: 8, borderRadius: 2, flexShrink: 0, background: ["#94a3b8", "#2563eb", "#7c3aed", "#059669", "#d97706", "#dc2626", "#8b5cf6", "#ec4899", "#0891b2"][i % 9] }} />
                       <span style={{ fontWeight: 600 }}>{p.coin?.replace("KRW-", "")}</span>
                       <span style={{ color: "var(--text-muted)" }}>{p.weight_pct}%</span>
                     </div>
@@ -291,9 +293,23 @@ export default function PublicDashboardPage() {
 
           {/* 모니터링 코인 */}
           {monitoringCoins.length > 0 && (
-            <div className="card">
-              <div className="card-title">모니터링 중 ({monitoringCoins.length}개 코인)</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            <div className="card" style={{ flex: 1 }}>
+              <div className="card-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>모니터링 중 ({monitoringCoins.length}개)</span>
+                {monitoringCoins.length > 12 && (
+                  <button onClick={() => setShowAllCoins(!showAllCoins)} style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    fontSize: 22, color: "#6b7fa3", lineHeight: 1,
+                    transform: showAllCoins ? "rotate(-90deg)" : "rotate(90deg)",
+                    transition: "transform 0.3s",
+                  }}>›</button>
+                )}
+              </div>
+              <div style={{
+                display: "flex", flexWrap: "wrap", gap: 6,
+                maxHeight: showAllCoins ? 200 : 80, overflowY: showAllCoins ? "auto" : "hidden",
+                overflowX: "hidden", transition: "max-height 0.3s",
+              }}>
                 {monitoringCoins.map((c: any) => (
                   <div key={c.coin} style={{
                     padding: "5px 10px", borderRadius: 8, fontSize: 11,

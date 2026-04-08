@@ -233,54 +233,57 @@ export default function PublicDashboardPage() {
           ) : <div className="empty-state">분석 데이터 없음</div>}
         </div>
 
-        {/* 포트폴리오 비중 */}
-        <div className="card">
-          <div className="card-title">포트폴리오 비중</div>
-          {portfolio.length > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {portfolio.map((p: any, i: number) => {
-                const colors = ["#2563eb", "#7c3aed", "#059669", "#d97706", "#dc2626", "#8b5cf6", "#ec4899", "#0891b2"];
-                return (
-                  <div key={p.coin} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontWeight: 600, fontSize: 13, minWidth: 50, color: colors[i % 8] }}>
-                      {p.coin?.replace("KRW-", "")}
-                    </span>
-                    <div style={{ flex: 1, background: "#f1f5f9", borderRadius: 6, height: 22, overflow: "hidden" }}>
-                      <div style={{
-                        width: `${Math.max(p.weight_pct, 4)}%`, background: colors[i % 8],
-                        borderRadius: 6, height: "100%",
-                        display: "flex", alignItems: "center", paddingLeft: 8,
-                      }}>
-                        {p.weight_pct >= 12 && <span style={{ fontSize: 10, color: "#fff", fontWeight: 600 }}>{p.weight_pct}%</span>}
+        {/* 오른쪽: 포트폴리오 + 모니터링 세로 스택 */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* 포트폴리오 비중 */}
+          <div className="card">
+            <div className="card-title">포트폴리오 비중</div>
+            {portfolio.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {portfolio.map((p: any, i: number) => {
+                  const colors = ["#2563eb", "#7c3aed", "#059669", "#d97706", "#dc2626", "#8b5cf6", "#ec4899", "#0891b2"];
+                  return (
+                    <div key={p.coin} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontWeight: 600, fontSize: 13, minWidth: 50, color: colors[i % 8] }}>
+                        {p.coin?.replace("KRW-", "")}
+                      </span>
+                      <div style={{ flex: 1, background: "#f1f5f9", borderRadius: 6, height: 22, overflow: "hidden" }}>
+                        <div style={{
+                          width: `${Math.max(p.weight_pct, 4)}%`, background: colors[i % 8],
+                          borderRadius: 6, height: "100%",
+                          display: "flex", alignItems: "center", paddingLeft: 8,
+                        }}>
+                          {p.weight_pct >= 12 && <span style={{ fontSize: 10, color: "#fff", fontWeight: 600 }}>{p.weight_pct}%</span>}
+                        </div>
                       </div>
+                      {p.weight_pct < 12 && <span style={{ fontSize: 12, fontWeight: 600, color: colors[i % 8], minWidth: 35 }}>{p.weight_pct}%</span>}
                     </div>
-                    {p.weight_pct < 12 && <span style={{ fontSize: 12, fontWeight: 600, color: colors[i % 8], minWidth: 35 }}>{p.weight_pct}%</span>}
+                  );
+                })}
+              </div>
+            ) : <div className="empty-state">보유 포지션 없음</div>}
+          </div>
+
+          {/* 모니터링 코인 */}
+          {monitoringCoins.length > 0 && (
+            <div className="card">
+              <div className="card-title">모니터링 중 ({monitoringCoins.length}개 코인)</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {monitoringCoins.map((c: any) => (
+                  <div key={c.coin} style={{
+                    padding: "5px 10px", borderRadius: 8, fontSize: 11,
+                    background: c.market_state === "bullish" ? "#ecfdf5" : c.market_state === "bearish" ? "#fef2f2" : "#f8fafc",
+                    border: `1px solid ${c.market_state === "bullish" ? "#a7f3d0" : c.market_state === "bearish" ? "#fecaca" : "var(--border)"}`,
+                  }}>
+                    <span style={{ fontWeight: 600 }}>{c.coin.replace("KRW-", "")}</span>
+                    {c.rsi && <span style={{ marginLeft: 3, color: "var(--text-muted)", fontSize: 10 }}>RSI {c.rsi}</span>}
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          ) : <div className="empty-state">보유 포지션 없음</div>}
+          )}
         </div>
       </div>
-
-      {/* 모니터링 코인 */}
-      {monitoringCoins.length > 0 && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-title">모니터링 중 ({monitoringCoins.length}개 코인)</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {monitoringCoins.map((c: any) => (
-              <div key={c.coin} style={{
-                padding: "6px 12px", borderRadius: 8, fontSize: 12,
-                background: c.market_state === "bullish" ? "#ecfdf5" : c.market_state === "bearish" ? "#fef2f2" : "#f8fafc",
-                border: `1px solid ${c.market_state === "bullish" ? "#a7f3d0" : c.market_state === "bearish" ? "#fecaca" : "var(--border)"}`,
-              }}>
-                <span style={{ fontWeight: 600 }}>{c.coin.replace("KRW-", "")}</span>
-                {c.rsi && <span style={{ marginLeft: 4, color: "var(--text-muted)", fontSize: 10 }}>RSI {c.rsi}</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* 매매 전략 + 성과 */}
       {strategies.length > 0 && (

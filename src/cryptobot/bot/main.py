@@ -208,8 +208,6 @@ class CryptoBot:
             if abs(actual_diff - expected_diff) > expected_diff * 0.05:
                 logger.warning("잔고 불일치: 예상 -%s, 실제 -%s", f"{expected_diff:,.0f}", f"{actual_diff:,.0f}")
             self._recorder.record_signal(coin=coin, signal_type="buy", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, executed=True, trade_id=tid, snapshot_id=snapshot_id, strategy_params_json=pj)
-            if self._config_mgr.get_bool("slack_trade_notification", True):
-                self._notifier.notify_trade("buy", coin, order.price, order.amount, order.total_krw)
 
     def _check_and_sell(self, active_trade, price, snapshot_id, snapshot=None, coin=None):
         """매도 신호 확인 및 실행."""
@@ -257,9 +255,6 @@ class CryptoBot:
                 self._notifier.notify_error(f"DB 쓰기 검증 실패: {coin} 매도 기록 누락")
             self._recorder.record_signal(coin=coin, signal_type="sell", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, executed=True, trade_id=tid, snapshot_id=snapshot_id, strategy_params_json=pj)
             s.reset()
-            if self._config_mgr.get_bool("slack_trade_notification", True):
-                self._notifier.notify_trade("sell", coin, order.price, order.amount, order.total_krw)
-                self._notifier.notify_profit(coin, profit_pct, profit_krw, s._hold_minutes)
 
     def _llm_analyze(self):
         try:
@@ -271,19 +266,14 @@ class CryptoBot:
             force = a.check_emergency()
             r = a.analyze(force=force)
             if r:
-                prefix = "🚨 *긴급 시장 분석*" if force else "📊 *LLM 시장 분석*"
-                self._notifier.send(f"{prefix}\n{r.get('market_summary_kr','')[:100]}")
                 self._config_mgr.refresh()
                 self._strategy_sel.refresh(self._notifier)
-                # 전략 적용 검증
+                # 전략 적용 검증 (로그만, Slack 안 보냄)
                 recommended = r.get("recommended_strategy")
                 if recommended and recommended != self._strategy_sel.current_strategy_name:
                     logger.warning(
                         "전략 불일치: LLM 추천=%s, 실제=%s",
                         recommended, self._strategy_sel.current_strategy_name,
-                    )
-                    self._notifier.send(
-                        f"⚠️ 전략 불일치: 추천={recommended}, 실제={self._strategy_sel.current_strategy_name}"
                     )
         except Exception as e:
             logger.error("LLM 에러: %s", e, exc_info=True)

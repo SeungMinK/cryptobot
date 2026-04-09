@@ -121,13 +121,22 @@ class BaseStrategy(ABC):
         rsi_oversold = self.params.extra.get("rsi_oversold", self.params.extra.get("oversold", 30))
         is_oversold = current_rsi is not None and current_rsi <= rsi_oversold
 
-        # 시간 기반 ROI — RSI 과매도면 매도 보류 (더 오를 여지)
+        # 시간 기반 ROI — RSI 신뢰도 비교
         hold_minutes = hold_minutes if hold_minutes is not None else self._hold_minutes
         if hold_minutes > 0 and self.params.roi_table:
             for minutes, min_roi in sorted(self.params.roi_table.items()):
                 if hold_minutes >= minutes and net_pnl >= min_roi and net_pnl > 0:
+                    # RSI 과매도 시 ROI 크기로 판단
                     if is_oversold:
-                        return None  # RSI 과매도 → 더 오를 여지, 매도 보류
+                        # ROI가 손절폭의 50% 이상이면 충분한 수익 → 매도
+                        strong_roi = abs(self.params.stop_loss_pct) * 0.5
+                        if net_pnl >= strong_roi:
+                            return Signal(
+                                "sell", 0.9,
+                                f"ROI 강제 (RSI={current_rsi:.0f} 과매도이나 실질 +{net_pnl:.2f}% 충분)",
+                                trigger_value=round(net_pnl, 2),
+                            )
+                        return None  # RSI 과매도 + ROI 약함 → 매도 보류
                     return Signal(
                         "sell", 0.9,
                         f"ROI 도달 ({hold_minutes}분 보유, 실질 +{net_pnl:.2f}% >= {min_roi}%)",

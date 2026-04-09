@@ -95,12 +95,13 @@ class BBRSICombined(BaseStrategy):
 
     def check_sell(self, df: pd.DataFrame, current_price: float, buy_price: float) -> Signal:
         """매도: RSI > overbought OR 가격 > 볼린저 중간선."""
-        # 공통 손절/트레일링 체크
-        stop_signal = self.check_trailing_stop(current_price, buy_price)
+        rsi = self._calc_rsi(df)
+
+        # 공통 손절/트레일링 체크 (RSI 전달 → 과매도 시 ROI 매도 보류)
+        stop_signal = self.check_trailing_stop(current_price, buy_price, current_rsi=rsi)
         if stop_signal:
             return stop_signal
 
-        rsi = self._calc_rsi(df)
         bb = self._calc_bb(df)
 
         if rsi is None or bb is None:

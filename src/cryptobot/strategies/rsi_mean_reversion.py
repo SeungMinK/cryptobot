@@ -61,14 +61,14 @@ class RSIMeanReversion(BaseStrategy):
         return Signal("hold", 0.0, f"RSI {current_rsi:.1f} — 대기")
 
     def check_sell(self, df: pd.DataFrame, current_price: float, buy_price: float) -> Signal:
-        stop_signal = self.check_trailing_stop(current_price, buy_price)
+        rsi = _calculate_rsi(df["close"], self._period) if len(df) >= self._period + 2 else None
+
+        stop_signal = self.check_trailing_stop(current_price, buy_price, current_rsi=rsi)
         if stop_signal:
             return stop_signal
 
-        if len(df) < self._period + 2:
+        if rsi is None:
             return Signal("hold", 0.0, "데이터 부족")
-
-        rsi = _calculate_rsi(df["close"], self._period)
         current_rsi = rsi.iloc[-1]
         previous_rsi = rsi.iloc[-2]
 

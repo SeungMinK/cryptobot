@@ -101,7 +101,10 @@ class BaseStrategy(ABC):
         """가격 수익률에서 수수료를 빼 실질 수익률 계산."""
         return pnl_pct - self.ROUND_TRIP_FEE_PCT
 
-    def check_trailing_stop(self, current_price: float, buy_price: float, hold_minutes: int | None = None) -> Signal | None:
+    def check_trailing_stop(
+        self, current_price: float, buy_price: float,
+        hold_minutes: int | None = None, current_rsi: float | None = None,
+    ) -> Signal | None:
         """공통 트레일링 스탑 + 손절 + ROI + 수수료 반영."""
         # 최고가 갱신
         if self._highest_price is None or current_price > self._highest_price:
@@ -110,15 +113,21 @@ class BaseStrategy(ABC):
         pnl_pct = (current_price - buy_price) / buy_price * 100
         net_pnl = self._net_pnl_pct(pnl_pct)
 
-        # 손절 — 무조건 실행 (수수료 무시)
+        # 손절 — 무조건 실행 (수수료 무시, RSI 무시)
         if pnl_pct <= self.params.stop_loss_pct:
             return Signal("sell", 1.0, "손절", trigger_value=round(pnl_pct, 2))
 
-        # 시간 기반 ROI — 보유 시간별 최소 수익 도달 시 매도 (실질 수익 기준)
+        # RSI 과매도 판단 (전략별 oversold 기준)
+        rsi_oversold = self.params.extra.get("rsi_oversold", self.params.extra.get("oversold", 30))
+        is_oversold = current_rsi is not None and current_rsi <= rsi_oversold
+
+        # 시간 기반 ROI — RSI 과매도면 매도 보류 (더 오를 여지)
         hold_minutes = hold_minutes if hold_minutes is not None else self._hold_minutes
         if hold_minutes > 0 and self.params.roi_table:
             for minutes, min_roi in sorted(self.params.roi_table.items()):
                 if hold_minutes >= minutes and net_pnl >= min_roi and net_pnl > 0:
+                    if is_oversold:
+                        return None  # RSI 과매도 → 더 오를 여지, 매도 보류
                     return Signal(
                         "sell", 0.9,
                         f"ROI 도달 ({hold_minutes}분 보유, 실질 +{net_pnl:.2f}% >= {min_roi}%)",

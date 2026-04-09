@@ -633,30 +633,18 @@ class LLMAnalyzer:
         return "\n".join(lines)
 
     def _get_news_text(self) -> str:
-        """마지막 LLM 호출 이후 뉴스 (최소 1시간, 최대 6시간)."""
-        # 마지막 분석 시간 기준
-        last_row = self._db.execute(
-            "SELECT timestamp FROM llm_decisions ORDER BY id DESC LIMIT 1"
-        ).fetchone()
-        if last_row:
-            since = dict(last_row)["timestamp"]
-        else:
-            since = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-
+        """최신 뉴스 20개 (항상 포함)."""
         rows = self._db.execute(
             """
-            SELECT title, summary, sentiment_keyword, coins_mentioned, source
+            SELECT title, summary, sentiment_keyword, coins_mentioned, source, published_at
             FROM news_articles
-            WHERE collected_at >= ?
-            AND collected_at >= datetime('now', '-6 hours')
-            ORDER BY published_at DESC
-            LIMIT 30
-            """,
-            (since,),
+            ORDER BY id DESC
+            LIMIT 20
+            """
         ).fetchall()
 
         if not rows:
-            return "최근 뉴스 없음"
+            return "뉴스 데이터 없음"
 
         lines = []
         for i, r in enumerate(rows, 1):
@@ -706,6 +694,23 @@ class LLMAnalyzer:
         ).fetchall()
         prev_data = {dict(r)["coin"]: dict(r) for r in prev_rows}
 
+        # 거래량 데이터 (ohlcv_daily 최근 2일)
+        vol_rows = self._db.execute(
+            """
+            SELECT coin, volume, date FROM ohlcv_daily
+            WHERE date >= DATE('now', '-2 days')
+            ORDER BY date DESC
+            """
+        ).fetchall()
+        vol_data: dict = {}
+        for v in vol_rows:
+            v = dict(v)
+            coin = v["coin"]
+            if coin not in vol_data:
+                vol_data[coin] = {"today": v["volume"]}
+            elif "prev" not in vol_data[coin]:
+                vol_data[coin]["prev"] = v["volume"]
+
         lines = []
         for r in rows:
             r = dict(r)
@@ -727,7 +732,14 @@ class LLMAnalyzer:
                 pct = (r["price"] - prev["price"]) / prev["price"] * 100
                 price_str += f" ({pct:+.1f}%/1h)"
 
-            lines.append(f"{name}: {price_str} | {state} | {rsi_str}")
+            # 거래량 변화
+            vol_str = ""
+            vd = vol_data.get(r["coin"])
+            if vd and vd.get("today") and vd.get("prev") and vd["prev"] > 0:
+                vol_chg = (vd["today"] - vd["prev"]) / vd["prev"] * 100
+                vol_str = f" | 거래량 {vol_chg:+.0f}%"
+
+            lines.append(f"{name}: {price_str} | {state} | {rsi_str}{vol_str}")
         return "\n".join(lines) if lines else "시장 데이터 없음"
 
     def _get_performance_text(self) -> str:

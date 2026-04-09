@@ -268,12 +268,15 @@ class CryptoBot:
             if r:
                 self._config_mgr.refresh()
                 self._strategy_sel.refresh(self._notifier)
-                # 전략 적용 검증 (로그만, Slack 안 보냄)
+                # 전략 적용 검증
                 recommended = r.get("recommended_strategy")
                 if recommended and recommended != self._strategy_sel.current_strategy_name:
                     logger.warning(
                         "전략 불일치: LLM 추천=%s, 실제=%s",
                         recommended, self._strategy_sel.current_strategy_name,
+                    )
+                    self._notifier.notify_error(
+                        f"전략 불일치: 추천={recommended}, 실제={self._strategy_sel.current_strategy_name}"
                     )
         except Exception as e:
             logger.error("LLM 에러: %s", e, exc_info=True)

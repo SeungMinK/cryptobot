@@ -21,6 +21,7 @@ export default function PublicDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showAllTrades, setShowAllTrades] = useState(true);
   const [tradeFilter, setTradeFilter] = useState<string | null>(null);
+  const [sideFilter, setSideFilter] = useState<string | null>(null);
   const [showAllDaily, setShowAllDaily] = useState(false);
   const [newsExpanded, setNewsExpanded] = useState(false);
   const [newsIndex, setNewsIndex] = useState(0);
@@ -355,6 +356,13 @@ export default function PublicDashboardPage() {
                 {tradeFilter.replace("KRW-", "")} ✕
               </span>
             )}
+            {sideFilter && (
+              <span style={{ fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+                className={sideFilter === "buy" ? "positive" : "negative"}
+                onClick={() => setSideFilter(null)}>
+                {sideFilter === "buy" ? "매수" : "매도"} ✕
+              </span>
+            )}
           </div>
           {trades.length > 5 && (
             <button onClick={() => setShowAllTrades(!showAllTrades)} style={{
@@ -380,13 +388,16 @@ export default function PublicDashboardPage() {
               <thead><tr><th>시간</th><th>종목</th><th>방향</th><th>전략</th><th>단가</th><th>수익률</th><th>보유</th></tr></thead>
               <tbody>
                 {(() => {
-                  const filtered = tradeFilter ? trades.filter((t: any) => t.coin === tradeFilter) : trades;
+                  let filtered = trades;
+                  if (tradeFilter) filtered = filtered.filter((t: any) => t.coin === tradeFilter);
+                  if (sideFilter) filtered = filtered.filter((t: any) => t.side === sideFilter);
                   return (showAllTrades ? filtered.slice(0, 50) : filtered.slice(0, 5)).map((t: any, i: number) => (
                   <tr key={i}>
                     <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{formatDateTime(t.timestamp).replace(/\d{4}\. /, "")}</td>
                     <td style={{ fontWeight: 600, cursor: "pointer", color: tradeFilter === t.coin ? "var(--accent-blue)" : "inherit" }}
                       onClick={() => setTradeFilter(tradeFilter === t.coin ? null : t.coin)}>{t.coin?.replace("KRW-", "")}</td>
-                    <td><span className={`badge ${t.side === "buy" ? "badge-green" : "badge-red"}`} style={{ fontSize: 10 }}>{t.side === "buy" ? "매수" : "매도"}</span></td>
+                    <td><span className={`badge ${t.side === "buy" ? "badge-green" : "badge-red"}`} style={{ fontSize: 10, cursor: "pointer", opacity: sideFilter && sideFilter !== t.side ? 0.4 : 1 }}
+                      onClick={() => setSideFilter(sideFilter === t.side ? null : t.side)}>{t.side === "buy" ? "매수" : "매도"}</span></td>
                     <td style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.strategy?.replace(/_/g, " ")}</td>
                     <td style={{ fontSize: 11 }}>{t.price ? Number(t.price).toLocaleString() : "-"}</td>
                     <td className={t.profit_pct != null ? (t.profit_pct >= 0 ? "positive" : "negative") : ""} style={{ fontWeight: 600 }}>{t.profit_pct != null ? formatPercent(t.profit_pct) : "-"}</td>

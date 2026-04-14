@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/dashboard.png" alt="Dashboard" width="100%" />
+  <img width="100%" alt="Dashboard" src="https://github.com/user-attachments/assets/df01385b-54c6-4189-9172-1fe620b2b839" />
 </p>
 
 > **면책 조항**: 이 프로젝트는 교육 및 연구 목적입니다. 실제 투자에 사용할 경우 손실이 발생할 수 있으며, 개발자는 이에 대한 책임을 지지 않습니다.

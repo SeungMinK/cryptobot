@@ -248,9 +248,9 @@ class LLMAnalyzer:
     # Haiku 4.5 가격 (2026-04 기준)
     PRICE_INPUT_PER_M = 0.80  # $0.80 / 1M 입력 토큰
     PRICE_OUTPUT_PER_M = 4.00  # $4.00 / 1M 출력 토큰
-    MAX_DAILY_CALLS = 60  # 하드 리밋 (동적 주기 목표 ~30회, 긴급 분석 여유)
+    MAX_DAILY_CALLS = 36  # 하드 리밋 (활발 시 24회 + 긴급 여유)
     # 동적 주기 (시장 활동량에 따라)
-    INTERVAL_ACTIVE_MIN = 30  # 활발: 30분
+    INTERVAL_ACTIVE_MIN = 60  # 활발: 1시간 (30분은 파라미터 진동만 유발)
     INTERVAL_NORMAL_MIN = 120  # 보통: 2시간
     INTERVAL_QUIET_MIN = 240  # 한산: 4시간
 

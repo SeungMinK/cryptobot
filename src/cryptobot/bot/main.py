@@ -65,7 +65,11 @@ class CryptoBot:
         self._scheduler.add_job(self._tick, "interval", seconds=self._tick_interval, id="main_tick")
         self._scheduler.add_job(self._daily_report, "cron", hour=0, minute=0, id="daily_report")
         self._scheduler.add_job(self._daily_health_check, "cron", hour=6, minute=0, id="daily_health")
+        self._scheduler.add_job(self._hourly_reconciliation, "interval", hours=1, id="hourly_reconciliation")
         self._scheduler.add_job(self._weekly_report, "cron", day_of_week="sun", hour=3, minute=0, id="weekly_report")
+        self._scheduler.add_job(
+            self._weekly_backtest, "cron", day_of_week="sun", hour=2, minute=0, id="weekly_backtest",
+        )
         self._scheduler.add_job(self._monthly_audit, "cron", day=1, hour=4, minute=0, id="monthly_audit")
         self._scheduler.add_job(self._llm_analyze, "interval", minutes=10, id="llm_analyze")
 
@@ -195,7 +199,7 @@ class CryptoBot:
         bal_before = bal  # 잔고 스냅샷
         order = self._trader.buy_market(coin, amount)
         if order.success:
-            tid = self._recorder.record_trade(coin=coin, side="buy", price=order.price, amount=order.amount, total_krw=order.total_krw, fee_krw=order.fee_krw, strategy=sn, trigger_reason=sig.reason, trigger_value=sig.trigger_value, param_k_value=s.params.extra.get("k_value"), param_stop_loss=s.params.stop_loss_pct, param_trailing_stop=s.params.trailing_stop_pct, market_state_at_trade=snapshot.get("market_state"), btc_price_at_trade=price, rsi_at_trade=snapshot.get("rsi_14"))
+            tid = self._recorder.record_trade(coin=coin, side="buy", price=order.price, amount=order.amount, total_krw=order.total_krw, fee_krw=order.fee_krw, strategy=sn, trigger_reason=sig.reason, trigger_value=sig.trigger_value, param_k_value=s.params.extra.get("k_value"), param_stop_loss=s.params.stop_loss_pct, param_trailing_stop=s.params.trailing_stop_pct, market_state_at_trade=snapshot.get("market_state"), btc_price_at_trade=price, rsi_at_trade=snapshot.get("rsi_14"), order_uuid=order.order_uuid)
             # DB 쓰기 검증
             verify = self._db.execute("SELECT id FROM trades WHERE id = ?", (tid,)).fetchone()
             if not verify:
@@ -247,7 +251,7 @@ class CryptoBot:
             bf = active_trade.get("fee_krw") or 0
             profit_krw = round((order.total_krw - order.fee_krw) - (active_trade["total_krw"] + bf), 2)
             profit_pct = round(profit_krw / (active_trade["total_krw"] + bf) * 100, 2) if (active_trade["total_krw"] + bf) > 0 else 0
-            tid = self._recorder.record_trade(coin=coin, side="sell", price=order.price, amount=order.amount, total_krw=order.total_krw, fee_krw=order.fee_krw, strategy=sn, trigger_reason=sig.reason, trigger_value=sig.trigger_value, param_k_value=s.params.extra.get("k_value"), param_stop_loss=s.params.stop_loss_pct, param_trailing_stop=s.params.trailing_stop_pct, buy_trade_id=active_trade["id"], profit_pct=profit_pct, profit_krw=profit_krw, hold_duration_minutes=s._hold_minutes)
+            tid = self._recorder.record_trade(coin=coin, side="sell", price=order.price, amount=order.amount, total_krw=order.total_krw, fee_krw=order.fee_krw, strategy=sn, trigger_reason=sig.reason, trigger_value=sig.trigger_value, param_k_value=s.params.extra.get("k_value"), param_stop_loss=s.params.stop_loss_pct, param_trailing_stop=s.params.trailing_stop_pct, buy_trade_id=active_trade["id"], profit_pct=profit_pct, profit_krw=profit_krw, hold_duration_minutes=s._hold_minutes, order_uuid=order.order_uuid)
             # DB 쓰기 검증
             verify = self._db.execute("SELECT id FROM trades WHERE id = ?", (tid,)).fetchone()
             if not verify:
@@ -360,6 +364,14 @@ class CryptoBot:
         except Exception as e:
             logger.error("헬스체크 에러: %s", e, exc_info=True)
 
+    def _hourly_reconciliation(self):
+        """매시간 체결 정합성 검증."""
+        try:
+            checker = HealthChecker(self._db, self._trader, self._notifier)
+            checker.reconcile_trades()
+        except Exception as e:
+            logger.error("체결 정합성 검증 에러: %s", e, exc_info=True)
+
     def _weekly_report(self):
         """주간 리포트 (일요일 03:00)."""
         try:
@@ -367,6 +379,16 @@ class CryptoBot:
             reporter.run_all()
         except Exception as e:
             logger.error("주간 리포트 에러: %s", e, exc_info=True)
+
+    def _weekly_backtest(self):
+        """주간 백테스트 (일요일 02:00)."""
+        try:
+            from cryptobot.backtest.reporter import BacktestReporter
+
+            reporter = BacktestReporter(self._db, config.bot.db_path, self._notifier)
+            reporter.run_all()
+        except Exception as e:
+            logger.error("주간 백테스트 에러: %s", e, exc_info=True)
 
     def _monthly_audit(self):
         """월간 감사 (매월 1일 04:00)."""

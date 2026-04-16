@@ -26,8 +26,8 @@ build/
 # 임시 문서 파일
 docs/temp/
 
-# 사업 계획 (비공개)
-docs/business/
+# 비공개 계획
+docs/private/
 
 # IDE
 .idea/

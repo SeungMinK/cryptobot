@@ -14,6 +14,13 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
+# 공통 파라미터 키 — 전략별 파라미터가 아닌 bot_config에 직접 적용되는 키
+COMMON_PARAM_KEYS = {
+    "stop_loss_pct", "trailing_stop_pct", "max_position_per_coin_pct",
+    "max_spread_pct", "emergency_held_pct", "emergency_non_held_pct",
+    "roi_10min", "roi_30min", "roi_60min", "roi_120min",
+}
+
 # 하드 리밋 — LLM이 이 범위를 벗어나면 클리핑
 HARD_LIMITS = {
     "stop_loss_pct": (-20.0, -5.0),
@@ -58,22 +65,18 @@ ANALYSIS_PROMPT = """당신은 암호화폐 자동매매 봇의 시장 분석 �
 ## 현재 전략 파라미터 (지금 봇에 적용 중인 값)
 {current_strategy_params}
 
-## 사용 가능한 전략
-- volatility_breakout: 변동성 돌파 (상승장에 적합, k_value 조절)
-- bb_rsi_combined: 볼린저+RSI 복합 (횡보/하락장, 매수조건: RSI ≤ rsi_oversold AND 가격 < 볼린저하단)
-- rsi_mean_reversion: RSI 평균회귀 (횡보장)
-- ma_crossover: 이동평균 교차 (추세 전환)
-- bollinger_bands: 볼린저 밴드 (횡보장)
+## 현재 활성 전략
+{active_strategy_text}
 
-## 파라미터 조절 범위 (하드 리밋)
+## 사용 가능한 전략
+{strategies_text}
+
+## 공통 파라미터 조절 범위 (하드 리밋)
 | 파라미터 | 범위 | 설명 |
 |----------|------|------|
 | stop_loss_pct | -20.0 ~ -5.0 | 손절률 (%) |
 | trailing_stop_pct | -10.0 ~ -1.0 | 트레일링 스탑 (%) |
 | max_position_per_coin_pct | 30 ~ 80 | 종목당 최대 포지션 (%) |
-| k_value | 0.2 ~ 0.8 | 변동성 돌파 계수 |
-| bb_std | 0.8 ~ 2.5 | 볼린저밴드 표준편차 배수 (낮을수록 밴드 좁음→매수 쉬움) |
-| rsi_oversold | 20 ~ 45 | RSI 과매도 기준 (높을수록 매수 조건 완화) |
 | roi_10min | 1.0 ~ 5.0 | 10분 보유 시 목표 수익률 (%) |
 | roi_30min | 0.5 ~ 3.0 | 30분 보유 시 목표 수익률 (%) |
 | roi_60min | 0.3 ~ 2.0 | 60분 보유 시 목표 수익률 (%) |
@@ -82,6 +85,14 @@ ANALYSIS_PROMPT = """당신은 암호화폐 자동매매 봇의 시장 분석 �
 
 ## 과거 전략별 실제 성과
 {param_stats_text}
+
+## 백테스트 시뮬레이션 결과 (파라미터 스윕 포함, 코인당 수익률 Top 10)
+{backtest_text}
+
+위 백테스트는 실제 OHLCV 일봉 데이터로 각 전략의 다양한 파라미터 조합을 시뮬레이션한 결과입니다.
+괄호 안은 해당 결과의 핵심 파라미터입니다.
+현재 파라미터와 비교하여 조정 근거로 활용하세요.
+단, 백테스트는 과거 데이터 기반이므로 맹신하지 말고 참고 자료로만 사용하세요.
 
 ## 중요 규칙
 
@@ -119,6 +130,28 @@ ANALYSIS_PROMPT = """당신은 암호화폐 자동매매 봇의 시장 분석 �
 - 나쁜 전략의 과거 성과 때문에 좋은 전략의 파라미터를 보수적으로 잡지 마세요
 - **건당 평균 수익이 건당 평균 손실의 1/3 이상인지 확인하세요**
 
+### 전략 전환 판단 (매 분석마다 반드시 수행)
+**주의: 이 섹션은 단순 참고가 아니라 매 분석마다 반드시 수행해야 하는 핵심 작업입니다.**
+
+1. **현재 전략 적합성 평가**: 위의 '현재 활성 전략' 정보와 '현재 시장 상태'를 비교하세요.
+   - 현재 전략의 '적합 시장'과 실제 시장 상태가 불일치하면 전략 전환을 적극 검토
+   - 예: 시장이 bullish인데 활성 전략이 bb_rsi_combined(sideways,bearish용)이면 → 전환 검토
+
+2. **전환 판단 시 종합적으로 고려할 요소**:
+   - 시장 상태(bullish/sideways/bearish)와 각 전략의 적합 시장
+   - 현재 코인 보유 현황과 미실현 손익
+   - 백테스트 시뮬레이션 결과(해당 전략의 수익률, 승률, MDD)
+   - 최근 매매 성과(현재 전략의 실전 승률, 손익비)
+   - 공포/탐욕 지수 추이
+
+3. **전환 실행 방법**: 전략을 바꾸기로 결정했다면:
+   - recommended_strategy에 새 전략 이름 설정
+   - recommended_params에 해당 전략의 파라미터 포함
+   - reasoning에 전환 근거 명시
+
+4. **전략 유지도 적극적 판단**: 현재 전략이 시장에 맞다면 유지하되,
+   "관성으로 유지"가 아니라 "검토 후 유지"임을 reasoning에 명시
+
 ### 시장 대응
 - 업비트 현물 거래만 가능 (숏/선물/레버리지 불가)
 - 공포/탐욕 지수 25 이하(극도 공포)는 역사적 매수 적기 (7년 백테스트 1,145% 수익)
@@ -141,16 +174,25 @@ ANALYSIS_PROMPT = """당신은 암호화폐 자동매매 봇의 시장 분석 �
   "alert_message": "",
   "recommended_strategy": "전략 이름",
   "recommended_params": {{
-    "k_value": 0.5,
-    "bb_std": 1.5,
-    "rsi_oversold": 35,
+    // 공통 파라미터 (모든 전략)
     "stop_loss_pct": -5.0,
     "trailing_stop_pct": -3.0,
     "max_position_per_coin_pct": 50,
     "roi_10min": 3.0,
     "roi_30min": 2.0,
     "roi_60min": 1.0,
-    "roi_120min": 0.3
+    "roi_120min": 0.3,
+    // 전략별 파라미터 — recommended_strategy에 해당하는 것만 포함
+    // volatility_breakout: k_value
+    // bb_rsi_combined: bb_std, rsi_oversold, bb_period, rsi_period
+    // rsi_mean_reversion: rsi_period, oversold, overbought
+    // ma_crossover: short_period, long_period
+    // bollinger_bands: bb_period, bb_std
+    // macd: fast, slow, signal_period
+    // supertrend: st_period, st_multiplier
+    // bollinger_squeeze: bb_period, bb_std, squeeze_lookback
+    // breakout_momentum: entry_period, exit_period
+    // grid_trading: grid_count, range_pct
   }},
   "coin_recommendations": {{
     "add": [],
@@ -344,8 +386,12 @@ class LLMAnalyzer:
             previous_feedback = self._get_previous_feedback()
             param_stats_text = self._get_param_stats_text()
             current_strategy_params = self._get_current_strategy_params()
+            backtest_text, _backtest_run_date = self._get_backtest_text()
 
             # 2. 프롬프트 구성
+            strategies_text = self._get_strategies_text()
+            active_strategy_text = self._get_active_strategy_text()
+
             prompt = ANALYSIS_PROMPT.format(
                 news_text=news_text,
                 fear_greed_text=fear_greed_text,
@@ -355,6 +401,9 @@ class LLMAnalyzer:
                 previous_feedback=previous_feedback,
                 param_stats_text=param_stats_text,
                 current_strategy_params=current_strategy_params,
+                backtest_text=backtest_text,
+                strategies_text=strategies_text,
+                active_strategy_text=active_strategy_text,
             )
 
             # 2.5. 프롬프트 버전 저장
@@ -632,6 +681,126 @@ class LLMAnalyzer:
 
         return "\n".join(lines)
 
+    # 코인당 백테스트 결과 표시 수 제한 (토큰 절약)
+    TOP_N_PER_COIN = 10
+
+    def _get_backtest_text(self) -> tuple[str, str]:
+        """최근 2회 백테스트 결과를 텍스트로 반환.
+
+        스윕으로 레코드가 많으므로 코인당 수익률 Top N만 포함.
+        파라미터 정보를 함께 표시하여 LLM이 어떤 설정의 결과인지 파악 가능.
+
+        Returns:
+            (결과 텍스트, 실행일자) 튜플
+        """
+        try:
+            # 최근 2회 실행일 조회
+            date_rows = self._db.execute(
+                "SELECT DISTINCT run_date FROM backtest_results ORDER BY run_date DESC LIMIT 2"
+            ).fetchall()
+            if not date_rows:
+                return "백테스트 데이터 없음", "없음"
+
+            run_dates = [dict(d)["run_date"] for d in date_rows]
+            placeholders = ",".join("?" * len(run_dates))
+
+            rows = self._db.execute(
+                f"""SELECT coin, strategy_name, total_return_pct, num_trades,
+                          win_rate, max_drawdown_pct, sharpe_ratio, period,
+                          params_json, run_date
+                FROM backtest_results
+                WHERE run_date IN ({placeholders})
+                ORDER BY run_date DESC, coin, total_return_pct DESC""",
+                run_dates,
+            ).fetchall()
+
+            if not rows:
+                return "백테스트 데이터 없음", "없음"
+
+            # 실행일별 → 코인별 그룹핑
+            date_groups: dict[str, dict[str, list]] = {}
+            for r in rows:
+                r = dict(r)
+                rd = r["run_date"]
+                date_groups.setdefault(rd, {}).setdefault(r["coin"], []).append(r)
+
+            lines = []
+            for i, rd in enumerate(run_dates):
+                label = "최근 실행" if i == 0 else "이전 실행"
+                lines.append(f"### {label}: {rd}")
+
+                coin_groups = date_groups.get(rd, {})
+                for coin, results in coin_groups.items():
+                    # 코인당 수익률 Top N만
+                    top_results = results[: self.TOP_N_PER_COIN]
+                    period = top_results[0]["period"] if top_results else ""
+                    lines.append(f"[{coin}] ({period})")
+                    for r in top_results:
+                        param_str = self._format_backtest_params(r.get("params_json"), r["strategy_name"])
+                        entry = f"  {r['strategy_name']}{param_str}: {r['total_return_pct']:+.1f}%"
+                        entry += f" | {r['num_trades']}건 승률{r['win_rate']:.0f}%"
+                        entry += f" | MDD {r['max_drawdown_pct']:.1f}%"
+                        if r["sharpe_ratio"] != 0:
+                            entry += f" | sharpe {r['sharpe_ratio']:.2f}"
+                        lines.append(entry)
+                lines.append("")
+
+            return "\n".join(lines), run_dates[0]
+        except Exception as e:
+            logger.debug("백테스트 데이터 조회 실패: %s", e)
+            return "백테스트 데이터 없음", "없음"
+
+    @staticmethod
+    def _format_backtest_params(params_json: str | None, strategy_name: str) -> str:
+        """params_json에서 핵심 파라미터(공통 제외)만 간결하게 표시.
+
+        Args:
+            params_json: JSON 문자열 또는 None
+            strategy_name: 전략 이름
+
+        Returns:
+            "(k=0.7)" 형태 문자열. 파라미터가 없으면 빈 문자열.
+        """
+        if not params_json:
+            return ""
+        try:
+            params = json.loads(params_json) if isinstance(params_json, str) else params_json
+        except (json.JSONDecodeError, TypeError):
+            return ""
+
+        # 공통 파라미터 제외, 전략 고유 파라미터만
+        short_names = {
+            "k_value": "k",
+            "short_period": "short",
+            "long_period": "long",
+            "st_multiplier": "st_m",
+            "rsi_oversold": "rsi_os",
+            "bb_std": "bb",
+            "grid_count": "grid",
+            "entry_period": "entry",
+            "exit_period": "exit",
+            "oversold": "os",
+            "overbought": "ob",
+            "fast": "fast",
+            "slow": "slow",
+            "bb_period": "bb_p",
+            "rsi_period": "rsi_p",
+            "st_period": "st_p",
+            "signal_period": "sig",
+            "squeeze_lookback": "sq_lb",
+            "range_pct": "range",
+        }
+        parts = []
+        for key, value in params.items():
+            if key in COMMON_PARAM_KEYS:
+                continue
+            short = short_names.get(key, key)
+            if isinstance(value, float) and value == int(value):
+                parts.append(f"{short}={int(value)}")
+            else:
+                parts.append(f"{short}={value}")
+        return f"({','.join(parts)})" if parts else ""
+
     def _get_news_text(self) -> str:
         """최신 뉴스 20개 (항상 포함)."""
         rows = self._db.execute(
@@ -853,6 +1022,103 @@ class LLMAnalyzer:
             lines.append(f"  {r['name']}: {r['default_params_json']}")
 
         return "\n".join(lines) if lines else "설정 없음"
+
+    def _get_strategies_text(self) -> str:
+        """DB에서 사용 가능한 전략 목록을 동적으로 생성."""
+        try:
+            rows = self._db.execute(
+                """SELECT name, display_name, description, category, market_states, default_params_json
+                FROM strategies WHERE is_available = TRUE
+                ORDER BY name"""
+            ).fetchall()
+
+            if not rows:
+                return "사용 가능한 전략 없음"
+
+            lines = []
+            for r in rows:
+                r = dict(r)
+                name = r["name"]
+                display = r["display_name"] or name
+                category = r["category"] or "기타"
+                markets = r["market_states"] or "all"
+                desc = r["description"] or ""
+
+                line = f"### {name} ({display}) [{category}]"
+                lines.append(line)
+                if desc:
+                    lines.append(f"- 설명: {desc}")
+                lines.append(f"- 적합 시장: {markets}")
+
+                # 조절 가능한 파라미터 목록 + 하드 리밋 범위
+                if r["default_params_json"]:
+                    try:
+                        params = json.loads(r["default_params_json"])
+                        param_parts = []
+                        for k, v in params.items():
+                            limit = HARD_LIMITS.get(k)
+                            if limit:
+                                param_parts.append(f"{k}={v} ({limit[0]}~{limit[1]})")
+                            else:
+                                param_parts.append(f"{k}={v}")
+                        if param_parts:
+                            lines.append(f"- 조절 파라미터: {', '.join(param_parts)}")
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                lines.append("")  # 빈 줄로 구분
+
+            return "\n".join(lines)
+        except Exception as e:
+            logger.debug("전략 목록 조회 실패: %s", e)
+            return "전략 목록 조회 실패"
+
+    def _get_active_strategy_text(self) -> str:
+        """현재 활성 전략 정보를 텍스트로 생성."""
+        try:
+            row = self._db.execute(
+                """SELECT name, display_name, description, market_states, default_params_json
+                FROM strategies WHERE is_active = TRUE LIMIT 1"""
+            ).fetchone()
+
+            if not row:
+                return "활성 전략 없음 (기본 전략 사용 중)"
+
+            r = dict(row)
+            lines = [
+                f"전략: {r['name']} ({r['display_name'] or r['name']})",
+                f"적합 시장: {r['market_states'] or 'all'}",
+            ]
+
+            if r["default_params_json"]:
+                try:
+                    params = json.loads(r["default_params_json"])
+                    param_str = ", ".join(f"{k}={v}" for k, v in params.items())
+                    lines.append(f"파라미터: {param_str}")
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+            # 최근 성과 요약 (활성 전략 기준)
+            perf = self._db.execute(
+                """SELECT COUNT(*) as cnt,
+                    SUM(CASE WHEN profit_krw > 0 THEN 1 ELSE 0 END) as wins,
+                    AVG(profit_pct) as avg_pct
+                FROM trades WHERE side='sell' AND strategy = ?
+                AND timestamp >= datetime('now', '-7 days')""",
+                (r["name"],),
+            ).fetchone()
+            if perf:
+                p = dict(perf)
+                cnt = p["cnt"] or 0
+                if cnt > 0:
+                    wr = round((p["wins"] or 0) / cnt * 100)
+                    lines.append(f"최근 7일 성과: {cnt}건 매도, 승률 {wr}%, 평균 {p['avg_pct'] or 0:+.2f}%")
+                else:
+                    lines.append("최근 7일 성과: 매매 없음")
+
+            return "\n".join(lines)
+        except Exception as e:
+            logger.debug("활성 전략 조회 실패: %s", e)
+            return "활성 전략 조회 실패"
 
     # 필수 응답 필드
     REQUIRED_FIELDS = ["market_summary_kr", "market_state", "recommended_strategy"]
@@ -1084,18 +1350,18 @@ class LLMAnalyzer:
             row = self._db.execute("SELECT value FROM bot_config WHERE key = ?", (key,)).fetchone()
             if row:
                 before[key] = dict(row)["value"]
-        # 전략 파라미터도 before에 포함
-        strategy = result.get("recommended_strategy")
-        if strategy:
-            row = self._db.execute("SELECT default_params_json FROM strategies WHERE name = ?", (strategy,)).fetchone()
-            if row and dict(row)["default_params_json"]:
-                try:
-                    sp = json.loads(dict(row)["default_params_json"])
-                    for k in ["rsi_oversold", "bb_std"]:
-                        if k in sp:
-                            before[k] = sp[k]
-                except (json.JSONDecodeError, TypeError):
-                    pass
+        # 전략 파라미터도 before에 포함 (활성 전략의 모든 파라미터)
+        active_row = self._db.execute(
+            "SELECT name, default_params_json FROM strategies WHERE is_active = TRUE LIMIT 1"
+        ).fetchone()
+        if active_row and dict(active_row)["default_params_json"]:
+            try:
+                sp = json.loads(dict(active_row)["default_params_json"])
+                for k, v in sp.items():
+                    before[f"strategy:{k}"] = v
+                before["active_strategy"] = dict(active_row)["name"]
+            except (json.JSONDecodeError, TypeError):
+                pass
 
         # 파라미터 적용
         config_map = {
@@ -1137,10 +1403,10 @@ class LLMAnalyzer:
                 json.loads(dict(row)["default_params_json"]) if row and dict(row)["default_params_json"] else {}
             )
 
-            # LLM 추천값으로 머지 (있는 것만 덮어쓰기)
-            for key in ["bb_std", "rsi_oversold", "k_value"]:
-                if key in params:
-                    strategy_params[key] = params[key]
+            # LLM 추천값으로 머지 — 공통 키 제외한 전략별 파라미터 모두 반영
+            for key, value in params.items():
+                if key not in COMMON_PARAM_KEYS:
+                    strategy_params[key] = value
 
             self._db.execute(
                 "UPDATE strategies SET default_params_json = ?, updated_at = ? WHERE name = ?",
@@ -1200,9 +1466,11 @@ class LLMAnalyzer:
         after = {k: str(v) for k, v in config_map.items() if v is not None}
         if result.get("allow_trading") is not None:
             after["allow_trading"] = str(result["allow_trading"]).lower()
-        for k in ["rsi_oversold", "bb_std"]:
-            if k in params:
-                after[k] = params[k]
+        if strategy:
+            after["active_strategy"] = strategy
+        for key, value in params.items():
+            if key not in COMMON_PARAM_KEYS:
+                after[f"strategy:{key}"] = value
 
         # before/after를 최신 llm_decisions에 기록
         self._db.execute(

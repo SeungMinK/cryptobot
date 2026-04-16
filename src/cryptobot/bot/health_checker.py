@@ -27,6 +27,8 @@ class HealthChecker:
         results = {}
 
         results["trade_integrity"] = self._check_trade_integrity()
+        results["trade_reconciliation"] = self.reconcile_trades()
+        results["balance_check"] = self._check_balance_consistency()
         results["news_collector"] = self._check_news_collector()
         results["pending_orders"] = self._check_pending_orders()
         results["llm_cost"] = self._check_llm_cost()
@@ -309,6 +311,257 @@ class HealthChecker:
         except Exception as e:
             logger.error("전략 일관성 체크 실패: %s", e)
             return {"status": "warning", "message": str(e)}
+
+    def reconcile_trades(self) -> dict:
+        """미검증 거래의 체결 정합성을 검증하고 보정한다.
+
+        order_uuid가 있는 미검증(reconciled=0) 거래를 업비트 API로 확인하여
+        실체결가와 DB 기록의 차이가 0.1% 이상이면 DB를 보정한다.
+
+        Returns:
+            검증 결과 dict
+        """
+        try:
+            if not self._trader or not self._trader.is_ready:
+                return {"status": "ok", "message": "API 미설정 — 스킵"}
+
+            # 미검증 거래 조회 (최근 7일, order_uuid 있는 건)
+            rows = self._db.execute(
+                """
+                SELECT id, coin, side, price, amount, total_krw, fee_krw, order_uuid, buy_trade_id
+                FROM trades
+                WHERE reconciled = 0
+                  AND order_uuid IS NOT NULL
+                  AND timestamp >= datetime('now', '-7 days')
+                ORDER BY id
+                """
+            ).fetchall()
+
+            if not rows:
+                return {"status": "ok", "checked": 0, "corrected": 0}
+
+            checked = 0
+            corrected = 0
+            now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+            for row in rows:
+                trade = dict(row)
+                detail = self._trader.get_order_detail(trade["order_uuid"])
+                if not detail:
+                    logger.warning("체결 상세 조회 실패 (trade_id=%d)", trade["id"])
+                    continue
+
+                checked += 1
+                db_price = trade["price"]
+                db_total = trade["total_krw"]
+                actual_price = detail["price"]
+                actual_total = detail["funds"]
+                actual_fee = detail["fee"]
+                actual_volume = detail["volume"]
+
+                # 오차율 계산
+                price_diff = abs(db_price - actual_price) / actual_price if actual_price > 0 else 0
+                total_diff = abs(db_total - actual_total) / actual_total if actual_total > 0 else 0
+
+                if price_diff > 0.001 or total_diff > 0.001:
+                    # DB 보정
+                    self._db.execute(
+                        """
+                        UPDATE trades
+                        SET price = ?, amount = ?, total_krw = ?, fee_krw = ?,
+                            reconciled = 2, reconciled_at = ?
+                        WHERE id = ?
+                        """,
+                        (actual_price, actual_volume, actual_total, actual_fee, now_str, trade["id"]),
+                    )
+                    corrected += 1
+                    logger.info(
+                        "거래 보정: id=%d %s 가격 %.0f→%.0f 금액 %.0f→%.0f",
+                        trade["id"], trade["side"], db_price, actual_price, db_total, actual_total,
+                    )
+
+                    # 매도 거래의 profit 재계산
+                    if trade["side"] == "sell" and trade["buy_trade_id"]:
+                        self._recalculate_profit(trade["id"], trade["buy_trade_id"])
+                else:
+                    # 일치 확인
+                    self._db.execute(
+                        "UPDATE trades SET reconciled = 1, reconciled_at = ? WHERE id = ?",
+                        (now_str, trade["id"]),
+                    )
+
+            self._db.commit()
+
+            result = {"status": "ok", "checked": checked, "corrected": corrected}
+            if corrected > 0:
+                result["status"] = "warning"
+                result["message"] = f"{corrected}건 보정됨 (총 {checked}건 검증)"
+                logger.warning("체결 정합성: %d건 보정 / %d건 검증", corrected, checked)
+            else:
+                logger.info("체결 정합성: %d건 검증 완료 — 이상 없음", checked)
+
+            return result
+        except Exception as e:
+            logger.error("체결 정합성 검증 실패: %s", e, exc_info=True)
+            return {"status": "warning", "message": str(e)}
+
+    def _recalculate_profit(self, sell_trade_id: int, buy_trade_id: int) -> None:
+        """보정된 매수/매도 값 기준으로 profit_krw, profit_pct를 재계산한다."""
+        try:
+            buy = self._db.execute(
+                "SELECT total_krw, fee_krw FROM trades WHERE id = ?", (buy_trade_id,)
+            ).fetchone()
+            sell = self._db.execute(
+                "SELECT total_krw, fee_krw FROM trades WHERE id = ?", (sell_trade_id,)
+            ).fetchone()
+
+            if not buy or not sell:
+                return
+
+            buy = dict(buy)
+            sell = dict(sell)
+            buy_cost = buy["total_krw"] + (buy["fee_krw"] or 0)
+            sell_revenue = sell["total_krw"] - (sell["fee_krw"] or 0)
+            profit_krw = round(sell_revenue - buy_cost, 2)
+            profit_pct = round(profit_krw / buy_cost * 100, 2) if buy_cost > 0 else 0
+
+            self._db.execute(
+                "UPDATE trades SET profit_krw = ?, profit_pct = ? WHERE id = ?",
+                (profit_krw, profit_pct, sell_trade_id),
+            )
+            logger.info("수익 재계산: sell_id=%d profit=%.0f원 (%.2f%%)", sell_trade_id, profit_krw, profit_pct)
+        except Exception as e:
+            logger.error("수익 재계산 실패 (sell_id=%d): %s", sell_trade_id, e)
+
+    def _check_balance_consistency(self) -> dict:
+        """DB 역산 잔고 vs 실제 업비트 KRW 잔고 비교.
+
+        차이 > 2%이면 미검증 거래를 즉시 재보정한 후 재확인.
+        재보정 후에도 차이 > 2%이면 Slack 경고.
+        """
+        try:
+            if not self._trader or not self._trader.is_ready:
+                return {"status": "ok", "message": "API 미설정 — 스킵"}
+
+            # 실제 업비트 자산 조회
+            actual_krw = self._trader.get_balance_krw()
+
+            import pyupbit
+            active_rows = self._db.execute(
+                """
+                SELECT coin, amount FROM trades t
+                WHERE side = 'buy'
+                AND NOT EXISTS (SELECT 1 FROM trades s WHERE s.buy_trade_id = t.id AND s.side = 'sell')
+                """
+            ).fetchall()
+            coin_value = 0
+            for ar in active_rows:
+                ad = dict(ar)
+                cp = pyupbit.get_current_price(ad["coin"])
+                if cp:
+                    coin_value += ad["amount"] * cp
+
+            total_actual = actual_krw + coin_value
+            logger.info("잔고 검증: KRW=%.0f 코인=%.0f 합계=%.0f", actual_krw, coin_value, total_actual)
+
+            # DB 기준 총자산 역산
+            db_total = self._calculate_db_total_asset()
+
+            if total_actual <= 0 or db_total <= 0:
+                return {"status": "ok", "krw_balance": actual_krw, "coin_value": coin_value, "total": total_actual}
+
+            diff_pct = abs(total_actual - db_total) / total_actual * 100
+
+            if diff_pct > 2.0:
+                logger.warning(
+                    "잔고 차이 %.1f%%: 실제=%.0f, DB 역산=%.0f → 미검증 거래 즉시 재보정",
+                    diff_pct, total_actual, db_total,
+                )
+                # 자동 복구: 미검증 거래 재보정
+                recon_result = self.reconcile_trades()
+                corrected = recon_result.get("corrected", 0)
+
+                if corrected > 0:
+                    # 재보정 후 재확인
+                    db_total_after = self._calculate_db_total_asset()
+                    diff_pct_after = abs(total_actual - db_total_after) / total_actual * 100
+                    logger.info(
+                        "재보정 후 잔고 차이: %.1f%% → %.1f%% (%d건 보정)",
+                        diff_pct, diff_pct_after, corrected,
+                    )
+
+                    if diff_pct_after > 2.0:
+                        msg = (
+                            f"잔고 차이 {diff_pct_after:.1f}%: "
+                            f"실제={total_actual:,.0f}원, DB={db_total_after:,.0f}원 "
+                            f"({corrected}건 보정 후)"
+                        )
+                        if self._notifier:
+                            self._notifier.send(f"⚠️ *잔고 불일치 경고*\n{msg}")
+                        return {"status": "warning", "message": msg, "diff_pct": diff_pct_after}
+
+                    return {
+                        "status": "ok",
+                        "message": f"자동 보정 완료 ({corrected}건): {diff_pct:.1f}% → {diff_pct_after:.1f}%",
+                        "krw_balance": actual_krw,
+                        "total": total_actual,
+                    }
+                else:
+                    msg = (
+                        f"잔고 차이 {diff_pct:.1f}%: "
+                        f"실제={total_actual:,.0f}원, DB={db_total:,.0f}원 (보정 가능 건 없음)"
+                    )
+                    if self._notifier:
+                        self._notifier.send(f"⚠️ *잔고 불일치 경고*\n{msg}")
+                    return {"status": "warning", "message": msg, "diff_pct": diff_pct}
+
+            return {"status": "ok", "krw_balance": actual_krw, "coin_value": coin_value, "total": total_actual}
+        except Exception as e:
+            logger.error("잔고 일관성 체크 실패: %s", e)
+            return {"status": "warning", "message": str(e)}
+
+    def _calculate_db_total_asset(self) -> float:
+        """DB 기록 기준 총자산을 역산한다."""
+        try:
+            import pyupbit
+
+            # 매도 수익 합산
+            row = self._db.execute(
+                """
+                SELECT
+                    COALESCE(SUM(CASE WHEN side = 'sell' THEN total_krw - fee_krw ELSE 0 END), 0)
+                    - COALESCE(SUM(CASE WHEN side = 'buy' THEN total_krw ELSE 0 END), 0)
+                    AS net_flow
+                FROM trades
+                """
+            ).fetchone()
+            net_flow = row[0] if row else 0
+
+            # 미매도 코인 DB 기록 가치
+            active_rows = self._db.execute(
+                """
+                SELECT coin, amount FROM trades t
+                WHERE side = 'buy'
+                AND NOT EXISTS (SELECT 1 FROM trades s WHERE s.buy_trade_id = t.id AND s.side = 'sell')
+                """
+            ).fetchall()
+            db_coin_value = 0
+            for ar in active_rows:
+                ad = dict(ar)
+                cp = pyupbit.get_current_price(ad["coin"])
+                if cp:
+                    db_coin_value += ad["amount"] * cp
+
+            # 최초 입금액이 없으므로 daily_reports의 starting_balance 참고
+            first_report = self._db.execute(
+                "SELECT starting_balance_krw FROM daily_reports ORDER BY date ASC LIMIT 1"
+            ).fetchone()
+            initial_balance = dict(first_report)["starting_balance_krw"] if first_report else 0
+
+            return initial_balance + net_flow + db_coin_value
+        except Exception as e:
+            logger.error("DB 총자산 역산 실패: %s", e)
+            return 0
 
     def _send_alert(self, results: dict) -> None:
         """이상 발견 시 Slack 알림."""

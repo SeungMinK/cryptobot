@@ -565,19 +565,21 @@ export default function PublicDashboardPage() {
       )}
 
       {/* 면책 조항 + 푸터 */}
-      <div style={{ textAlign: "center", padding: "32px 16px 12px", color: "var(--text-muted)", fontSize: 11, lineHeight: 1.6 }}>
-        <div style={{ maxWidth: 560, margin: "0 auto", padding: "12px 16px", borderTop: "1px solid var(--border)", marginBottom: 12 }}>
-          <p style={{ margin: "0 0 4px", fontWeight: 600, fontSize: 11, color: "var(--text-secondary)" }}>
+      <div style={{ textAlign: "center", padding: "48px 24px 24px", color: "var(--text-muted)", fontSize: 11, lineHeight: 1.8 }}>
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 24, marginBottom: 16 }}>
+          <p style={{ margin: "0 0 8px", fontWeight: 600, fontSize: 12, color: "var(--text-secondary)", letterSpacing: 1 }}>
             Disclaimer
           </p>
-          <p style={{ margin: 0 }}>
+          <p style={{ margin: 0, maxWidth: 700, marginInline: "auto" }}>
             본 서비스는 학습·포트폴리오 목적으로 제작된 자동매매 실험 프로젝트이며,
-            투자 조언이나 특정 자산의 매수·매도를 권유하지 않습니다.
+            투자 조언이나 특정 자산의 매수·매도를 권유하지 않습니다.<br />
             모든 투자 판단과 그에 따른 손익의 책임은 이용자 본인에게 있으며,
             개발자는 본 서비스 이용으로 발생한 어떠한 손실에도 책임을 지지 않습니다.
           </p>
         </div>
-        Powered by Claude AI + {strategies.length} Trading Strategies
+        <div style={{ marginTop: 8 }}>
+          Powered by Claude AI + {strategies.length} Trading Strategies
+        </div>
       </div>
     </div>
   );

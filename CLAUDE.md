@@ -97,6 +97,8 @@ logger = logging.getLogger(__name__)
 - 테스트 파일: `tests/` 디렉토리에 `test_*.py`
 - API 호출이 필요한 테스트는 mock 사용 (실제 API 호출 금지)
 - 매매 전략 로직은 반드시 단위 테스트 작성
+- **전략 전환 테스트 필수**: 전략 추가/수정/LLM 프롬프트 변경 시 `pytest tests/test_llm_strategy_switch.py -v` 실행 필수.
+  이 테스트는 DB에서 전략을 동적으로 가져오므로 새 전략 추가 시 자동으로 커버됨.
 
 ### DB
 

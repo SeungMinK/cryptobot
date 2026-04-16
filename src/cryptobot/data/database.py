@@ -93,6 +93,9 @@ CREATE TABLE IF NOT EXISTS trades (
     hold_duration_minutes INTEGER,
     strategy_params_json TEXT,
     strategy_selection_reason TEXT,
+    order_uuid TEXT,
+    reconciled INTEGER DEFAULT 0,
+    reconciled_at DATETIME,
     FOREIGN KEY (buy_trade_id) REFERENCES trades(id)
 );
 
@@ -260,6 +263,26 @@ CREATE TABLE IF NOT EXISTS coin_strategy_config (
     description TEXT,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS backtest_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_date DATE NOT NULL,
+    strategy_name TEXT NOT NULL,
+    coin TEXT NOT NULL,
+    period TEXT NOT NULL,
+    num_trades INTEGER NOT NULL,
+    win_rate REAL NOT NULL,
+    total_return_pct REAL NOT NULL,
+    max_drawdown_pct REAL NOT NULL,
+    sharpe_ratio REAL NOT NULL,
+    avg_profit_pct REAL NOT NULL,
+    avg_loss_pct REAL NOT NULL,
+    best_trade_pct REAL NOT NULL,
+    worst_trade_pct REAL NOT NULL,
+    params_json TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_bt_run_date ON backtest_results(run_date, strategy_name, coin);
 """
 
 # 기본 전략 파라미터 (최초 1회 삽입)
@@ -597,9 +620,10 @@ class Database:
         """현재 DB 커넥션을 반환한다. 없으면 생성."""
         if self._conn is None:
             self._db_path.parent.mkdir(parents=True, exist_ok=True)
-            self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
+            self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False, timeout=30)
             self._conn.row_factory = sqlite3.Row  # dict처럼 접근 가능
             self._conn.execute("PRAGMA journal_mode=WAL")  # 동시 읽기 성능 향상
+            self._conn.execute("PRAGMA busy_timeout=30000")  # 30초 대기 (동시 시작 대응)
             self._conn.execute("PRAGMA foreign_keys=OFF")
         return self._conn
 
@@ -670,6 +694,15 @@ class Database:
             except sqlite3.OperationalError:
                 conn.execute("ALTER TABLE trade_signals ADD COLUMN strategy_params_json TEXT")
                 logger.info("trade_signals 테이블에 strategy_params_json 컬럼 추가 완료")
+
+            # 마이그레이션: trades 테이블에 정합성 검증 컬럼 추가
+            try:
+                conn.execute("SELECT order_uuid FROM trades LIMIT 1")
+            except sqlite3.OperationalError:
+                conn.execute("ALTER TABLE trades ADD COLUMN order_uuid TEXT")
+                conn.execute("ALTER TABLE trades ADD COLUMN reconciled INTEGER DEFAULT 0")
+                conn.execute("ALTER TABLE trades ADD COLUMN reconciled_at DATETIME")
+                logger.info("trades 테이블에 정합성 검증 컬럼 추가 완료 (order_uuid, reconciled, reconciled_at)")
 
             # 마이그레이션: bot_config에 새 설정 추가 (기존 DB 호환)
             existing = conn.execute("SELECT key FROM bot_config WHERE key = 'strategy_switch_delay_seconds'").fetchone()

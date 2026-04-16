@@ -28,6 +28,7 @@ class OrderResult:
     fee_krw: float
     raw_response: dict | None = None
     error: str | None = None
+    order_uuid: str | None = None
 
 
 class Trader:
@@ -115,31 +116,34 @@ class Trader:
             result = self._upbit.buy_market_order(coin, krw_amount)
             logger.info("매수 주문 실행: %s %s원", coin, f"{krw_amount:,.0f}")
 
-            price = self.get_current_price(coin)
-            fee = krw_amount * self.FEE_RATE
-            amount = (krw_amount - fee) / price
+            order_uuid = result.get("uuid") if isinstance(result, dict) else None
 
-            # 체결 검증 — 실제 잔고 확인 (실패해도 주문은 이미 나갔으므로 기록 필수)
-            actual_balance = amount  # 기본값: 계산된 수량
-            try:
-                import time as _time
-                _time.sleep(0.5)
-                actual_balance = self.get_balance_coin(coin)
-                if actual_balance <= 0:
-                    logger.error("매수 체결 검증 실패: %s 잔고=0 (주문 응답: %s)", coin, result)
-                    actual_balance = amount  # 폴백: 계산된 수량으로 기록
-            except Exception as e:
-                logger.warning("매수 체결 검증 에러: %s — 계산량으로 기록", e)
+            # 추정값 (폴백용)
+            est_price = self.get_current_price(coin)
+            est_fee = krw_amount * self.FEE_RATE
+            est_amount = (krw_amount - est_fee) / est_price
+
+            # 실체결가 조회
+            price, amount, total_krw, fee = est_price, est_amount, krw_amount, est_fee
+            if order_uuid:
+                trade_detail = self._fetch_order_detail(order_uuid)
+                if trade_detail:
+                    price = trade_detail["price"]
+                    amount = trade_detail["volume"]
+                    total_krw = trade_detail["funds"]
+                    fee = trade_detail["fee"]
+                    logger.info("매수 실체결가: %s %.0f원 × %.8f개 (수수료 %.0f원)", coin, price, amount, fee)
 
             return OrderResult(
                 success=True,
                 side="buy",
                 coin=coin,
                 price=price,
-                amount=actual_balance,
-                total_krw=krw_amount,
+                amount=amount,
+                total_krw=total_krw,
                 fee_krw=fee,
                 raw_response=result,
+                order_uuid=order_uuid,
             )
         except (InsufficientBalanceError, APIError):
             raise
@@ -174,32 +178,37 @@ class Trader:
                     error="매도 가능한 수량 없음",
                 )
 
-            price = self.get_current_price(coin)
             result = self._upbit.sell_market_order(coin, amount)
             logger.info("매도 주문 실행: %s %.8f개", coin, amount)
 
-            # 체결 검증 — 매도 후 잔고 확인 (실패해도 기록은 유지)
-            try:
-                import time as _time
-                _time.sleep(0.5)
-                remaining = self.get_balance_coin(coin)
-                if remaining > amount * 0.01:
-                    logger.warning("매도 부분 체결: %s 잔여 %.8f개", coin, remaining)
-            except Exception as e:
-                logger.warning("매도 체결 검증 에러: %s", e)
+            order_uuid = result.get("uuid") if isinstance(result, dict) else None
 
-            total_krw = price * amount
-            fee = total_krw * self.FEE_RATE
+            # 추정값 (폴백용)
+            est_price = self.get_current_price(coin)
+            est_total = est_price * amount
+            est_fee = est_total * self.FEE_RATE
+
+            # 실체결가 조회
+            price, sell_amount, total_krw, fee = est_price, amount, est_total, est_fee
+            if order_uuid:
+                trade_detail = self._fetch_order_detail(order_uuid)
+                if trade_detail:
+                    price = trade_detail["price"]
+                    sell_amount = trade_detail["volume"]
+                    total_krw = trade_detail["funds"]
+                    fee = trade_detail["fee"]
+                    logger.info("매도 실체결가: %s %.0f원 × %.8f개 (수수료 %.0f원)", coin, price, sell_amount, fee)
 
             return OrderResult(
                 success=True,
                 side="sell",
                 coin=coin,
                 price=price,
-                amount=amount,
+                amount=sell_amount,
                 total_krw=total_krw,
                 fee_krw=fee,
                 raw_response=result,
+                order_uuid=order_uuid,
             )
         except APIError:
             raise
@@ -226,6 +235,65 @@ class Trader:
             return len(orders)
         except Exception as e:
             raise APIError(f"주문 취소 실패: {e}") from e
+
+    def _fetch_order_detail(self, order_uuid: str, max_retries: int = 3) -> dict | None:
+        """주문 UUID로 실체결 상세를 조회한다.
+
+        Args:
+            order_uuid: 업비트 주문 UUID
+            max_retries: 최대 재시도 횟수
+
+        Returns:
+            {"price": 평균체결가, "volume": 체결수량, "funds": 체결금액, "fee": 수수료} 또는 None
+        """
+        import time as _time
+
+        for attempt in range(max_retries):
+            _time.sleep(0.5 * (attempt + 1))
+            try:
+                detail = self._upbit.get_individual_order(order_uuid)
+                if not isinstance(detail, dict):
+                    continue
+
+                trades = detail.get("trades", [])
+                state = detail.get("state", "")
+
+                if state not in ("done", "cancel") and not trades:
+                    logger.debug("주문 미체결 상태 (attempt %d): %s", attempt + 1, state)
+                    continue
+
+                if not trades:
+                    logger.warning("체결 내역 없음: uuid=%s, state=%s", order_uuid, state)
+                    return None
+
+                total_funds = sum(float(t.get("funds", 0)) for t in trades)
+                total_volume = sum(float(t.get("volume", 0)) for t in trades)
+                paid_fee = float(detail.get("paid_fee", 0))
+                avg_price = total_funds / total_volume if total_volume > 0 else 0
+
+                return {
+                    "price": avg_price,
+                    "volume": total_volume,
+                    "funds": total_funds,
+                    "fee": paid_fee,
+                }
+            except Exception as e:
+                logger.warning("체결 상세 조회 실패 (attempt %d): %s", attempt + 1, e)
+
+        logger.warning("체결 상세 조회 최종 실패: uuid=%s", order_uuid)
+        return None
+
+    def get_order_detail(self, order_uuid: str) -> dict | None:
+        """외부에서 주문 UUID로 체결 상세를 조회한다.
+
+        Args:
+            order_uuid: 업비트 주문 UUID
+
+        Returns:
+            {"price": 평균체결가, "volume": 체결수량, "funds": 체결금액, "fee": 수수료} 또는 None
+        """
+        self._ensure_ready()
+        return self._fetch_order_detail(order_uuid)
 
     def _ensure_ready(self) -> None:
         """API Key 설정 확인."""

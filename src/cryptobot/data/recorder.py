@@ -90,6 +90,7 @@ class DataRecorder:
         profit_pct: float | None = None,
         profit_krw: float | None = None,
         hold_duration_minutes: int | None = None,
+        order_uuid: str | None = None,
     ) -> int:
         """매매 체결을 기록한다.
 
@@ -103,8 +104,9 @@ class DataRecorder:
                 strategy, trigger_reason, trigger_value,
                 param_k_value, param_stop_loss, param_trailing_stop,
                 market_state_at_trade, btc_price_at_trade, rsi_at_trade,
-                buy_trade_id, profit_pct, profit_krw, hold_duration_minutes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                buy_trade_id, profit_pct, profit_krw, hold_duration_minutes,
+                order_uuid
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 coin,
@@ -126,6 +128,7 @@ class DataRecorder:
                 profit_pct,
                 profit_krw,
                 hold_duration_minutes,
+                order_uuid,
             ),
         )
         self._db.commit()

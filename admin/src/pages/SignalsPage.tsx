@@ -7,11 +7,14 @@ import { formatKRW, formatDateTime, formatNumber } from "../utils/format";
 import { getParamDesc } from "../utils/paramDescriptions";
 import { getIndicatorDesc, getMarketStateKR, MARKET_STATE_KR } from "../utils/indicatorDescriptions";
 
+// 기본 뷰는 "매매만" (hold 제외). HOLD는 조건 미충족 기록이라 confidence=0이 정상이라
+// 대시보드에 섞이면 buy/sell 신호가 묻히고 "신뢰도가 다 0%"처럼 보여 오해를 유발함.
 const SIGNAL_FILTERS = [
-  { label: "전체", value: "" },
+  { label: "매매만", value: "trades" }, // buy + sell (exclude_hold=true)
   { label: "매수", value: "buy" },
   { label: "매도", value: "sell" },
   { label: "HOLD", value: "hold" },
+  { label: "전체", value: "" },
 ] as const;
 
 const STAT_PERIODS = [
@@ -28,14 +31,26 @@ export default function SignalsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [filter, setFilter] = useState("");
+  const [filter, setFilter] = useState<string>("trades"); // 기본: 매매만
+  const [excludeZeroConfidence, setExcludeZeroConfidence] = useState(true);
   const [statPeriod, setStatPeriod] = useState(1);
   const [selected, setSelected] = useState<SignalItem | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
+      const queryParams: Parameters<typeof getSignals>[0] = { page, limit: 30 };
+      if (filter === "trades") {
+        queryParams.exclude_hold = true;
+      } else if (filter) {
+        queryParams.signal_type = filter;
+      }
+      if (excludeZeroConfidence) {
+        // 0.001은 0%로 표시되지만 실제 0은 아닌 값까지 포함 — 0 초과만 남김
+        queryParams.min_confidence = 0.001;
+      }
+
       const [signalRes, statsRes] = await Promise.all([
-        getSignals({ page, limit: 30, signal_type: filter || undefined }),
+        getSignals(queryParams),
         getSignalStats(statPeriod),
       ]);
       setSignals(signalRes.items);
@@ -47,7 +62,7 @@ export default function SignalsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filter, statPeriod]);
+  }, [page, filter, excludeZeroConfidence, statPeriod]);
 
   useEffect(() => {
     fetchData();
@@ -112,8 +127,8 @@ export default function SignalsPage() {
 
       {/* Filter */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {SIGNAL_FILTERS.map((f) => (
               <button
                 key={f.value}
@@ -132,8 +147,22 @@ export default function SignalsPage() {
               </button>
             ))}
           </div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            총 {formatNumber(total)}건
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <label
+              style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-muted)", cursor: "pointer" }}
+              title="HOLD 신호는 조건 미충족 기록이라 confidence=0이 정상. 끄면 포함됨."
+            >
+              <input
+                type="checkbox"
+                checked={excludeZeroConfidence}
+                onChange={(e) => { setExcludeZeroConfidence(e.target.checked); setPage(1); }}
+                style={{ cursor: "pointer" }}
+              />
+              신뢰도 0% 제외
+            </label>
+            <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+              총 {formatNumber(total)}건
+            </div>
           </div>
         </div>
       </div>

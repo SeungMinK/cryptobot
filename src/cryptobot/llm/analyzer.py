@@ -263,15 +263,15 @@ class LLMAnalyzer:
     INTERVAL_QUIET_MIN = 240  # 한산: 4시간
 
     def _get_dynamic_interval_minutes(self) -> int:
-        """시장 활동량에 따른 LLM 호출 간격(분) 결정."""
+        """시장 활동량에 따른 LLM 호출 간격(분) 결정.
+
+        뉴스 건수는 ACTIVE 판정 기준에서 제외한다. 수집기 기본 출력이 시간당
+        평균 3.8건이라 news_count>=3 조건이 57% 시간대에서 오판정의 주범이었고,
+        뉴스發 시장 급변은 check_emergency()가 가격 기준으로 별도 포착한다.
+        """
         # 최근 1시간 매매 건수
         trade_count = self._db.execute(
             "SELECT COUNT(*) FROM trades WHERE timestamp >= datetime('now', '-1 hour')"
-        ).fetchone()[0] or 0
-
-        # 최근 1시간 뉴스 건수
-        news_count = self._db.execute(
-            "SELECT COUNT(*) FROM news_articles WHERE collected_at >= datetime('now', '-1 hour')"
         ).fetchone()[0] or 0
 
         # 보유 포지션 수
@@ -280,12 +280,12 @@ class LLMAnalyzer:
             AND NOT EXISTS (SELECT 1 FROM trades s WHERE s.buy_trade_id = t.id AND s.side='sell')"""
         ).fetchone()[0] or 0
 
-        # 활발: 매매 2건+ OR 뉴스 3건+ OR 포지션 3개+
-        if trade_count >= 2 or news_count >= 3 or position_count >= 3:
+        # 활발: 매매 2건+ OR 포지션 3개+
+        if trade_count >= 2 or position_count >= 3:
             return self.INTERVAL_ACTIVE_MIN
 
-        # 한산: 매매 0건 AND 뉴스 0건 AND 포지션 0개
-        if trade_count == 0 and news_count == 0 and position_count == 0:
+        # 한산: 매매 0건 AND 포지션 0개
+        if trade_count == 0 and position_count == 0:
             return self.INTERVAL_QUIET_MIN
 
         return self.INTERVAL_NORMAL_MIN

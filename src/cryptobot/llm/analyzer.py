@@ -260,9 +260,9 @@ class LLMAnalyzer:
     def is_configured(self) -> bool:
         return bool(self._api_key)
 
-    # Haiku 4.5 가격 (2026-04 기준)
-    PRICE_INPUT_PER_M = 0.80  # $0.80 / 1M 입력 토큰
-    PRICE_OUTPUT_PER_M = 4.00  # $4.00 / 1M 출력 토큰
+    # Haiku 4.5 공식가 (platform.claude.com/docs/en/docs/about-claude/pricing)
+    PRICE_INPUT_PER_M = 1.00  # $1.00 / 1M 입력 토큰
+    PRICE_OUTPUT_PER_M = 5.00  # $5.00 / 1M 출력 토큰
     MAX_DAILY_CALLS = 36  # 하드 리밋 (활발 시 24회 + 긴급 여유)
     # 동적 주기 (시장 활동량에 따라)
     INTERVAL_ACTIVE_MIN = 60  # 활발: 1시간 (30분은 파라미터 진동만 유발)

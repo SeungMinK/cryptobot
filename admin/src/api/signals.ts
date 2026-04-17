@@ -49,6 +49,8 @@ export async function getSignals(params: {
   limit?: number;
   signal_type?: string;
   strategy?: string;
+  exclude_hold?: boolean;
+  min_confidence?: number;
 }): Promise<SignalListResponse> {
   const { data } = await client.get<SignalListResponse>("/signals", { params });
   return data;

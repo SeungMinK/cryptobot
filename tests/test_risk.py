@@ -203,3 +203,122 @@ def test_sell_always_allowed():
         assert can is True
     finally:
         db.close()
+
+
+def test_consecutive_losses_outside_window_ignored():
+    """시간 윈도우 밖의 과거 손실은 현재 매매를 차단하지 않는다.
+
+    과거 이슈: 한번 연속 3회 손실난 코인이 수익 거래가 나올 때까지 영구 차단됐음.
+    """
+    limits = RiskLimits(max_consecutive_losses=3, consecutive_loss_window_hours=24)
+    rm, recorder, db = _make_risk_manager(limits)
+    try:
+        # 2일 전 매도 3건 — 전부 손실
+        for _ in range(3):
+            buy_id = recorder.record_trade(
+                coin="KRW-BTC",
+                side="buy",
+                price=50000000,
+                amount=0.001,
+                total_krw=50000,
+                fee_krw=25,
+                strategy="test",
+                trigger_reason="test",
+            )
+            recorder.record_trade(
+                coin="KRW-BTC",
+                side="sell",
+                price=48000000,
+                amount=0.001,
+                total_krw=48000,
+                fee_krw=24,
+                strategy="test",
+                trigger_reason="손절",
+                buy_trade_id=buy_id,
+                profit_pct=-4.0,
+                profit_krw=-2000,
+            )
+        # 모든 레코드를 윈도우 밖으로 이동 (2일 전)
+        db.execute("UPDATE trades SET timestamp = datetime('now', '-2 days')")
+        db.commit()
+
+        can, _ = rm.check_can_buy("KRW-BTC", 50_000, 500_000)
+        assert can is True, "24시간 윈도우 밖 손실은 차단해선 안 됨"
+    finally:
+        db.close()
+
+
+def test_consecutive_losses_within_window_blocks():
+    """시간 윈도우 안 연속 손실은 차단한다."""
+    limits = RiskLimits(max_consecutive_losses=3, consecutive_loss_window_hours=24, max_daily_loss_pct=-100.0)
+    rm, recorder, db = _make_risk_manager(limits)
+    try:
+        for _ in range(3):
+            buy_id = recorder.record_trade(
+                coin="KRW-BTC",
+                side="buy",
+                price=50000000,
+                amount=0.001,
+                total_krw=50000,
+                fee_krw=25,
+                strategy="test",
+                trigger_reason="test",
+            )
+            recorder.record_trade(
+                coin="KRW-BTC",
+                side="sell",
+                price=49950000,
+                amount=0.001,
+                total_krw=49950,
+                fee_krw=25,
+                strategy="test",
+                trigger_reason="손절",
+                buy_trade_id=buy_id,
+                profit_pct=-0.1,
+                profit_krw=-50,
+            )
+
+        can, reason = rm.check_can_buy("KRW-BTC", 50_000, 500_000)
+        assert can is False
+        assert "연속" in reason
+    finally:
+        db.close()
+
+
+def test_default_consecutive_losses_allows_4_losses():
+    """기본 max_consecutive_losses=5 — 4회 연속 손실까지는 이 가드에서 차단 안 함.
+
+    다른 가드(일일 손실률 등)는 분리 테스트. 여기선 연속 손실 카운트만 검증.
+    """
+    limits = RiskLimits(max_consecutive_losses=5, max_daily_loss_pct=-100.0)
+    rm, recorder, db = _make_risk_manager(limits)
+    try:
+        for _ in range(4):
+            buy_id = recorder.record_trade(
+                coin="KRW-BTC",
+                side="buy",
+                price=50000000,
+                amount=0.001,
+                total_krw=50000,
+                fee_krw=25,
+                strategy="test",
+                trigger_reason="test",
+            )
+            recorder.record_trade(
+                coin="KRW-BTC",
+                side="sell",
+                price=49950000,
+                amount=0.001,
+                total_krw=49950,
+                fee_krw=25,
+                strategy="test",
+                trigger_reason="손절",
+                buy_trade_id=buy_id,
+                profit_pct=-0.1,
+                profit_krw=-50,
+            )
+
+        can, _ = rm.check_can_buy("KRW-BTC", 50_000, 500_000)
+        assert can is True, "4회 연속 손실은 5회 미만이라 허용돼야 함"
+    finally:
+        db.close()

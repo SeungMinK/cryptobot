@@ -16,9 +16,16 @@ logger = logging.getLogger(__name__)
 
 # 공통 파라미터 키 — 전략별 파라미터가 아닌 bot_config에 직접 적용되는 키
 COMMON_PARAM_KEYS = {
-    "stop_loss_pct", "trailing_stop_pct", "max_position_per_coin_pct",
-    "max_spread_pct", "emergency_held_pct", "emergency_non_held_pct",
-    "roi_10min", "roi_30min", "roi_60min", "roi_120min",
+    "stop_loss_pct",
+    "trailing_stop_pct",
+    "max_position_per_coin_pct",
+    "max_spread_pct",
+    "emergency_held_pct",
+    "emergency_non_held_pct",
+    "roi_10min",
+    "roi_30min",
+    "roi_60min",
+    "roi_120min",
 }
 
 # 하드 리밋 — LLM이 이 범위를 벗어나면 클리핑
@@ -263,29 +270,33 @@ class LLMAnalyzer:
     INTERVAL_QUIET_MIN = 240  # 한산: 4시간
 
     def _get_dynamic_interval_minutes(self) -> int:
-        """시장 활동량에 따른 LLM 호출 간격(분) 결정."""
-        # 최근 1시간 매매 건수
-        trade_count = self._db.execute(
-            "SELECT COUNT(*) FROM trades WHERE timestamp >= datetime('now', '-1 hour')"
-        ).fetchone()[0] or 0
+        """시장 활동량에 따른 LLM 호출 간격(분) 결정.
 
-        # 최근 1시간 뉴스 건수
-        news_count = self._db.execute(
-            "SELECT COUNT(*) FROM news_articles WHERE collected_at >= datetime('now', '-1 hour')"
-        ).fetchone()[0] or 0
+        뉴스 건수는 ACTIVE 판정 기준에서 제외한다. 수집기 기본 출력이 시간당
+        평균 3.8건이라 news_count>=3 조건이 57% 시간대에서 오판정의 주범이었고,
+        뉴스發 시장 급변은 check_emergency()가 가격 기준으로 별도 포착한다.
+        """
+        # 최근 1시간 매매 건수
+        trade_count = (
+            self._db.execute("SELECT COUNT(*) FROM trades WHERE timestamp >= datetime('now', '-1 hour')").fetchone()[0]
+            or 0
+        )
 
         # 보유 포지션 수
-        position_count = self._db.execute(
-            """SELECT COUNT(*) FROM trades t WHERE side='buy'
+        position_count = (
+            self._db.execute(
+                """SELECT COUNT(*) FROM trades t WHERE side='buy'
             AND NOT EXISTS (SELECT 1 FROM trades s WHERE s.buy_trade_id = t.id AND s.side='sell')"""
-        ).fetchone()[0] or 0
+            ).fetchone()[0]
+            or 0
+        )
 
-        # 활발: 매매 2건+ OR 뉴스 3건+ OR 포지션 3개+
-        if trade_count >= 2 or news_count >= 3 or position_count >= 3:
+        # 활발: 매매 2건+ OR 포지션 3개+
+        if trade_count >= 2 or position_count >= 3:
             return self.INTERVAL_ACTIVE_MIN
 
-        # 한산: 매매 0건 AND 뉴스 0건 AND 포지션 0개
-        if trade_count == 0 and news_count == 0 and position_count == 0:
+        # 한산: 매매 0건 AND 포지션 0개
+        if trade_count == 0 and position_count == 0:
             return self.INTERVAL_QUIET_MIN
 
         return self.INTERVAL_NORMAL_MIN
@@ -293,9 +304,10 @@ class LLMAnalyzer:
     def _should_run(self, force: bool = False) -> bool:
         """분석 실행 여부 판단 (동적 주기)."""
         # 일일 호출 제한
-        daily_count = self._db.execute(
-            "SELECT COUNT(*) FROM llm_decisions WHERE DATE(timestamp) = DATE('now')"
-        ).fetchone()[0] or 0
+        daily_count = (
+            self._db.execute("SELECT COUNT(*) FROM llm_decisions WHERE DATE(timestamp) = DATE('now')").fetchone()[0]
+            or 0
+        )
         if daily_count >= self.MAX_DAILY_CALLS:
             logger.warning("LLM 일일 호출 제한 도달: %d/%d", daily_count, self.MAX_DAILY_CALLS)
             return False
@@ -358,7 +370,9 @@ class LLMAnalyzer:
                 if change >= threshold:
                     logger.warning(
                         "시장 급변 감지: %s %.1f%% 변동 (기준 %.0f%%, %s)",
-                        d["coin"], change, threshold,
+                        d["coin"],
+                        change,
+                        threshold,
                         "보유" if d["coin"] in held_coins else "비보유",
                     )
                     return True
@@ -601,7 +615,7 @@ class LLMAnalyzer:
             p = dict(prev)
             pnl = p.get("evaluation_period_pnl_pct")
             was_good = p.get("evaluation_was_good")
-            label = "직전" if i == 0 else f"{i+1}회 전"
+            label = "직전" if i == 0 else f"{i + 1}회 전"
 
             entry = f"[{label}] {p.get('timestamp', '?')} | {p.get('output_market_state', '?')}"
             if pnl is not None:
@@ -1068,9 +1082,7 @@ class LLMAnalyzer:
             for t in trades:
                 t = dict(t)
                 coin = t["coin"].replace("KRW-", "")
-                lines.append(
-                    f"  {coin} {t['pct']:+.2f}% ({t['hold'] or 0}분) — {t['trigger_reason'][:40]}"
-                )
+                lines.append(f"  {coin} {t['pct']:+.2f}% ({t['hold'] or 0}분) — {t['trigger_reason'][:40]}")
 
         # 3. 전략별 24시간 성과
         strats = self._db.execute(
@@ -1102,13 +1114,15 @@ class LLMAnalyzer:
             lines.append("\n[보유 포지션]")
             try:
                 import pyupbit
+
                 for h in held:
                     h = dict(h)
                     coin = h["coin"]
                     cp = pyupbit.get_current_price(coin)
                     if cp and h["price"] > 0:
                         pnl = (cp - h["price"]) / h["price"] * 100
-                        lines.append(f"  {coin.replace('KRW-','')}: 매수 {h['price']:,.0f} → 현재 {cp:,.0f} ({pnl:+.1f}%)")
+                        sym = coin.replace("KRW-", "")
+                        lines.append(f"  {sym}: 매수 {h['price']:,.0f} → 현재 {cp:,.0f} ({pnl:+.1f}%)")
             except Exception:
                 lines.append("  (가격 조회 실패)")
 
@@ -1503,6 +1517,7 @@ class LLMAnalyzer:
         if strategy:
             # 전략 전환 (is_active 업데이트)
             from cryptobot.data.strategy_repository import StrategyRepository
+
             repo = StrategyRepository(self._db)
             activated = repo.activate(strategy, source="llm", reason="LLM 분석에서 추천")
             if not activated:
@@ -1530,14 +1545,10 @@ class LLMAnalyzer:
         if roi_changed:
             roi_table = {10: 3.0, 30: 2.0, 60: 1.0, 120: 0.1}  # 기본값
             # 기존 DB 값 로드
-            existing = self._db.execute(
-                "SELECT value FROM bot_config WHERE key = 'roi_table'"
-            ).fetchone()
+            existing = self._db.execute("SELECT value FROM bot_config WHERE key = 'roi_table'").fetchone()
             if existing and dict(existing)["value"]:
                 try:
-                    roi_table.update(
-                        {int(k): float(v) for k, v in json.loads(dict(existing)["value"]).items()}
-                    )
+                    roi_table.update({int(k): float(v) for k, v in json.loads(dict(existing)["value"]).items()})
                 except (json.JSONDecodeError, ValueError):
                     pass
             # LLM 추천값 머지

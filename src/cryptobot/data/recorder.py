@@ -97,6 +97,23 @@ class DataRecorder:
         Returns:
             생성된 trade의 id
         """
+        # profit_pct만 들어오고 profit_krw 누락된 경우 자동 계산 (#173)
+        # 성과 리포트의 SUM(profit_krw) undercount 방지
+        if profit_pct is not None and profit_krw is None and total_krw > 0:
+            profit_krw = round(total_krw * profit_pct / 100, 2)
+
+        # buy_trade_id가 주어졌으면 실존 매수 레코드인지 검증 (#173)
+        # orphan sell (buy_trade_id가 가리키는 매수가 없는 상태) 방지
+        if buy_trade_id is not None:
+            exists = self._db.execute(
+                "SELECT 1 FROM trades WHERE id = ? AND side = 'buy'",
+                (buy_trade_id,),
+            ).fetchone()
+            if not exists:
+                raise ValueError(
+                    f"record_trade: buy_trade_id={buy_trade_id}에 해당하는 매수 레코드가 없음 (orphan 방지)"
+                )
+
         cursor = self._db.execute(
             """
             INSERT INTO trades (

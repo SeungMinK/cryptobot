@@ -213,9 +213,16 @@ def test_fee_guard_allows_stop_loss_even_when_negative(db):
     from cryptobot.bot.main import CryptoBot
     from cryptobot.bot.trader import OrderResult
 
+    # 실존 buy 레코드 먼저 생성 — orphan 가드(#173) 대응
+    recorder = DataRecorder(db)
+    buy_id = recorder.record_trade(
+        coin="KRW-BTC", side="buy", price=100.0, amount=1,
+        total_krw=10000, fee_krw=5, strategy="test_strategy", trigger_reason="seed",
+    )
+
     bot = CryptoBot.__new__(CryptoBot)
     bot._db = db
-    bot._recorder = DataRecorder(db)
+    bot._recorder = recorder
     bot._notifier = MagicMock()
     bot._trader = MagicMock()
     bot._trader.is_ready = True
@@ -244,7 +251,7 @@ def test_fee_guard_allows_stop_loss_even_when_negative(db):
     bot._coin_mgr = MagicMock(collectors={"KRW-BTC": coll})
 
     active_trade = {
-        "id": 1, "price": 100.0, "total_krw": 10000, "fee_krw": 5,
+        "id": buy_id, "price": 100.0, "total_krw": 10000, "fee_krw": 5,
         "timestamp": "2026-04-17T00:00:00+00:00",
     }
     # 가격 95 — 손실 상태지만 손절이므로 통과해야 함

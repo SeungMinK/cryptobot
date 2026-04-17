@@ -591,13 +591,23 @@ class LLMAnalyzer:
         return result
 
     def _get_balance_text(self) -> str:
-        """현재 잔고 + 포지션 정보."""
+        """현재 잔고 + 포지션 정보.
+
+        API 미설정 시 LLM에 "API 키 미설정"만 주면 잔고 미상 상태로 공격적 권고를
+        받을 수 있음. DB 기반 보수적 폴백으로 대체하여 allow_trading=False 유도.
+        """
         try:
             from cryptobot.bot.trader import Trader
 
             trader = Trader()
             if not trader.is_ready:
-                return "API 키 미설정"
+                # 잔고 조회 불가 — 보수적 경고 텍스트로 대체
+                logger.warning("Trader 미설정 — 잔고 데이터 없이 LLM 호출. 보수 모드 유도")
+                return (
+                    "⚠️ 잔고 데이터 조회 불가 (Upbit API 미설정).\n"
+                    "신규 매수 가능 금액 미상 — 공격적 파라미터 권고 금지.\n"
+                    "권고: allow_trading=false 또는 보수적 aggression(≤0.3) 설정."
+                )
 
             krw = trader.get_balance_krw()
 

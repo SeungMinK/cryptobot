@@ -20,7 +20,8 @@ class RiskLimits:
     max_daily_loss_pct: float = -10.0  # 일일 최대 손실률 (%)
     max_position_size_krw: float = 1_000_000  # 최대 1회 매수 금액 (원)
     min_balance_krw: float = 5_000  # 최소 유지 잔고 (업비트 최소 주문금액)
-    max_consecutive_losses: int = 3  # 연속 손실 시 매매 중단
+    max_consecutive_losses: int = 5  # 연속 손실 시 매매 중단 (최근 1일 윈도우)
+    consecutive_loss_window_hours: int = 24  # 연속 손실 판정 윈도우
     min_order_krw: float = 5_000  # 업비트 최소 주문 금액 (원)
 
 
@@ -30,7 +31,6 @@ class RiskManager:
     매매 전에 check_*() 메서드로 리스크를 점검한다.
     NestJS의 Guard처럼, 조건 미충족 시 매매를 차단한다.
     """
-
 
     def __init__(self, db: Database, limits: RiskLimits | None = None) -> None:
         self._db = db
@@ -127,14 +127,21 @@ class RiskManager:
         return float(row[0]) if row else 0.0
 
     def _get_consecutive_losses(self, coin: str) -> int:
-        """최근 연속 손실 횟수."""
+        """최근 consecutive_loss_window_hours 내 연속 손실 횟수.
+
+        시간 윈도우를 두지 않으면 한 번 연속 손실이 발생한 코인이 영구 차단된다
+        (다음 수익 거래가 나올 때까지 재매수 금지). 매매가 아예 중단된 코인에는
+        이 서킷브레이커가 의미 없으므로 최근 윈도우로 제한한다.
+        """
+        window_hours = self.limits.consecutive_loss_window_hours
         rows = self._db.execute(
             """
             SELECT profit_pct FROM trades
             WHERE coin = ? AND side = 'sell' AND profit_pct IS NOT NULL
+              AND timestamp >= datetime('now', ?)
             ORDER BY id DESC LIMIT ?
             """,
-            (coin, self.limits.max_consecutive_losses),
+            (coin, f"-{window_hours} hours", self.limits.max_consecutive_losses),
         ).fetchall()
 
         count = 0
@@ -144,4 +151,3 @@ class RiskManager:
             else:
                 break
         return count
-

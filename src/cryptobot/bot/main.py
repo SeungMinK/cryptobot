@@ -262,9 +262,10 @@ class CryptoBot:
 
         pnl_pct = (price - buy_price) / buy_price * 100
         net_pnl = pnl_pct - BaseStrategy.ROUND_TRIP_FEE_PCT
-        # 수수료 가드: 익절 신호(ROI/트레일링)만 차단, 전략적 매도(RSI/볼린저/모멘텀)는 통과
-        is_profit_taking = "ROI" in sig.reason or "트레일링" in sig.reason or "중간선" in sig.reason or "중심선" in sig.reason or "그리드 익절" in sig.reason
-        if is_profit_taking and net_pnl <= 0:
+        # 수수료 가드: Signal에 명시된 is_profit_taking 플래그 기반 (이전엔 reason 문자열 매칭 취약).
+        # 익절 신호(ROI/트레일링/중간선 등)만 수수료로 인한 실질 음수 시 차단.
+        # 손절/전략 판단(RSI 정상복귀, 데드크로스 등)은 통과.
+        if sig.is_profit_taking and net_pnl <= 0:
             self._recorder.record_signal(coin=coin, signal_type="sell", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=f"수수료 가드: 가격 {pnl_pct:+.2f}% 실질 {net_pnl:+.2f}%", snapshot_id=snapshot_id, strategy_params_json=pj)
             return
 

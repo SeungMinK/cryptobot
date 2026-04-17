@@ -86,6 +86,6 @@ class BollingerBands(BaseStrategy):
             profit_pct = (current_price - buy_price) / buy_price * 100
             net_pnl = self._net_pnl_pct(profit_pct)
             if net_pnl > 1.0:
-                return Signal("sell", 0.5, f"중심선 익절 (실질 +{net_pnl:.1f}%)")
+                return Signal("sell", 0.5, f"중심선 익절 (실질 +{net_pnl:.1f}%)", is_profit_taking=True)
 
         return Signal("hold", 0.0, "보유 유지")

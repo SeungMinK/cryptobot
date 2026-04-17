@@ -470,21 +470,44 @@ class LLMAnalyzer:
             return None
 
     def _apply_hard_limits(self, result: dict) -> dict:
-        """LLM 응답에 하드 리밋 클리핑."""
+        """LLM 응답에 하드 리밋 클리핑.
+
+        클리핑된 필드는 `_clipped_fields`에 누적 기록해 _save_decision()이
+        output_raw_json 옆에 보존한다. DB 쿼리로 "LLM이 반복적으로 범위 밖 값을
+        제안하는지" 모니터링하기 위함.
+        """
         params = result.get("recommended_params", {})
+        clipped: list[dict] = []
 
         for key, (mn, mx) in HARD_LIMITS.items():
             if key in params:
-                original = params[key]
-                params[key] = max(mn, min(mx, params[key]))
-                if params[key] != original:
-                    logger.warning("하드 리밋 클리핑: %s = %s → %s", key, original, params[key])
+                try:
+                    original = float(params[key])
+                except (ValueError, TypeError):
+                    continue
+                new_val = max(mn, min(mx, original))
+                if new_val != original:
+                    logger.warning("하드 리밋 클리핑: %s = %s → %s (범위 %s~%s)", key, original, new_val, mn, mx)
+                    clipped.append({"field": key, "original": original, "clipped": new_val, "range": [mn, mx]})
+                    params[key] = new_val
 
-        # aggression도 클리핑
+        # aggression도 클리핑 + 로그
         if "aggression" in result:
             mn, mx = HARD_LIMITS["aggression"]
-            result["aggression"] = max(mn, min(mx, result["aggression"]))
+            try:
+                original = float(result["aggression"])
+                new_val = max(mn, min(mx, original))
+                if new_val != original:
+                    logger.warning("하드 리밋 클리핑: aggression = %s → %s (범위 %s~%s)", original, new_val, mn, mx)
+                    clipped.append(
+                        {"field": "aggression", "original": original, "clipped": new_val, "range": [mn, mx]}
+                    )
+                result["aggression"] = new_val
+            except (ValueError, TypeError):
+                pass
 
+        if clipped:
+            result["_clipped_fields"] = clipped
         result["recommended_params"] = params
         return result
 
@@ -1332,7 +1355,39 @@ class LLMAnalyzer:
                     continue
 
         logger.error("LLM 분석 최종 실패 (%d회 시도) — 과거 데이터 유지", self.MAX_RETRIES)
+        # 실패해도 이미 Anthropic에는 과금됐으므로 누적 토큰을 DB에 기록
+        # (그렇지 않으면 DB 합계 vs 실제 청구가 어긋나 비용 추적이 실패)
+        if total_input > 0 or total_output > 0:
+            self._record_failed_call(total_input, total_output, self.MAX_RETRIES)
         return None
+
+    def _record_failed_call(self, input_tokens: int, output_tokens: int, attempts: int) -> None:
+        """최종 실패한 LLM 호출의 토큰·비용을 DB에 기록.
+
+        MAX_RETRIES 내내 JSON 파싱 실패 또는 예외로 return None하는 경우에도
+        토큰은 이미 소모됐으므로 llm_decisions에 FAILED 레코드로 저장한다.
+        """
+        try:
+            cost = self._calc_cost(input_tokens, output_tokens)
+            self._db.execute(
+                """
+                INSERT INTO llm_decisions (
+                    timestamp, model, input_tokens, output_tokens, cost_usd,
+                    output_market_state, output_reasoning
+                ) VALUES (datetime('now'), ?, ?, ?, ?, 'FAILED', ?)
+                """,
+                (
+                    self._model, input_tokens, output_tokens, cost,
+                    f"MAX_RETRIES {attempts}회 전부 실패 — 토큰만 집계",
+                ),
+            )
+            self._db.commit()
+            logger.warning(
+                "실패 호출 토큰 기록: in=%d out=%d cost=$%.4f",
+                input_tokens, output_tokens, cost,
+            )
+        except Exception as e:
+            logger.error("실패 호출 DB 기록 실패: %s", e)
 
     def _fill_defaults(self, result: dict) -> dict:
         """필수 필드 누락 시 기본값 채우기."""
@@ -1369,20 +1424,35 @@ class LLMAnalyzer:
                     except (ValueError, TypeError):
                         pass
 
-        # 전략 파라미터 기반 (rsi_oversold, bb_std 등) — 활성 전략에서 읽기
+        # 전략 파라미터 기반 (rsi_oversold, bb_std 등)
+        # 1순위: 활성 전략 / 2순위: is_available=TRUE 중 첫 번째 / 3순위: 하드코딩 폴백
         strategy_keys = ["rsi_oversold", "bb_std"]
+        hardcoded_defaults = {"rsi_oversold": 30, "bb_std": 2.0}
         for key in strategy_keys:
-            if key not in params:
+            if key in params:
+                continue
+            # 1순위: 활성 전략
+            row = self._db.execute(
+                "SELECT default_params_json FROM strategies WHERE is_active = TRUE LIMIT 1"
+            ).fetchone()
+            # 2순위: 사용 가능 전략 중 첫 번째
+            if not row or not dict(row).get("default_params_json"):
                 row = self._db.execute(
-                    "SELECT default_params_json FROM strategies WHERE is_active = TRUE LIMIT 1"
+                    "SELECT default_params_json FROM strategies "
+                    "WHERE is_available = TRUE AND default_params_json IS NOT NULL "
+                    "ORDER BY id LIMIT 1"
                 ).fetchone()
-                if row and dict(row)["default_params_json"]:
-                    try:
-                        sp = json.loads(dict(row)["default_params_json"])
-                        if key in sp:
-                            params[key] = sp[key]
-                    except (json.JSONDecodeError, TypeError):
-                        pass
+            if row and dict(row).get("default_params_json"):
+                try:
+                    sp = json.loads(dict(row)["default_params_json"])
+                    if key in sp:
+                        params[key] = sp[key]
+                        continue
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            # 3순위: 하드코딩
+            params[key] = hardcoded_defaults[key]
+            logger.warning("전략 파라미터 하드코딩 기본값 적용: %s = %s", key, params[key])
         return params
 
     def _save_decision(self, result: dict) -> None:
@@ -1395,6 +1465,14 @@ class LLMAnalyzer:
         cost = self._calc_cost(input_tokens, output_tokens)
 
         prompt_vid = result.get("_prompt_version_id")
+
+        # reasoning에 클리핑 흔적이 있으면 덧붙여 저장 (별도 컬럼 추가 전 임시)
+        reasoning = result.get("market_summary_kr", "") + "\n\n" + result.get("reasoning", "")
+        if result.get("_clipped_fields"):
+            clipped_notes = ", ".join(
+                f"{c['field']}: {c['original']}→{c['clipped']}" for c in result["_clipped_fields"]
+            )
+            reasoning += f"\n\n[하드리밋 클리핑] {clipped_notes}"
 
         self._db.execute(
             """
@@ -1416,7 +1494,7 @@ class LLMAnalyzer:
                 params.get("k_value"),
                 params.get("stop_loss_pct"),
                 params.get("trailing_stop_pct"),
-                result.get("market_summary_kr", "") + "\n\n" + result.get("reasoning", ""),
+                reasoning,
                 input_tokens,
                 output_tokens,
                 cost,

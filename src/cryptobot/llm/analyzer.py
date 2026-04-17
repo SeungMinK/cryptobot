@@ -634,6 +634,10 @@ class LLMAnalyzer:
                     changed = [f"{k}={v}" for k, v in after.items()]
                     if changed:
                         entry += f" | 설정: {', '.join(changed[:5])}"
+                    # LLM이 존재하지 않는 전략 이름을 반환했던 경우 경고 표기
+                    rejected = ba.get("_rejected_strategy")
+                    if rejected:
+                        entry += f" | ⚠️ 거절된 추천: {ba.get('_rejected_strategy_reason', rejected)}"
                 except Exception:
                     pass
 
@@ -1521,7 +1525,16 @@ class LLMAnalyzer:
             repo = StrategyRepository(self._db)
             activated = repo.activate(strategy, source="llm", reason="LLM 분석에서 추천")
             if not activated:
-                logger.warning("전략 활성화 실패: %s — 기존 전략 유지", strategy)
+                # LLM이 존재하지 않는 전략 이름을 반환한 경우
+                # — 다음 호출의 이전 피드백에 반영하기 위해 결과 딕셔너리에 마킹
+                logger.warning("전략 활성화 실패: %s — 기존 전략 유지, 다음 프롬프트에 반영", strategy)
+                available = self._db.execute(
+                    "SELECT name FROM strategies WHERE is_available = TRUE"
+                ).fetchall()
+                names = ", ".join(dict(r)["name"] for r in available) or "(없음)"
+                result["_rejected_strategy"] = strategy
+                result["_rejected_strategy_reason"] = f"'{strategy}'은 존재하지 않음. 사용 가능: {names}"
+                strategy = None  # 이후 파라미터 병합도 스킵
 
             # 기존 파라미터 로드
             row = self._db.execute("SELECT default_params_json FROM strategies WHERE name = ?", (strategy,)).fetchone()
@@ -1594,14 +1607,18 @@ class LLMAnalyzer:
             if key not in COMMON_PARAM_KEYS:
                 after[f"strategy:{key}"] = value
 
-        # before/after를 최신 llm_decisions에 기록
+        # before/after를 최신 llm_decisions에 기록 (거절된 전략 추천이 있으면 함께)
+        payload = {"before": before, "after": after, "strategy": strategy}
+        if result.get("_rejected_strategy"):
+            payload["_rejected_strategy"] = result["_rejected_strategy"]
+            payload["_rejected_strategy_reason"] = result.get("_rejected_strategy_reason", "")
         self._db.execute(
             """
             UPDATE llm_decisions SET
                 input_news_summary = ?
             WHERE id = (SELECT MAX(id) FROM llm_decisions)
             """,
-            (json.dumps({"before": before, "after": after, "strategy": strategy}, ensure_ascii=False),),
+            (json.dumps(payload, ensure_ascii=False),),
         )
 
         self._db.commit()

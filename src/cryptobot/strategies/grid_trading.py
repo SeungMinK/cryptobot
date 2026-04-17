@@ -93,7 +93,7 @@ class GridTrading(BaseStrategy):
 
         # 그리드 범위 상한 이탈 → 익절
         if current_price > self._grids[-1]:
-            return Signal("sell", 0.8, "그리드 상한 돌파 — 익절")
+            return Signal("sell", 0.8, "그리드 상한 돌파 — 익절", is_profit_taking=True)
 
         # 매수 격자보다 한 칸 이상 위로 이동 → 익절
         buy_index = self._find_grid_index(buy_price)
@@ -107,6 +107,7 @@ class GridTrading(BaseStrategy):
                     "sell",
                     0.6,
                     f"그리드 익절 #{buy_index}→#{current_index} (실질 +{net_pnl:.1f}%)",
+                    is_profit_taking=True,
                 )
 
         return Signal("hold", 0.0, "보유 유지")

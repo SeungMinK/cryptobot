@@ -20,6 +20,10 @@ class Signal:
     trigger_value: float | None = None  # 돌파 기준가 등
     stop_loss: float | None = None  # 이 신호에 대한 권장 손절가
     take_profit: float | None = None  # 이 신호에 대한 권장 익절가
+    # 익절성 매도(ROI/트레일링/밴드 중간선 등) 여부.
+    # main.py의 fee guard가 "수수료 커버 안 되면 스킵" 결정에 사용.
+    # 손절성/전략적 매도(RSI 정상복귀 등)는 False. 각 전략이 명시적으로 설정.
+    is_profit_taking: bool = False
 
 
 @dataclass
@@ -114,8 +118,9 @@ class BaseStrategy(ABC):
         net_pnl = self._net_pnl_pct(pnl_pct)
 
         # 손절 — 무조건 실행 (수수료 무시, RSI 무시)
+        # 손절은 is_profit_taking=False — fee guard에 막히면 안 됨
         if pnl_pct <= self.params.stop_loss_pct:
-            return Signal("sell", 1.0, "손절", trigger_value=round(pnl_pct, 2))
+            return Signal("sell", 1.0, "손절", trigger_value=round(pnl_pct, 2), is_profit_taking=False)
 
         # RSI 과매도 판단 (전략별 oversold 기준)
         rsi_oversold = self.params.extra.get("rsi_oversold", self.params.extra.get("oversold", 30))
@@ -135,19 +140,26 @@ class BaseStrategy(ABC):
                                 "sell", 0.9,
                                 f"ROI 강제 (RSI={current_rsi:.0f} 과매도이나 실질 +{net_pnl:.2f}% 충분)",
                                 trigger_value=round(net_pnl, 2),
+                                is_profit_taking=True,
                             )
                         return None  # RSI 과매도 + ROI 약함 → 매도 보류
                     return Signal(
                         "sell", 0.9,
                         f"ROI 도달 ({hold_minutes}분 보유, 실질 +{net_pnl:.2f}% >= {min_roi}%)",
                         trigger_value=round(net_pnl, 2),
+                        is_profit_taking=True,
                     )
 
         # 트레일링 스탑 — 실질 수익이 있을 때만 매도
         drop_pct = (current_price - self._highest_price) / self._highest_price * 100
         if drop_pct <= self.params.trailing_stop_pct:
             if net_pnl > 0:
-                return Signal("sell", 0.8, f"트레일링 스탑 (실질 {net_pnl:+.2f}%)", trigger_value=round(drop_pct, 2))
+                return Signal(
+                    "sell", 0.8,
+                    f"트레일링 스탑 (실질 {net_pnl:+.2f}%)",
+                    trigger_value=round(drop_pct, 2),
+                    is_profit_taking=True,
+                )
             return None
 
         return None

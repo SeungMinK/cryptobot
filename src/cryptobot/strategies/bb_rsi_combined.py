@@ -125,6 +125,7 @@ class BBRSICombined(BaseStrategy):
                 "sell", 0.6,
                 f"볼린저 중간선 도달 (실질 +{net_pnl:.1f}%)",
                 trigger_value=round(ma, 2),
+                is_profit_taking=True,
             )
 
         return Signal("hold", 0.0, f"보유 유지 (RSI={rsi:.0f}, 실질 {net_pnl:+.1f}%)")

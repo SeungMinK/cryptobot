@@ -83,3 +83,22 @@ def test_normal_when_one_open_position():
     # buy만 존재 — trades 테이블에 1건 있으므로 trade_count=1, position_count=1
     # trade_count(1) < 2 이고 position_count(1) < 3 이므로 NORMAL
     assert analyzer._get_dynamic_interval_minutes() == analyzer.INTERVAL_NORMAL_MIN
+
+
+def test_haiku_pricing_matches_official():
+    """Haiku 4.5 가격 상수는 공식가와 일치해야 한다.
+
+    공식: input $1.00/MTok, output $5.00/MTok
+    (platform.claude.com/docs/en/docs/about-claude/pricing)
+    """
+    analyzer, db = _make_analyzer()
+    assert analyzer.PRICE_INPUT_PER_M == 1.00, "Haiku 4.5 공식 input 가격: $1/MTok"
+    assert analyzer.PRICE_OUTPUT_PER_M == 5.00, "Haiku 4.5 공식 output 가격: $5/MTok"
+
+
+def test_cost_calculation_example():
+    """실측 데이터 예시: in=25083 + out=911 → 공식가 $0.02963."""
+    analyzer, db = _make_analyzer()
+    cost = analyzer._calc_cost(25083, 911)
+    # 25083/1M * 1 + 911/1M * 5 = 0.025083 + 0.004555 = 0.029638
+    assert abs(cost - 0.029638) < 1e-5

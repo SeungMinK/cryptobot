@@ -184,7 +184,7 @@ class TestBacktestTextTopNLimit:
     def test_top_n_limit(self):
         """코인당 TOP_N_PER_COIN개만 표시되는지 확인."""
         db = _create_test_db()
-        # 15개 결과 삽입 (Top 10만 표시되어야 함)
+        # 15개 결과 삽입 (Top N만 표시되어야 함)
         for i in range(15):
             _insert_backtest_row(
                 db, "2026-04-13", f"strategy_{i}", "KRW-BTC", 10.0 - i,
@@ -196,11 +196,12 @@ class TestBacktestTextTopNLimit:
         analyzer._db = db
 
         text, _ = analyzer._get_backtest_text()
-        # strategy_0 ~ strategy_9 (Top 10) 있어야 함
-        for i in range(10):
+        top_n = LLMAnalyzer.TOP_N_PER_COIN
+        # strategy_0 ~ strategy_(N-1) (Top N) 있어야 함
+        for i in range(top_n):
             assert f"strategy_{i}" in text
-        # strategy_10 ~ strategy_14 (하위 5개) 없어야 함
-        for i in range(10, 15):
+        # strategy_N ~ strategy_14 (나머지) 없어야 함
+        for i in range(top_n, 15):
             assert f"strategy_{i}" not in text
 
 

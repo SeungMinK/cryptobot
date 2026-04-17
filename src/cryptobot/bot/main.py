@@ -25,6 +25,7 @@ from cryptobot.bot.trader import Trader
 from cryptobot.bot.weekly_reporter import WeeklyReporter
 from cryptobot.data.database import Database
 from cryptobot.data.recorder import DataRecorder
+from cryptobot.exceptions import APIError, InsufficientBalanceError
 from cryptobot.notifier.slack import SlackNotifier
 from cryptobot.strategies.base import BaseStrategy
 
@@ -197,9 +198,27 @@ class CryptoBot:
             return
 
         bal_before = bal  # 잔고 스냅샷
-        order = self._trader.buy_market(coin, amount)
+        # 주문 실행 — APIError가 중간에 나면 주문이 접수됐을 수도 있으니 긴급 알림 필수
+        try:
+            order = self._trader.buy_market(coin, amount)
+        except (APIError, InsufficientBalanceError) as e:
+            logger.error("매수 API 실패: %s %s원 — %s", coin, f"{amount:,.0f}", e)
+            self._notifier.notify_error(
+                f"⚠️ 매수 주문 API 실패: {coin} {amount:,.0f}원 — 접수 후 체결 조회 실패 가능성. "
+                f"Upbit에서 수동 확인 필요.\n{e}"
+            )
+            skip = f"API 예외: {type(e).__name__}"
+            self._recorder.record_signal(coin=coin, signal_type="buy", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=skip, snapshot_id=snapshot_id, strategy_params_json=pj)
+            return
         if order.success:
             tid = self._recorder.record_trade(coin=coin, side="buy", price=order.price, amount=order.amount, total_krw=order.total_krw, fee_krw=order.fee_krw, strategy=sn, trigger_reason=sig.reason, trigger_value=sig.trigger_value, param_k_value=s.params.extra.get("k_value"), param_stop_loss=s.params.stop_loss_pct, param_trailing_stop=s.params.trailing_stop_pct, market_state_at_trade=snapshot.get("market_state"), btc_price_at_trade=price, rsi_at_trade=snapshot.get("rsi_14"), order_uuid=order.order_uuid)
+            # 즉시 commit — 다음 틱이 이 buy를 찾지 못해 중복 매수하는 것을 방지
+            try:
+                self._db.commit()
+            except Exception as ce:
+                logger.critical("매수 trade commit 실패: coin=%s tid=%s — %s", coin, tid, ce)
+                self._notifier.notify_error(f"🚨 DB commit 실패 (매수): {coin} — 수동 확인 필수")
+                raise
             # DB 쓰기 검증
             verify = self._db.execute("SELECT id FROM trades WHERE id = ?", (tid,)).fetchone()
             if not verify:
@@ -212,6 +231,9 @@ class CryptoBot:
             if abs(actual_diff - expected_diff) > expected_diff * 0.05:
                 logger.warning("잔고 불일치: 예상 -%s, 실제 -%s", f"{expected_diff:,.0f}", f"{actual_diff:,.0f}")
             self._recorder.record_signal(coin=coin, signal_type="buy", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, executed=True, trade_id=tid, snapshot_id=snapshot_id, strategy_params_json=pj)
+        else:
+            # 사전 검증 실패 (최소 주문 금액 미달 등) — 기록만
+            self._recorder.record_signal(coin=coin, signal_type="buy", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=order.error or "주문 실패", snapshot_id=snapshot_id, strategy_params_json=pj)
 
     def _check_and_sell(self, active_trade, price, snapshot_id, snapshot=None, coin=None):
         """매도 신호 확인 및 실행."""
@@ -246,12 +268,29 @@ class CryptoBot:
             self._recorder.record_signal(coin=coin, signal_type="sell", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=f"수수료 가드: 가격 {pnl_pct:+.2f}% 실질 {net_pnl:+.2f}%", snapshot_id=snapshot_id, strategy_params_json=pj)
             return
 
-        order = self._trader.sell_market(coin)
+        try:
+            order = self._trader.sell_market(coin)
+        except (APIError, InsufficientBalanceError) as e:
+            logger.error("매도 API 실패: %s — %s", coin, e)
+            self._notifier.notify_error(
+                f"⚠️ 매도 주문 API 실패: {coin} — 접수 후 체결 조회 실패 가능성. "
+                f"Upbit에서 수동 확인 필요.\n{e}"
+            )
+            skip = f"API 예외: {type(e).__name__}"
+            self._recorder.record_signal(coin=coin, signal_type="sell", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=skip, snapshot_id=snapshot_id, strategy_params_json=pj)
+            return
         if order.success:
             bf = active_trade.get("fee_krw") or 0
             profit_krw = round((order.total_krw - order.fee_krw) - (active_trade["total_krw"] + bf), 2)
             profit_pct = round(profit_krw / (active_trade["total_krw"] + bf) * 100, 2) if (active_trade["total_krw"] + bf) > 0 else 0
             tid = self._recorder.record_trade(coin=coin, side="sell", price=order.price, amount=order.amount, total_krw=order.total_krw, fee_krw=order.fee_krw, strategy=sn, trigger_reason=sig.reason, trigger_value=sig.trigger_value, param_k_value=s.params.extra.get("k_value"), param_stop_loss=s.params.stop_loss_pct, param_trailing_stop=s.params.trailing_stop_pct, buy_trade_id=active_trade["id"], profit_pct=profit_pct, profit_krw=profit_krw, hold_duration_minutes=s._hold_minutes, order_uuid=order.order_uuid)
+            # 즉시 commit — 미커밋으로 다음 틱이 이 매도를 놓치면 이중 매도 위험
+            try:
+                self._db.commit()
+            except Exception as ce:
+                logger.critical("매도 trade commit 실패: coin=%s tid=%s — %s", coin, tid, ce)
+                self._notifier.notify_error(f"🚨 DB commit 실패 (매도): {coin} — 수동 확인 필수")
+                raise
             # DB 쓰기 검증
             verify = self._db.execute("SELECT id FROM trades WHERE id = ?", (tid,)).fetchone()
             if not verify:
@@ -259,6 +298,8 @@ class CryptoBot:
                 self._notifier.notify_error(f"DB 쓰기 검증 실패: {coin} 매도 기록 누락")
             self._recorder.record_signal(coin=coin, signal_type="sell", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, executed=True, trade_id=tid, snapshot_id=snapshot_id, strategy_params_json=pj)
             s.reset()
+        else:
+            self._recorder.record_signal(coin=coin, signal_type="sell", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=order.error or "주문 실패", snapshot_id=snapshot_id, strategy_params_json=pj)
 
     def _llm_analyze(self):
         try:

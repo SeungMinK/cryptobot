@@ -217,6 +217,9 @@ CREATE TABLE IF NOT EXISTS llm_decisions (
     cost_usd REAL,
     evaluation_period_pnl_pct REAL,
     evaluation_was_good BOOLEAN,
+    -- before/after 스냅샷 (#171). input_news_summary 재사용하던 방식 개선
+    before_snapshot_json TEXT,
+    after_snapshot_json TEXT,
     FOREIGN KEY (input_market_snapshot_id) REFERENCES market_snapshots(id)
 );
 

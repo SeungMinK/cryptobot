@@ -247,11 +247,25 @@ class LLMAnalyzer:
         self._model = os.getenv("LLM_MODEL", "claude-haiku-4-5-20251001")
 
     def _get_config_float(self, key: str, default: float) -> float:
-        """bot_config에서 float 값 조회."""
+        """bot_config에서 float 값 조회. HARD_LIMITS 범위 검증 포함.
+
+        HARD_LIMITS에 정의된 키라면 범위(mn, mx) 밖 값은 무효로 간주하고 default 반환.
+        예: emergency_held_pct=0.1 저장 시 범위 (1.0, 10.0) 밖이므로 기본값 3.0으로 폴백.
+        """
         row = self._db.execute("SELECT value FROM bot_config WHERE key = ?", (key,)).fetchone()
         if row:
             try:
-                return float(dict(row)["value"])
+                value = float(dict(row)["value"])
+                # HARD_LIMITS 범위 검증
+                if key in HARD_LIMITS:
+                    mn, mx = HARD_LIMITS[key]
+                    if not (mn <= value <= mx):
+                        logger.warning(
+                            "bot_config.%s 값 %s가 HARD_LIMITS 범위 [%s, %s] 밖 — 기본값 %s 사용",
+                            key, value, mn, mx, default,
+                        )
+                        return default
+                return value
             except (ValueError, TypeError):
                 pass
         return default
@@ -304,8 +318,14 @@ class LLMAnalyzer:
     def _should_run(self, force: bool = False) -> bool:
         """분석 실행 여부 판단 (동적 주기)."""
         # 일일 호출 제한
+        # KST 일 경계 기준 카운트. DB timestamp는 UTC라 +9 hours로 변환 후 DATE 비교.
+        # 프로젝트 규칙: "모든 시간은 KST(Asia/Seoul)". UTC의 DATE('now')로 하면
+        # KST 기준 23시~익일 0시 구간에서 새 날짜로 잘못 인식되는 문제.
         daily_count = (
-            self._db.execute("SELECT COUNT(*) FROM llm_decisions WHERE DATE(timestamp) = DATE('now')").fetchone()[0]
+            self._db.execute(
+                "SELECT COUNT(*) FROM llm_decisions "
+                "WHERE DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')"
+            ).fetchone()[0]
             or 0
         )
         if daily_count >= self.MAX_DAILY_CALLS:
@@ -1685,18 +1705,25 @@ class LLMAnalyzer:
             if key not in COMMON_PARAM_KEYS:
                 after[f"strategy:{key}"] = value
 
-        # before/after를 최신 llm_decisions에 기록 (거절된 전략 추천이 있으면 함께)
+        # before/after를 최신 llm_decisions에 기록 (신규 전용 컬럼 + 구 컬럼 호환)
         payload = {"before": before, "after": after, "strategy": strategy}
         if result.get("_rejected_strategy"):
             payload["_rejected_strategy"] = result["_rejected_strategy"]
             payload["_rejected_strategy_reason"] = result.get("_rejected_strategy_reason", "")
+        payload_json = json.dumps(payload, ensure_ascii=False)
+        before_json = json.dumps(before, ensure_ascii=False)
+        after_json = json.dumps(after, ensure_ascii=False)
+        # before_snapshot_json / after_snapshot_json: 신규 전용 컬럼
+        # input_news_summary: 구 쿼리 호환용 (마이그레이션 전 코드가 읽는 경로 보존)
         self._db.execute(
             """
             UPDATE llm_decisions SET
+                before_snapshot_json = ?,
+                after_snapshot_json = ?,
                 input_news_summary = ?
             WHERE id = (SELECT MAX(id) FROM llm_decisions)
             """,
-            (json.dumps(payload, ensure_ascii=False),),
+            (before_json, after_json, payload_json),
         )
 
         self._db.commit()

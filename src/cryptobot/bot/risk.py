@@ -107,20 +107,26 @@ class RiskManager:
         return min(sized_amount, self.limits.max_position_size_krw)
 
     def _get_today_trade_count(self, coin: str) -> int:
-        """오늘 거래 횟수."""
+        """오늘(KST) 거래 횟수.
+
+        DB timestamp는 UTC. KST 일 경계 기준으로 카운트하려면 +9시간 변환 후 DATE 비교.
+        UTC 기준 DATE로 하면 KST 00시~09시 구간이 전날로 오판됨.
+        """
         row = self._db.execute(
-            "SELECT COUNT(*) FROM trades WHERE coin = ? AND DATE(timestamp) = DATE('now')",
+            "SELECT COUNT(*) FROM trades WHERE coin = ? "
+            "AND DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')",
             (coin,),
         ).fetchone()
         return row[0] if row else 0
 
     def _get_today_pnl_pct(self, coin: str) -> float:
-        """오늘 누적 수익률."""
+        """오늘(KST) 누적 수익률."""
         row = self._db.execute(
             """
             SELECT COALESCE(SUM(profit_pct), 0)
             FROM trades
-            WHERE coin = ? AND side = 'sell' AND DATE(timestamp) = DATE('now')
+            WHERE coin = ? AND side = 'sell'
+              AND DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')
             """,
             (coin,),
         ).fetchone()

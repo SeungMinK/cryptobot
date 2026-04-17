@@ -1,0 +1,93 @@
+당신은 암호화폐 자동매매 봇의 시장 분석 전문가입니다.
+아래 데이터를 종합 분석하여 매매 전략과 파라미터를 조절하세요.
+
+## 최근 뉴스 (마지막 분석 이후)
+1. [cointelegraph] Ex-Treasury chief warns of US bond crash, calls for contingency plan (negative)
+   "When we hit it, it will be vicious, so we have to prepare for that eventuality," said former Treasury Secretary Henry Paulson on a potential US Treas
+2. [cointelegraph] Russia-linked crypto exchange Grinex halts trading after $14M hack (negative)
+   Grinex has been accused by US authorities of assisting Russia and other entities in evading sanctions and laundering funds for Russia-linked hackers.
+3. [coindesk] Bitcoin bulls target $125,000 as U.S.-Iran peace talks trigger risk-on mood [BTC] (positive)
+   Funding rates at 2023 lows signal the market is heavily short against bitcoin, ZeroStack's Daniel Reis-Faria says, setting up conditions for a forced
+4. [cointelegraph] Three things Bitcoin must do to hold highs above $76K: Analysts [BTC] (positive)
+   Analysts say reclaiming $76,000, sustained spot market buy volume and consistent inflows to the Bitcoin ETFs are the necessary components required for
+5. [cointelegraph] HIVE plans $75M raise to fund AI infrastructure push [BTC] (neutral)
+   The Bitcoin miner will use the proceeds to expand GPU capacity and data centers as it scales its high-performance computing business beyond mining.
+
+## 공포/탐욕 지수
+현재: 21 (Extreme Fear) — 2026-04-17 04:13:38
+1회 전: 21 (Extreme Fear) — 2026-04-17 03:13:37
+2회 전: 21 (Extreme Fear) — 2026-04-17 02:13:35
+3회 전: 21 (Extreme Fear) — 2026-04-17 00:43:34
+
+## 현재 시장 상태 (개선 전 — 거의 전부 +0.0%/1h 버그)
+ENSO: 1,436원 (+0.0%/1h) | bearish | RSI=18→
+BTC: 101,877,000원 (+0.0%/1h) | bearish | RSI=50→
+BIO: 52원 (-1.7%/1h) | bullish | RSI=93↑ | 거래량 +60%
+ARKM: 193원 (+4.9%/1h) | bullish | RSI=76→ | 거래량 -94%
+CARV: 88원 (-1.2%/1h) | bearish | RSI=58↓ | 거래량 -6%
+
+## 현재 잔고 및 포지션 (개선 전 — 동시 보유 가능 종목 수 힌트 없음)
+KRW 잔고: 99,442원
+총 자산: 99,442원
+최소 주문: 5,000원
+신규 매수 가능: 89,442원
+
+## 최근 매매 성과 (개선 전 — 손익비 "1:1" 반올림 버그)
+[24시간] 8건, 승률 88%, 손익 +2,163원
+  평균 승: +2.14%, 평균 패: -1.39%, 손익비 1:1
+[최근 매매]
+  SKR +0.30% (7877분) — ROI 도달 (7877분 보유, 실질 +0.71% >= 0.4%)
+  BCH +0.60% (188분) — ROI 도달 (188분 보유, 실질 +0.83% >= 0.4%)
+  JST +2.05% (47분) — ROI 도달 (47분 보유, 실질 +2.06% >= 1.8%)
+  TRUMP -1.39% (9302분) — RSI(50) 정상 복귀 (실질 -1.4%)
+[전략별 24시간]
+  bb_rsi_combined: 8건, 승률 88%, 평균 +1.70%
+
+## 이전 분석 결과 피드백 (개선 전 — 3회 연속 "미평가")
+[직전] 2026-04-16 20:03:57 | bearish | 성과: 미평가 | 설정: stop_loss_pct=-5.0, trailing_stop_pct=-2.5, k_value=0.25, max_position_per_coin_pct=50, allow_trading=true
+[2회 전] 2026-04-16 19:53:40 | bearish | 성과: 미평가 | 설정: stop_loss_pct=-5.0, trailing_stop_pct=-2.5, k_value=0.25, max_position_per_coin_pct=55, allow_trading=true
+[3회 전] 2026-04-16 19:33:42 | bearish | 성과: 미평가 | 설정: stop_loss_pct=-5.0, trailing_stop_pct=-2.5, k_value=0.25, max_position_per_coin_pct=60, allow_trading=true
+
+## 백테스트 시뮬레이션 결과 (개선 전 — 0건/0% 노이즈 + 코인당 Top 10)
+### 최근 실행: 2026-04-17
+[KRW-BTC] (2025-12-05 ~ 2026-04-05)
+  volatility_breakout(k=0.7): +5.7% | 10건 승률80% | MDD -7.1% | sharpe 3.35
+  ma_crossover(short=10,long=20): +4.2% | 2건 승률100% | MDD 0.0% | sharpe 53.14
+  bb_rsi_combined(bb=2,bb_p=20,rsi_os=25,rsi_p=14,rsi_overbought=50,k=0.25): +3.4% | 2건 승률50% | MDD -8.4% | sharpe 2.86
+  bb_rsi_combined(bb=2,bb_p=20,rsi_os=30,rsi_p=14,rsi_overbought=50,k=0.25): +3.4% | 2건 승률50% | MDD -8.4% | sharpe 2.86
+  bb_rsi_combined(bb=2,bb_p=20,rsi_os=35,rsi_p=14,rsi_overbought=50,k=0.25): +3.4% | 2건 승률50% | MDD -8.4% | sharpe 2.86
+  ma_crossover(short=5,long=40): +1.4% | 2건 승률100% | MDD 0.0% | sharpe 30.24
+  ma_crossover(short=10,long=40): +1.0% | 1건 승률100% | MDD 0.0%
+  bollinger_squeeze(bb_p=20,bb=1.5,sq_lb=120): +0.0% | 0건 승률0% | MDD 0.0%
+  bollinger_squeeze(bb_p=20,bb=2,sq_lb=120): +0.0% | 0건 승률0% | MDD 0.0%
+  bollinger_squeeze(bb_p=20,bb=2.5,sq_lb=120): +0.0% | 0건 승률0% | MDD 0.0%
+[KRW-SKR] (2026-02-24 ~ 2026-04-16)
+  bollinger_bands(bb_p=20,bb=2): +1.7% | 1건 승률100% | MDD 0.0%
+  bb_rsi_combined(bb=2,bb_p=20,rsi_os=25,rsi_p=14,rsi_overbought=50,k=0.25): +0.0% | 0건 승률0% | MDD 0.0%
+  bollinger_bands(bb_p=20,bb=2.5): +0.0% | 0건 승률0% | MDD 0.0%
+  bollinger_squeeze(bb_p=20,bb=1.5,sq_lb=120): +0.0% | 0건 승률0% | MDD 0.0%
+  bollinger_squeeze(bb_p=20,bb=2,sq_lb=120): +0.0% | 0건 승률0% | MDD 0.0%
+  bollinger_squeeze(bb_p=20,bb=2.5,sq_lb=120): +0.0% | 0건 승률0% | MDD 0.0%
+  breakout_momentum(entry=10,exit=10): +0.0% | 0건 승률0% | MDD 0.0%
+  breakout_momentum(entry=20,exit=10): +0.0% | 0건 승률0% | MDD 0.0%
+  breakout_momentum(entry=30,exit=10): +0.0% | 0건 승률0% | MDD 0.0%
+  ma_crossover(short=5,long=20): +0.0% | 0건 승률0% | MDD 0.0%
+
+## 개선 전 프롬프트 텍스트 (발췌)
+
+### 시장 대응 (공포지수 편향 + should_alert_stop 기준 없음)
+- 업비트 현물 거래만 가능 (숏/선물/레버리지 불가)
+- 공포/탐욕 지수 25 이하(극도 공포)는 역사적 매수 적기 (7년 백테스트 1,145% 수익)
+- 극도 공포 시: aggression 높이고, rsi_oversold 올리고(매수 조건 완화), bb_std 낮추기(밴드 좁혀서 진입 쉽게)
+- allow_trading은 항상 true (매매 중단은 사람이 결정)
+- 시장이 극도로 위험하면 should_alert_stop = true
+
+=====================================================================
+## 개선 포인트 요약 (#153, PR #155 반영 대상)
+
+1. 백테스트: `num_trades=0` 또는 `total_return_pct=0` 결과 제외, Top 10 → Top 5
+2. 시장: prev 윈도를 -120min~-30min으로 제한, now==prev면 `+0.0%/1h` 생략
+3. 성과: `손익비 1:{avg_loss/avg_win:.0f}` 반올림 버그 → `손익비 1.54 (목표 ≥ 1.5)`
+4. 이전 피드백: 매매 0건일 때 BTC 변화 + 보유 평균 미실현을 대체 평가로 기록
+5. 잔고: `max_position_per_coin_pct` 기반 동시 보유 가능 종목 수 힌트 추가
+6. 프롬프트 텍스트: 공포지수 해석 중립화, should_alert_stop 기준 4항목 명시, 손익비 목표 1.5 이상으로 통일

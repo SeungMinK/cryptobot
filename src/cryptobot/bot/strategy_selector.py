@@ -89,6 +89,7 @@ class StrategySelector:
     def refresh(self, notifier=None) -> None:
         """전략 변경 감지 + 파라미터 실시간 반영 (전략 재생성)."""
         from cryptobot.data.strategy_repository import StrategyRepository
+
         repo = StrategyRepository(self._db)
         repo.complete_shutdown()
 
@@ -137,9 +138,7 @@ class StrategySelector:
             return self.current_strategy, self.current_strategy_name
 
         # 카테고리별 리스크 파라미터 (공유 인스턴스 보호 — 매 틱 후 복원)
-        row = self._db.execute(
-            "SELECT * FROM coin_strategy_config WHERE category = ?", (coin_category,)
-        ).fetchone()
+        row = self._db.execute("SELECT * FROM coin_strategy_config WHERE category = ?", (coin_category,)).fetchone()
         if row:
             # 원본 저장 → _tick_coin의 finally에서 복원됨
             strategy._orig_stop_loss = strategy.params.stop_loss_pct

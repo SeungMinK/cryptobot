@@ -74,9 +74,7 @@ class StrategyRepository:
             return True  # 이미 활성화됨
 
         # 전환 중인 전략이 있으면 차단
-        switching = self._db.execute(
-            "SELECT name FROM strategies WHERE status = 'shutting_down'"
-        ).fetchone()
+        switching = self._db.execute("SELECT name FROM strategies WHERE status = 'shutting_down'").fetchone()
         if switching:
             logger.warning("전략 '%s' 종료 중 — 전환 대기 필요", switching["name"])
             return False
@@ -114,9 +112,7 @@ class StrategyRepository:
         Returns:
             종료 완료된 전략 이름 목록
         """
-        rows = self._db.execute(
-            "SELECT name FROM strategies WHERE status = 'shutting_down'"
-        ).fetchall()
+        rows = self._db.execute("SELECT name FROM strategies WHERE status = 'shutting_down'").fetchall()
 
         completed = []
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")

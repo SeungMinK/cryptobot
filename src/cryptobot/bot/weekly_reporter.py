@@ -55,16 +55,16 @@ class WeeklyReporter:
             strategies = []
             for r in rows:
                 r = dict(r)
-                win_rate = round(
-                    (r["wins"] or 0) / r["trades"] * 100, 1
-                ) if r["trades"] > 0 else 0
-                strategies.append({
-                    "strategy": r["strategy"],
-                    "trades": r["trades"],
-                    "win_rate": win_rate,
-                    "avg_pct": r["avg_pct"] or 0,
-                    "total_pnl": r["total_pnl"] or 0,
-                })
+                win_rate = round((r["wins"] or 0) / r["trades"] * 100, 1) if r["trades"] > 0 else 0
+                strategies.append(
+                    {
+                        "strategy": r["strategy"],
+                        "trades": r["trades"],
+                        "win_rate": win_rate,
+                        "avg_pct": r["avg_pct"] or 0,
+                        "total_pnl": r["total_pnl"] or 0,
+                    }
+                )
 
             return {"status": "ok", "strategies": strategies}
         except Exception as e:
@@ -89,6 +89,7 @@ class WeeklyReporter:
                 if r["input_news_summary"]:
                     try:
                         import json
+
                         ba = json.loads(r["input_news_summary"])
                         before = ba.get("before", {})
                         after = ba.get("after", {})
@@ -98,10 +99,12 @@ class WeeklyReporter:
                             if str(before.get(k, "?")) != str(v)
                         }
                         if diff:
-                            changes.append({
-                                "timestamp": r["kst"],
-                                "changes": diff,
-                            })
+                            changes.append(
+                                {
+                                    "timestamp": r["kst"],
+                                    "changes": diff,
+                                }
+                            )
                     except Exception:
                         pass
 
@@ -130,8 +133,12 @@ class WeeklyReporter:
             # 테이블별 행 수
             tables = {}
             for table in [
-                "trades", "trade_signals", "market_snapshots",
-                "news_articles", "llm_decisions", "daily_reports",
+                "trades",
+                "trade_signals",
+                "market_snapshots",
+                "news_articles",
+                "llm_decisions",
+                "daily_reports",
             ]:
                 r = self._db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
                 tables[table] = r[0] if r else 0
@@ -150,9 +157,7 @@ class WeeklyReporter:
         """90일 이상 된 데이터 정리."""
         try:
             # market_snapshots 정리 (90일+)
-            cursor = self._db.execute(
-                "DELETE FROM market_snapshots WHERE timestamp < datetime('now', '-90 days')"
-            )
+            cursor = self._db.execute("DELETE FROM market_snapshots WHERE timestamp < datetime('now', '-90 days')")
             snapshots_deleted = cursor.rowcount
 
             # 미실행 신호 정리 (90일+)
@@ -169,7 +174,8 @@ class WeeklyReporter:
             if snapshots_deleted > 0 or signals_deleted > 0:
                 logger.info(
                     "데이터 정리: 스냅샷 %d건, 미실행 신호 %d건 삭제",
-                    snapshots_deleted, signals_deleted,
+                    snapshots_deleted,
+                    signals_deleted,
                 )
 
             return {

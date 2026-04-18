@@ -180,7 +180,10 @@ def test_fee_guard_blocks_profit_taking_when_negative_net(db):
     strat = MagicMock()
     # 익절성 매도 신호 (ROI 등) — 가격이 buy_price 근처라 실질 수수료 차감 후 음수
     strat.check_sell.return_value = Signal(
-        "sell", 0.9, "ROI 도달", is_profit_taking=True,
+        "sell",
+        0.9,
+        "ROI 도달",
+        is_profit_taking=True,
     )
     strat.params = MagicMock()
     strat.params.extra = {}
@@ -195,7 +198,10 @@ def test_fee_guard_blocks_profit_taking_when_negative_net(db):
     bot._coin_mgr = MagicMock(collectors={"KRW-BTC": coll})
 
     active_trade = {
-        "id": 1, "price": 100.0, "total_krw": 10000, "fee_krw": 5,
+        "id": 1,
+        "price": 100.0,
+        "total_krw": 10000,
+        "fee_krw": 5,
         "timestamp": "2026-04-17T00:00:00+00:00",
     }
     # 가격 = 100.05 → pnl 0.05%, 수수료 0.15% → 실질 -0.1%
@@ -216,8 +222,14 @@ def test_fee_guard_allows_stop_loss_even_when_negative(db):
     # 실존 buy 레코드 먼저 생성 — orphan 가드(#173) 대응
     recorder = DataRecorder(db)
     buy_id = recorder.record_trade(
-        coin="KRW-BTC", side="buy", price=100.0, amount=1,
-        total_krw=10000, fee_krw=5, strategy="test_strategy", trigger_reason="seed",
+        coin="KRW-BTC",
+        side="buy",
+        price=100.0,
+        amount=1,
+        total_krw=10000,
+        fee_krw=5,
+        strategy="test_strategy",
+        trigger_reason="seed",
     )
 
     bot = CryptoBot.__new__(CryptoBot)
@@ -227,8 +239,14 @@ def test_fee_guard_allows_stop_loss_even_when_negative(db):
     bot._trader = MagicMock()
     bot._trader.is_ready = True
     bot._trader.sell_market.return_value = OrderResult(
-        success=True, side="sell", coin="KRW-BTC", price=95, amount=1,
-        total_krw=9500, fee_krw=5, order_uuid="sell-uuid",
+        success=True,
+        side="sell",
+        coin="KRW-BTC",
+        price=95,
+        amount=1,
+        total_krw=9500,
+        fee_krw=5,
+        order_uuid="sell-uuid",
     )
     bot._config_mgr = MagicMock()
     bot._config_mgr.get_strategy_params_json.return_value = None
@@ -236,7 +254,10 @@ def test_fee_guard_allows_stop_loss_even_when_negative(db):
     strat = MagicMock()
     # 손절 신호 — is_profit_taking=False
     strat.check_sell.return_value = Signal(
-        "sell", 1.0, "손절", is_profit_taking=False,
+        "sell",
+        1.0,
+        "손절",
+        is_profit_taking=False,
     )
     strat.params = MagicMock()
     strat.params.extra = {}
@@ -251,7 +272,10 @@ def test_fee_guard_allows_stop_loss_even_when_negative(db):
     bot._coin_mgr = MagicMock(collectors={"KRW-BTC": coll})
 
     active_trade = {
-        "id": buy_id, "price": 100.0, "total_krw": 10000, "fee_krw": 5,
+        "id": buy_id,
+        "price": 100.0,
+        "total_krw": 10000,
+        "fee_krw": 5,
         "timestamp": "2026-04-17T00:00:00+00:00",
     }
     # 가격 95 — 손실 상태지만 손절이므로 통과해야 함

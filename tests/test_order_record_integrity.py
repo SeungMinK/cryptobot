@@ -51,7 +51,10 @@ def test_check_and_buy_api_error_notifies_and_records_signal(db):
 
     strat = MagicMock()
     strat.check_buy.return_value = MagicMock(
-        signal_type="buy", confidence=0.8, reason="RSI+BB", trigger_value=100.0,
+        signal_type="buy",
+        confidence=0.8,
+        reason="RSI+BB",
+        trigger_value=100.0,
     )
     strat.params = MagicMock(position_size_pct=100)
     bot._strategy_sel = MagicMock()
@@ -88,7 +91,10 @@ def test_check_and_sell_api_error_notifies_and_records_signal(db):
 
     strat = MagicMock()
     strat.check_sell.return_value = MagicMock(
-        signal_type="sell", confidence=0.7, reason="RSI 정상 복귀", trigger_value=70.0,
+        signal_type="sell",
+        confidence=0.7,
+        reason="RSI 정상 복귀",
+        trigger_value=70.0,
     )
     strat.params = MagicMock()
     strat.params.extra = {}
@@ -104,7 +110,10 @@ def test_check_and_sell_api_error_notifies_and_records_signal(db):
     bot._coin_mgr = MagicMock(collectors={"KRW-BTC": coll})
 
     active_trade = {
-        "id": 1, "price": 100.0, "total_krw": 10000, "fee_krw": 5,
+        "id": 1,
+        "price": 100.0,
+        "total_krw": 10000,
+        "fee_krw": 5,
         "timestamp": "2026-04-17T00:00:00+00:00",
     }
     bot._check_and_sell(active_trade, price=110.0, snapshot_id=None, coin="KRW-BTC")
@@ -124,9 +133,11 @@ def test_check_and_buy_commits_immediately_after_record(db):
     # commit을 명시적으로 spy
     commit_calls = []
     orig_commit = db.commit
+
     def spy_commit():
         commit_calls.append(1)
         orig_commit()
+
     bot._db.commit = spy_commit
     # 실제 쿼리는 실제 DB로
     bot._db.execute = db.execute
@@ -136,8 +147,14 @@ def test_check_and_buy_commits_immediately_after_record(db):
     bot._trader.is_ready = True
     bot._trader.get_balance_krw.return_value = 100_000
     bot._trader.buy_market.return_value = OrderResult(
-        success=True, side="buy", coin="KRW-BTC", price=100, amount=1,
-        total_krw=10_000, fee_krw=5, order_uuid="test-uuid",
+        success=True,
+        side="buy",
+        coin="KRW-BTC",
+        price=100,
+        amount=1,
+        total_krw=10_000,
+        fee_krw=5,
+        order_uuid="test-uuid",
     )
     bot._risk = MagicMock()
     bot._risk.check_can_buy.return_value = (True, "OK")
@@ -148,7 +165,10 @@ def test_check_and_buy_commits_immediately_after_record(db):
 
     strat = MagicMock()
     strat.check_buy.return_value = MagicMock(
-        signal_type="buy", confidence=0.8, reason="test", trigger_value=100.0,
+        signal_type="buy",
+        confidence=0.8,
+        reason="test",
+        trigger_value=100.0,
     )
     strat.params = MagicMock(position_size_pct=100)
     strat.params.extra = {"k_value": 0.5}
@@ -172,9 +192,7 @@ def test_rejected_strategy_marks_result_and_preserves_existing(db):
     # initialize()가 기본 전략을 등록하므로 bb_rsi_combined만 활성화로 세팅
     db.execute("UPDATE strategies SET is_active = 0")
     db.execute("UPDATE strategies SET is_active = 1, is_available = 1 WHERE name = 'bb_rsi_combined'")
-    db.execute(
-        "INSERT INTO llm_decisions (timestamp, model, output_raw_json) VALUES (datetime('now'), 'test', '{}')"
-    )
+    db.execute("INSERT INTO llm_decisions (timestamp, model, output_raw_json) VALUES (datetime('now'), 'test', '{}')")
     db.commit()
 
     analyzer = LLMAnalyzer(db)
@@ -198,6 +216,7 @@ def test_rejected_strategy_marks_result_and_preserves_existing(db):
     # llm_decisions에 rejected 정보 저장됐는지
     row = db.execute("SELECT input_news_summary FROM llm_decisions ORDER BY id DESC LIMIT 1").fetchone()
     import json as _j
+
     payload = _j.loads(dict(row)["input_news_summary"])
     assert payload.get("_rejected_strategy") == "NONEXISTENT_STRATEGY"
     assert "사용 가능" in payload.get("_rejected_strategy_reason", "")

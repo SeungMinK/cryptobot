@@ -221,25 +221,17 @@ class MonthlyAudit:
             emoji = "📈" if (s.get("total_pnl", 0) or 0) >= 0 else "📉"
             lines.append(f"{emoji} *전월 실적*")
             lines.append(
-                f"  총 {s.get('total_trades', 0)}건 거래, "
-                f"매도 {s.get('sells', 0)}건, "
-                f"승률 {s.get('win_rate', 0)}%"
+                f"  총 {s.get('total_trades', 0)}건 거래, 매도 {s.get('sells', 0)}건, 승률 {s.get('win_rate', 0)}%"
             )
             lines.append(f"  총 손익: {s.get('total_pnl', 0):+,.0f}원")
             lines.append(f"  총 수수료: {s.get('total_fees', 0):,.0f}원")
-            lines.append(
-                f"  최고: {s.get('best_trade', 0):+,.0f}원 / "
-                f"최악: {s.get('worst_trade', 0):+,.0f}원"
-            )
+            lines.append(f"  최고: {s.get('best_trade', 0):+,.0f}원 / 최악: {s.get('worst_trade', 0):+,.0f}원")
 
             strategies = s.get("strategies", [])
             if strategies:
                 lines.append("  전략별:")
                 for st in strategies:
-                    lines.append(
-                        f"    {st['strategy']}: {st['trades']}건, "
-                        f"{st['pnl']:+,.0f}원"
-                    )
+                    lines.append(f"    {st['strategy']}: {st['trades']}건, {st['pnl']:+,.0f}원")
 
         # LLM 비용
         llm = results.get("llm_cost", {})

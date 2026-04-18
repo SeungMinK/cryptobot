@@ -43,26 +43,18 @@ def test_llm_daily_count_kst_boundary(db):
     assert kst_today is not None
 
     # 25시간 전 레코드는 KST 기준 확실히 어제
-    db.execute(
-        "INSERT INTO llm_decisions (timestamp, model) "
-        "VALUES (datetime('now', '-25 hours'), 'test')"
-    )
+    db.execute("INSERT INTO llm_decisions (timestamp, model) VALUES (datetime('now', '-25 hours'), 'test')")
     db.commit()
     daily = db.execute(
-        "SELECT COUNT(*) FROM llm_decisions "
-        "WHERE DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')"
+        "SELECT COUNT(*) FROM llm_decisions WHERE DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')"
     ).fetchone()[0]
     assert daily == 0, "25시간 전 레코드는 KST 기준 오늘에 포함되면 안 됨"
 
     # 1분 전 레코드는 KST 기준 확실히 오늘
-    db.execute(
-        "INSERT INTO llm_decisions (timestamp, model) "
-        "VALUES (datetime('now', '-1 minute'), 'test')"
-    )
+    db.execute("INSERT INTO llm_decisions (timestamp, model) VALUES (datetime('now', '-1 minute'), 'test')")
     db.commit()
     daily_after = db.execute(
-        "SELECT COUNT(*) FROM llm_decisions "
-        "WHERE DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')"
+        "SELECT COUNT(*) FROM llm_decisions WHERE DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')"
     ).fetchone()[0]
     assert daily_after == 1
     # UTC 와 KST 일자가 다른 경우에도 쿼리가 올바르게 KST 기준으로 동작
@@ -76,8 +68,14 @@ def test_risk_today_trade_count_uses_kst(db):
     rm = RiskManager(db, RiskLimits())
     # 25시간 전 거래 1건 (KST 기준 어제)
     recorder.record_trade(
-        coin="KRW-BTC", side="buy", price=100, amount=1, total_krw=100, fee_krw=1,
-        strategy="test", trigger_reason="test",
+        coin="KRW-BTC",
+        side="buy",
+        price=100,
+        amount=1,
+        total_krw=100,
+        fee_krw=1,
+        strategy="test",
+        trigger_reason="test",
     )
     db.execute("UPDATE trades SET timestamp = datetime('now', '-25 hours')")
     db.commit()
@@ -96,8 +94,7 @@ def test_config_float_rejects_out_of_range(db):
     analyzer = LLMAnalyzer(db)
     # emergency_held_pct의 HARD_LIMITS = (1.0, 10.0)
     db.execute(
-        "INSERT INTO bot_config (key, value, display_name) "
-        "VALUES ('emergency_held_pct', '0.1', 'Emergency Held')"
+        "INSERT INTO bot_config (key, value, display_name) VALUES ('emergency_held_pct', '0.1', 'Emergency Held')"
     )
     db.commit()
     # 0.1은 범위 (1.0, 10.0) 밖 → default 3.0 반환
@@ -109,8 +106,7 @@ def test_config_float_accepts_in_range(db):
     """HARD_LIMITS 범위 내 값은 그대로 반환."""
     analyzer = LLMAnalyzer(db)
     db.execute(
-        "INSERT INTO bot_config (key, value, display_name) "
-        "VALUES ('emergency_held_pct', '5.0', 'Emergency Held')"
+        "INSERT INTO bot_config (key, value, display_name) VALUES ('emergency_held_pct', '5.0', 'Emergency Held')"
     )
     db.commit()
     value = analyzer._get_config_float("emergency_held_pct", 3.0)
@@ -120,10 +116,7 @@ def test_config_float_accepts_in_range(db):
 def test_config_float_no_limits_key_no_validation(db):
     """HARD_LIMITS에 없는 키는 범위 검증 안 함."""
     analyzer = LLMAnalyzer(db)
-    db.execute(
-        "INSERT INTO bot_config (key, value, display_name) "
-        "VALUES ('unrelated_key', '9999.9', 'Unrelated')"
-    )
+    db.execute("INSERT INTO bot_config (key, value, display_name) VALUES ('unrelated_key', '9999.9', 'Unrelated')")
     db.commit()
     value = analyzer._get_config_float("unrelated_key", 1.0)
     assert value == 9999.9
@@ -139,14 +132,8 @@ def test_apply_recommendations_writes_to_new_columns(db):
     analyzer = LLMAnalyzer(db)
     # bb_rsi_combined 활성
     db.execute("UPDATE strategies SET is_active = 0")
-    db.execute(
-        "UPDATE strategies SET is_active = 1, is_available = 1 "
-        "WHERE name = 'bb_rsi_combined'"
-    )
-    db.execute(
-        "INSERT INTO llm_decisions (timestamp, model) "
-        "VALUES (datetime('now'), 'test')"
-    )
+    db.execute("UPDATE strategies SET is_active = 1, is_available = 1 WHERE name = 'bb_rsi_combined'")
+    db.execute("INSERT INTO llm_decisions (timestamp, model) VALUES (datetime('now'), 'test')")
     db.commit()
 
     result = {

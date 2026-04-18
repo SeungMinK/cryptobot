@@ -113,8 +113,7 @@ class RiskManager:
         UTC 기준 DATE로 하면 KST 00시~09시 구간이 전날로 오판됨.
         """
         row = self._db.execute(
-            "SELECT COUNT(*) FROM trades WHERE coin = ? "
-            "AND DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')",
+            "SELECT COUNT(*) FROM trades WHERE coin = ? AND DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')",
             (coin,),
         ).fetchone()
         return row[0] if row else 0

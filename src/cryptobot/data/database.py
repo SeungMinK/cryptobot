@@ -408,7 +408,9 @@ _DEFAULT_STRATEGIES = [
         "market_states": "sideways,bearish",
         "timeframe": "1d",
         "difficulty": "medium",
-        "default_params_json": '{"bb_period": 20, "bb_std": 2.0, "rsi_period": 14, "rsi_oversold": 30, "rsi_overbought": 50}',
+        "default_params_json": (
+            '{"bb_period": 20, "bb_std": 2.0, "rsi_period": 14, "rsi_oversold": 30, "rsi_overbought": 50}'
+        ),
         "is_active": False,
     },
 ]
@@ -647,7 +649,9 @@ class Database:
 
             # 마이그레이션: market_snapshots AUTOINCREMENT 확인
             try:
-                idx = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='market_snapshots'").fetchone()
+                idx = conn.execute(
+                    "SELECT sql FROM sqlite_master WHERE type='table' AND name='market_snapshots'"
+                ).fetchone()
                 if idx and "AUTOINCREMENT" not in (idx[0] or ""):
                     # 컬럼을 명시적으로 매핑하여 재생성 (SELECT * 사용 금지 — 컬럼 밀림 방지)
                     conn.executescript("""
@@ -711,8 +715,17 @@ class Database:
             existing = conn.execute("SELECT key FROM bot_config WHERE key = 'strategy_switch_delay_seconds'").fetchone()
             if existing is None:
                 conn.execute(
-                    "INSERT OR IGNORE INTO bot_config (key, value, value_type, category, display_name, description) VALUES (?, ?, ?, ?, ?, ?)",
-                    ("strategy_switch_delay_seconds", "30", "int", "bot", "전략 전환 대기 시간 (초)", "새 전략 활성화 시 기존 전략이 종료되기까지 대기하는 시간"),
+                    "INSERT OR IGNORE INTO bot_config "
+                    "(key, value, value_type, category, display_name, description) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        "strategy_switch_delay_seconds",
+                        "30",
+                        "int",
+                        "bot",
+                        "전략 전환 대기 시간 (초)",
+                        "새 전략 활성화 시 기존 전략이 종료되기까지 대기하는 시간",
+                    ),
                 )
                 logger.info("bot_config에 strategy_switch_delay_seconds 추가")
 
@@ -722,8 +735,17 @@ class Database:
                 for cfg in _DEFAULT_BOT_CONFIG:
                     if cfg["category"] == "coin":
                         conn.execute(
-                            "INSERT OR IGNORE INTO bot_config (key, value, value_type, category, display_name, description) VALUES (?, ?, ?, ?, ?, ?)",
-                            (cfg["key"], cfg["value"], cfg["value_type"], cfg["category"], cfg["display_name"], cfg["description"]),
+                            "INSERT OR IGNORE INTO bot_config "
+                            "(key, value, value_type, category, display_name, description) "
+                            "VALUES (?, ?, ?, ?, ?, ?)",
+                            (
+                                cfg["key"],
+                                cfg["value"],
+                                cfg["value_type"],
+                                cfg["category"],
+                                cfg["display_name"],
+                                cfg["description"],
+                            ),
                         )
                 logger.info("bot_config에 멀티코인 설정 추가")
 
@@ -732,12 +754,19 @@ class Database:
             if row[0] == 0:
                 for cat_cfg in _DEFAULT_COIN_STRATEGY:
                     conn.execute(
-                        """INSERT INTO coin_strategy_config
-                        (category, strategy_name, stop_loss_pct, trailing_stop_pct, position_size_pct, strategy_params_json, description)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                        (cat_cfg["category"], cat_cfg["strategy_name"], cat_cfg["stop_loss_pct"],
-                         cat_cfg["trailing_stop_pct"], cat_cfg["position_size_pct"],
-                         cat_cfg["strategy_params_json"], cat_cfg["description"]),
+                        """INSERT INTO coin_strategy_config (
+                            category, strategy_name, stop_loss_pct, trailing_stop_pct,
+                            position_size_pct, strategy_params_json, description
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            cat_cfg["category"],
+                            cat_cfg["strategy_name"],
+                            cat_cfg["stop_loss_pct"],
+                            cat_cfg["trailing_stop_pct"],
+                            cat_cfg["position_size_pct"],
+                            cat_cfg["strategy_params_json"],
+                            cat_cfg["description"],
+                        ),
                     )
                 logger.info("코인 카테고리별 전략 기본값 삽입 완료")
 
@@ -778,13 +807,22 @@ class Database:
             bb_rsi = conn.execute("SELECT 1 FROM strategies WHERE name = 'bb_rsi_combined'").fetchone()
             if bb_rsi is None:
                 conn.execute(
-                    """INSERT INTO strategies (name, display_name, description, category, market_states, timeframe, difficulty, default_params_json, is_active, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    ("bb_rsi_combined", "볼린저+RSI 복합",
-                     "RSI 과매도 + 볼린저 하단 이탈 동시 충족 시 매수. 거짓 신호 감소로 60%+ 승률.",
-                     "mean_reversion", "sideways,bearish", "1d", "medium",
-                     '{"bb_period": 20, "bb_std": 2.0, "rsi_period": 14, "rsi_oversold": 30, "rsi_overbought": 50}',
-                     False, "inactive"),
+                    """INSERT INTO strategies (
+                        name, display_name, description, category, market_states,
+                        timeframe, difficulty, default_params_json, is_active, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        "bb_rsi_combined",
+                        "볼린저+RSI 복합",
+                        "RSI 과매도 + 볼린저 하단 이탈 동시 충족 시 매수. 거짓 신호 감소로 60%+ 승률.",
+                        "mean_reversion",
+                        "sideways,bearish",
+                        "1d",
+                        "medium",
+                        '{"bb_period": 20, "bb_std": 2.0, "rsi_period": 14, "rsi_oversold": 30, "rsi_overbought": 50}',
+                        False,
+                        "inactive",
+                    ),
                 )
                 logger.info("bb_rsi_combined 전략 추가")
 
@@ -797,7 +835,14 @@ class Database:
                         INSERT INTO bot_config (key, value, value_type, category, display_name, description)
                         VALUES (?, ?, ?, ?, ?, ?)
                         """,
-                        (cfg["key"], cfg["value"], cfg["value_type"], cfg["category"], cfg["display_name"], cfg["description"]),
+                        (
+                            cfg["key"],
+                            cfg["value"],
+                            cfg["value_type"],
+                            cfg["category"],
+                            cfg["display_name"],
+                            cfg["description"],
+                        ),
                     )
                 logger.info("봇 설정 기본값 삽입 완료 (%d개)", len(_DEFAULT_BOT_CONFIG))
 

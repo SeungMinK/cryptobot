@@ -31,6 +31,7 @@ def _test_db():
 
     # rate limit 초기화
     from cryptobot.api.routes.auth import _login_attempts
+
     _login_attempts.clear()
 
     yield db

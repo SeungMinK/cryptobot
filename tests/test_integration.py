@@ -3,7 +3,6 @@
 운영 중 발견된 버그를 재현하여 재발 방지.
 """
 
-import json
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,14 +12,12 @@ import pytest
 
 from cryptobot.data.database import Database
 from cryptobot.data.recorder import DataRecorder
-from cryptobot.data.collector import DataCollector
-from cryptobot.bot.risk import RiskLimits, RiskManager
-from cryptobot.strategies.base import BaseStrategy, Signal, StrategyParams, StrategyInfo
+from cryptobot.strategies.base import StrategyParams
 from cryptobot.strategies.bollinger_bands import BollingerBands
-from cryptobot.strategies.rsi_mean_reversion import RSIMeanReversion
-from cryptobot.strategies.volatility_breakout import VolatilityBreakout
 from cryptobot.strategies.ma_crossover import MACrossover
 from cryptobot.strategies.registry import StrategyRegistry
+from cryptobot.strategies.rsi_mean_reversion import RSIMeanReversion
+from cryptobot.strategies.volatility_breakout import VolatilityBreakout
 
 
 def _make_db():
@@ -34,13 +31,15 @@ def _make_ohlcv(prices: list[float], days: int = 30) -> pd.DataFrame:
     """테스트용 OHLCV DataFrame 생성."""
     data = []
     for i, p in enumerate(prices):
-        data.append({
-            "open": p * 0.99,
-            "high": p * 1.02,
-            "low": p * 0.98,
-            "close": p,
-            "volume": 1000,
-        })
+        data.append(
+            {
+                "open": p * 0.99,
+                "high": p * 1.02,
+                "low": p * 0.98,
+                "close": p,
+                "volume": 1000,
+            }
+        )
     df = pd.DataFrame(data)
     df.index = pd.date_range(end=datetime.now(), periods=len(prices), freq="D")
     return df
@@ -49,6 +48,7 @@ def _make_ohlcv(prices: list[float], days: int = 30) -> pd.DataFrame:
 # ═══════════════════════════════════════════════════
 # 1. 수수료 가드: 0.1% 이하 수익에서 매도 차단
 # ═══════════════════════════════════════════════════
+
 
 class TestFeeGuard:
     """BSV 반복 매도 버그 재현 — 수수료 이하 수익에서 매도 안 되는지."""
@@ -98,6 +98,7 @@ class TestFeeGuard:
 # 2. 수수료 포함 수익 계산 정확성
 # ═══════════════════════════════════════════════════
 
+
 class TestProfitCalculation:
     """profit_krw, profit_pct가 수수료를 포함하는지."""
 
@@ -130,6 +131,7 @@ class TestProfitCalculation:
 # ═══════════════════════════════════════════════════
 # 3. 멀티코인 스냅샷 분리
 # ═══════════════════════════════════════════════════
+
 
 class TestMultiCoinSnapshot:
     """코인별 get_latest_snapshot이 분리되는지."""
@@ -173,6 +175,7 @@ class TestMultiCoinSnapshot:
 # 4. 시장 상태별 전략 자동 선택
 # ═══════════════════════════════════════════════════
 
+
 class TestMarketStrategySelection:
     """시장 상태에 따라 올바른 전략이 선택되는지."""
 
@@ -205,6 +208,7 @@ class TestMarketStrategySelection:
 # 5. 보유 중 hold 신호 기록
 # ═══════════════════════════════════════════════════
 
+
 class TestHoldSignalRecording:
     """보유 중(매도 대기)일 때 hold 신호가 trade_signals에 기록되는지."""
 
@@ -233,6 +237,7 @@ class TestHoldSignalRecording:
 # ═══════════════════════════════════════════════════
 # 6. FOREIGN KEY 안전 처리
 # ═══════════════════════════════════════════════════
+
 
 class TestForeignKeySafety:
     """snapshot_id가 0이면 None으로 처리되는지."""
@@ -287,6 +292,7 @@ class TestForeignKeySafety:
 # 7. 코인별 포지션 독립 추적
 # ═══════════════════════════════════════════════════
 
+
 class TestMultiCoinPositions:
     """여러 코인의 매수/매도가 독립적으로 추적되는지."""
 
@@ -297,13 +303,25 @@ class TestMultiCoinPositions:
 
             # BTC 매수
             btc_buy = recorder.record_trade(
-                coin="KRW-BTC", side="buy", price=100000000, amount=0.001,
-                total_krw=100000, fee_krw=50, strategy="test", trigger_reason="test",
+                coin="KRW-BTC",
+                side="buy",
+                price=100000000,
+                amount=0.001,
+                total_krw=100000,
+                fee_krw=50,
+                strategy="test",
+                trigger_reason="test",
             )
-            # ETH 매수
-            eth_buy = recorder.record_trade(
-                coin="KRW-ETH", side="buy", price=3000000, amount=0.1,
-                total_krw=300000, fee_krw=150, strategy="test", trigger_reason="test",
+            # ETH 매수 (id 반환값은 쓰지 않지만 DB에 레코드 생성)
+            recorder.record_trade(
+                coin="KRW-ETH",
+                side="buy",
+                price=3000000,
+                amount=0.1,
+                total_krw=300000,
+                fee_krw=150,
+                strategy="test",
+                trigger_reason="test",
             )
 
             # BTC만 활성 매수
@@ -318,9 +336,17 @@ class TestMultiCoinPositions:
 
             # BTC 매도
             recorder.record_trade(
-                coin="KRW-BTC", side="sell", price=101000000, amount=0.001,
-                total_krw=101000, fee_krw=50.5, strategy="test", trigger_reason="test",
-                buy_trade_id=btc_buy, profit_pct=0.95, profit_krw=899.5,
+                coin="KRW-BTC",
+                side="sell",
+                price=101000000,
+                amount=0.001,
+                total_krw=101000,
+                fee_krw=50.5,
+                strategy="test",
+                trigger_reason="test",
+                buy_trade_id=btc_buy,
+                profit_pct=0.95,
+                profit_krw=899.5,
             )
 
             # BTC 포지션 없음
@@ -334,6 +360,7 @@ class TestMultiCoinPositions:
 # ═══════════════════════════════════════════════════
 # 8. naive/aware datetime 호환
 # ═══════════════════════════════════════════════════
+
 
 class TestDatetimeCompatibility:
     """UTC aware와 naive datetime이 섞여도 에러 안 나는지."""
@@ -366,6 +393,7 @@ class TestDatetimeCompatibility:
 # 9. 수수료 가드 — main.py 레벨
 # ═══════════════════════════════════════════════════
 
+
 class TestMainFeeGuard:
     """_check_and_sell의 최종 수수료 가드."""
 
@@ -396,6 +424,7 @@ class TestMainFeeGuard:
 # 10. 코인별 전략 파라미터 독립성
 # ═══════════════════════════════════════════════════
 
+
 class TestStrategyParamsIndependence:
     """전략 파라미터가 코인 간에 오염되지 않는지."""
 
@@ -416,11 +445,13 @@ class TestStrategyParamsIndependence:
 # 11. 스캐너 제외 목록
 # ═══════════════════════════════════════════════════
 
+
 class TestScannerExclusions:
     """스테이블코인이 제외되는지."""
 
     def test_stablecoin_excluded(self):
         from cryptobot.bot.scanner import CoinScanner
+
         excluded = CoinScanner.EXCLUDED_COINS
         assert "KRW-USDT" in excluded
         assert "KRW-USDC" in excluded
@@ -431,6 +462,7 @@ class TestScannerExclusions:
 # ═══════════════════════════════════════════════════
 # 12. DB 마이그레이션 안전성
 # ═══════════════════════════════════════════════════
+
 
 class TestDBMigration:
     """DB 초기화가 멱등(idempotent)하고 마이그레이션이 안전한지."""
@@ -443,9 +475,7 @@ class TestDBMigration:
             db.initialize()
 
             # 테이블 존재 확인
-            tables = [r[0] for r in db.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()]
+            tables = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
             assert "market_snapshots" in tables
             assert "trade_signals" in tables
             assert "trades" in tables

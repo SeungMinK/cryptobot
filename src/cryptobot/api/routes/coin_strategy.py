@@ -56,9 +56,15 @@ def update_coin_strategy(
         SET strategy_name = ?, stop_loss_pct = ?, trailing_stop_pct = ?,
             position_size_pct = ?, strategy_params_json = ?, updated_at = ?
         WHERE category = ?""",
-        (body.strategy_name, body.stop_loss_pct, body.trailing_stop_pct,
-         body.position_size_pct, body.strategy_params_json,
-         datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), category),
+        (
+            body.strategy_name,
+            body.stop_loss_pct,
+            body.trailing_stop_pct,
+            body.position_size_pct,
+            body.strategy_params_json,
+            datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+            category,
+        ),
     )
     db.commit()
 

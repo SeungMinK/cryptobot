@@ -82,7 +82,8 @@ class HealthChecker:
                 if db_only or upbit_only:
                     logger.warning(
                         "매매 정합성 불일치: DB에만=%s, 업비트에만=%s",
-                        db_only, upbit_only,
+                        db_only,
+                        upbit_only,
                     )
                     return {
                         "status": "warning",
@@ -132,7 +133,6 @@ class HealthChecker:
         try:
             if not self._trader or not self._trader.is_ready:
                 return {"status": "ok", "message": "API 미설정 — 스킵"}
-
 
             # 활성 코인 목록
             coins = self._db.execute(
@@ -238,6 +238,7 @@ class HealthChecker:
         """LLM 추천 vs DB 저장 vs 실제 신호 적용 — 3중 검증."""
         try:
             import json
+
             issues = []
 
             # 1. 활성 전략 확인
@@ -271,7 +272,6 @@ class HealthChecker:
             if llm_row and dict(llm_row)["input_news_summary"]:
                 try:
                     ba = json.loads(dict(llm_row)["input_news_summary"])
-                    llm_after = ba.get("after", {})
                     llm_strategy = ba.get("strategy")
 
                     # 전략 불일치
@@ -377,7 +377,12 @@ class HealthChecker:
                     corrected += 1
                     logger.info(
                         "거래 보정: id=%d %s 가격 %.0f→%.0f 금액 %.0f→%.0f",
-                        trade["id"], trade["side"], db_price, actual_price, db_total, actual_total,
+                        trade["id"],
+                        trade["side"],
+                        db_price,
+                        actual_price,
+                        db_total,
+                        actual_total,
                     )
 
                     # 매도 거래의 profit 재계산
@@ -408,12 +413,8 @@ class HealthChecker:
     def _recalculate_profit(self, sell_trade_id: int, buy_trade_id: int) -> None:
         """보정된 매수/매도 값 기준으로 profit_krw, profit_pct를 재계산한다."""
         try:
-            buy = self._db.execute(
-                "SELECT total_krw, fee_krw FROM trades WHERE id = ?", (buy_trade_id,)
-            ).fetchone()
-            sell = self._db.execute(
-                "SELECT total_krw, fee_krw FROM trades WHERE id = ?", (sell_trade_id,)
-            ).fetchone()
+            buy = self._db.execute("SELECT total_krw, fee_krw FROM trades WHERE id = ?", (buy_trade_id,)).fetchone()
+            sell = self._db.execute("SELECT total_krw, fee_krw FROM trades WHERE id = ?", (sell_trade_id,)).fetchone()
 
             if not buy or not sell:
                 return
@@ -447,6 +448,7 @@ class HealthChecker:
             actual_krw = self._trader.get_balance_krw()
 
             import pyupbit
+
             active_rows = self._db.execute(
                 """
                 SELECT coin, amount FROM trades t
@@ -475,7 +477,9 @@ class HealthChecker:
             if diff_pct > 2.0:
                 logger.warning(
                     "잔고 차이 %.1f%%: 실제=%.0f, DB 역산=%.0f → 미검증 거래 즉시 재보정",
-                    diff_pct, total_actual, db_total,
+                    diff_pct,
+                    total_actual,
+                    db_total,
                 )
                 # 자동 복구: 미검증 거래 재보정
                 recon_result = self.reconcile_trades()
@@ -487,7 +491,9 @@ class HealthChecker:
                     diff_pct_after = abs(total_actual - db_total_after) / total_actual * 100
                     logger.info(
                         "재보정 후 잔고 차이: %.1f%% → %.1f%% (%d건 보정)",
-                        diff_pct, diff_pct_after, corrected,
+                        diff_pct,
+                        diff_pct_after,
+                        corrected,
                     )
 
                     if diff_pct_after > 2.0:

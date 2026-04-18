@@ -52,8 +52,14 @@ def test_order_uuid_persisted_to_trades(db):
     bot._trader.is_ready = True
     bot._trader.get_balance_krw.return_value = 100_000
     bot._trader.buy_market.return_value = OrderResult(
-        success=True, side="buy", coin="KRW-BTC", price=100, amount=1,
-        total_krw=10_000, fee_krw=5, order_uuid="unique-order-abc123",
+        success=True,
+        side="buy",
+        coin="KRW-BTC",
+        price=100,
+        amount=1,
+        total_krw=10_000,
+        fee_krw=5,
+        order_uuid="unique-order-abc123",
     )
     bot._risk = MagicMock()
     bot._risk.check_can_buy.return_value = (True, "OK")
@@ -77,9 +83,7 @@ def test_order_uuid_persisted_to_trades(db):
 
     bot._check_and_buy({"market_state": "sideways"}, price=100.0, snapshot_id=None, coin="KRW-BTC")
 
-    row = db.execute(
-        "SELECT order_uuid FROM trades WHERE coin = 'KRW-BTC' AND side = 'buy'"
-    ).fetchone()
+    row = db.execute("SELECT order_uuid FROM trades WHERE coin = 'KRW-BTC' AND side = 'buy'").fetchone()
     assert dict(row)["order_uuid"] == "unique-order-abc123"
 
 
@@ -96,8 +100,14 @@ def test_duplicate_buy_blocked_when_active_position_exists(db):
     recorder = DataRecorder(db)
     # 기존 open 포지션
     recorder.record_trade(
-        coin="KRW-BTC", side="buy", price=100, amount=1, total_krw=100, fee_krw=1,
-        strategy="test", trigger_reason="test",
+        coin="KRW-BTC",
+        side="buy",
+        price=100,
+        amount=1,
+        total_krw=100,
+        fee_krw=1,
+        strategy="test",
+        trigger_reason="test",
     )
     db.commit()
 
@@ -109,8 +119,14 @@ def test_duplicate_buy_blocked_when_active_position_exists(db):
     bot._trader.is_ready = True
     bot._trader.get_balance_krw.return_value = 100_000
     bot._trader.buy_market.return_value = OrderResult(
-        success=True, side="buy", coin="KRW-BTC", price=100, amount=1,
-        total_krw=10_000, fee_krw=5, order_uuid="new-order",
+        success=True,
+        side="buy",
+        coin="KRW-BTC",
+        price=100,
+        amount=1,
+        total_krw=10_000,
+        fee_krw=5,
+        order_uuid="new-order",
     )
     bot._risk = MagicMock()
     bot._risk.check_can_buy.return_value = (True, "OK")
@@ -144,15 +160,10 @@ def test_apply_recommendations_updates_bot_config(db):
     """LLM 추천값이 bot_config에 UPDATE로 반영된다."""
     analyzer = LLMAnalyzer(db)
     # 사전 값
-    db.execute(
-        "INSERT OR REPLACE INTO bot_config (key, value, display_name) "
-        "VALUES ('stop_loss_pct', '-5', 'SL')"
-    )
+    db.execute("INSERT OR REPLACE INTO bot_config (key, value, display_name) VALUES ('stop_loss_pct', '-5', 'SL')")
     db.execute("UPDATE strategies SET is_active = 0")
     db.execute("UPDATE strategies SET is_active = 1 WHERE name = 'bb_rsi_combined'")
-    db.execute(
-        "INSERT INTO llm_decisions (timestamp, model) VALUES (datetime('now'), 'test')"
-    )
+    db.execute("INSERT INTO llm_decisions (timestamp, model) VALUES (datetime('now'), 'test')")
     db.commit()
 
     result = {
@@ -180,15 +191,14 @@ def test_apply_recommendations_merges_strategy_params(db):
     """LLM 전략별 파라미터가 strategies.default_params_json에 머지된다."""
     analyzer = LLMAnalyzer(db)
     import json as _j
+
     db.execute(
         "UPDATE strategies SET default_params_json = ? WHERE name = 'bb_rsi_combined'",
         (_j.dumps({"rsi_oversold": 30, "bb_std": 2.0, "bb_period": 20}),),
     )
     db.execute("UPDATE strategies SET is_active = 0")
     db.execute("UPDATE strategies SET is_active = 1 WHERE name = 'bb_rsi_combined'")
-    db.execute(
-        "INSERT INTO llm_decisions (timestamp, model) VALUES (datetime('now'), 'test')"
-    )
+    db.execute("INSERT INTO llm_decisions (timestamp, model) VALUES (datetime('now'), 'test')")
     db.commit()
 
     result = {
@@ -208,9 +218,7 @@ def test_apply_recommendations_merges_strategy_params(db):
     }
     analyzer._apply_recommendations(result)
 
-    row = db.execute(
-        "SELECT default_params_json FROM strategies WHERE name = 'bb_rsi_combined'"
-    ).fetchone()
+    row = db.execute("SELECT default_params_json FROM strategies WHERE name = 'bb_rsi_combined'").fetchone()
     merged = _j.loads(dict(row)["default_params_json"])
     assert merged["rsi_oversold"] == 25  # 업데이트
     assert merged["bb_std"] == 1.5  # 업데이트
@@ -257,28 +265,30 @@ def test_check_emergency_held_vs_non_held_thresholds(db):
     # 보유 코인 등록
     recorder = DataRecorder(db)
     recorder.record_trade(
-        coin="KRW-BTC", side="buy", price=100, amount=1, total_krw=100, fee_krw=1,
-        strategy="test", trigger_reason="test",
+        coin="KRW-BTC",
+        side="buy",
+        price=100,
+        amount=1,
+        total_krw=100,
+        fee_krw=1,
+        strategy="test",
+        trigger_reason="test",
     )
     db.commit()
 
     # market_snapshots 2개 세팅: BTC(보유) +4%, ETH(비보유) +4%
     # held_threshold=3.0, non_held=7.0 → BTC는 트리거, ETH는 트리거 안 됨
     db.execute(
-        "INSERT INTO market_snapshots (coin, timestamp, price) "
-        "VALUES ('KRW-BTC', datetime('now', '-65 minutes'), 100)"
+        "INSERT INTO market_snapshots (coin, timestamp, price) VALUES ('KRW-BTC', datetime('now', '-65 minutes'), 100)"
     )
     db.execute(
-        "INSERT INTO market_snapshots (coin, timestamp, price) "
-        "VALUES ('KRW-BTC', datetime('now'), 104)"  # +4%
+        "INSERT INTO market_snapshots (coin, timestamp, price) VALUES ('KRW-BTC', datetime('now'), 104)"  # +4%
     )
     db.execute(
-        "INSERT INTO market_snapshots (coin, timestamp, price) "
-        "VALUES ('KRW-ETH', datetime('now', '-65 minutes'), 100)"
+        "INSERT INTO market_snapshots (coin, timestamp, price) VALUES ('KRW-ETH', datetime('now', '-65 minutes'), 100)"
     )
     db.execute(
-        "INSERT INTO market_snapshots (coin, timestamp, price) "
-        "VALUES ('KRW-ETH', datetime('now'), 104)"  # +4%
+        "INSERT INTO market_snapshots (coin, timestamp, price) VALUES ('KRW-ETH', datetime('now'), 104)"  # +4%
     )
     db.commit()
 

@@ -7,6 +7,7 @@ OHLCV 일봉 데이터는 ohlcv_daily 테이블에 별도 저장 (백테스팅/L
 
 import logging
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 import pyupbit
 
@@ -14,6 +15,9 @@ from cryptobot.bot.indicators import calculate_all
 from cryptobot.bot.strategy import determine_market_state
 from cryptobot.data.database import Database
 from cryptobot.exceptions import APIError
+
+if TYPE_CHECKING:
+    import pandas as pd  # noqa: F401 — type-hint only
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +69,7 @@ class DataCollector:
     def _collect_market_data(self) -> dict | None:
         """업비트 API로 시장 데이터 수집."""
         import time as _time
+
         try:
             # OHLCV 데이터 조회 — 1시간 캐시 (일봉은 자주 안 바뀜)
             now = _time.time()
@@ -84,7 +89,9 @@ class DataCollector:
             if self._last_price and self._last_price > 0:
                 change_pct = abs(current_price - self._last_price) / self._last_price * 100
                 if change_pct > 20:
-                    logger.warning("가격 급변: %s %.1f%% (%s → %s)", self._coin, change_pct, self._last_price, current_price)
+                    logger.warning(
+                        "가격 급변: %s %.1f%% (%s → %s)", self._coin, change_pct, self._last_price, current_price
+                    )
             self._last_price = current_price
 
             # 기술적 지표 계산
@@ -168,11 +175,18 @@ class DataCollector:
         rows = []
         for idx, row in self._latest_df.iterrows():
             date_str = idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx)[:10]
-            rows.append((
-                self._coin, date_str,
-                row["open"], row["high"], row["low"], row["close"], row["volume"],
-                now,
-            ))
+            rows.append(
+                (
+                    self._coin,
+                    date_str,
+                    row["open"],
+                    row["high"],
+                    row["low"],
+                    row["close"],
+                    row["volume"],
+                    now,
+                )
+            )
 
         self._db.executemany(
             """

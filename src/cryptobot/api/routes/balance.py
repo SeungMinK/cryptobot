@@ -1,12 +1,13 @@
-import logging
-logger = logging.getLogger(__name__)
 """잔고 + 포지션 라우트."""
+
+import logging
 
 from fastapi import APIRouter, Depends, Query
 
 from cryptobot.api.auth import UserResponse, get_current_user
-from cryptobot.api.deps import get_db, get_recorder
+from cryptobot.api.deps import get_db
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/balance", tags=["balance"])
 
 
@@ -37,7 +38,6 @@ def get_balance(_: UserResponse = Depends(get_current_user)):
 @router.get("/positions")
 def get_positions(_: UserResponse = Depends(get_current_user)):
     """현재 보유 포지션 전체 (멀티코인 대응)."""
-    from cryptobot.bot.trader import Trader
 
     db = get_db()
     # 미매도 매수 건 전체 조회
@@ -53,14 +53,14 @@ def get_positions(_: UserResponse = Depends(get_current_user)):
     if not rows:
         return {"has_position": False, "positions": []}
 
-    trader = Trader()
     positions = []
     # 배치 가격 조회 (N개 코인 → 1 API)
     import pyupbit
+
     coins = list(set(dict(r)["coin"] for r in rows))
     try:
         prices = pyupbit.get_current_price(coins) if len(coins) > 1 else {coins[0]: pyupbit.get_current_price(coins[0])}
-    except Exception as e:
+    except Exception:
         prices = {}
 
     for row in rows:
@@ -74,12 +74,14 @@ def get_positions(_: UserResponse = Depends(get_current_user)):
             unrealized_pnl_pct = 0
             unrealized_pnl_krw = 0
 
-        positions.append({
-            **trade,
-            "current_price": current_price,
-            "unrealized_pnl_pct": round(unrealized_pnl_pct, 2),
-            "unrealized_pnl_krw": round(unrealized_pnl_krw, 0),
-        })
+        positions.append(
+            {
+                **trade,
+                "current_price": current_price,
+                "unrealized_pnl_pct": round(unrealized_pnl_pct, 2),
+                "unrealized_pnl_krw": round(unrealized_pnl_krw, 0),
+            }
+        )
 
     return {
         "has_position": True,

@@ -48,6 +48,7 @@ class CoinManager:
 
         try:
             from cryptobot.bot.scanner import CoinScanner
+
             scanner = CoinScanner(
                 min_volume_krw=float(self._config.get("min_volume_krw", "1000000000")),
                 min_price_krw=float(self._config.get("min_price_krw", "1000")),
@@ -69,10 +70,7 @@ class CoinManager:
 
                 # LLM 제거 추천 (보유 중 코인만 제외 불가)
                 held_coins = self._get_held_coins()
-                new_coins = [
-                    c for c in new_coins
-                    if c not in llm_remove or c in held_coins
-                ]
+                new_coins = [c for c in new_coins if c not in llm_remove or c in held_coins]
 
                 # 보유 중 코인 보장
                 for held in held_coins:

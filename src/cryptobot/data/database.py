@@ -714,6 +714,22 @@ class Database:
                 conn.execute("ALTER TABLE trades ADD COLUMN reconciled_at DATETIME")
                 logger.info("trades 테이블에 정합성 검증 컬럼 추가 완료 (order_uuid, reconciled, reconciled_at)")
 
+            # 마이그레이션: llm_decisions에 before/after 스냅샷 컬럼 추가 (#171)
+            try:
+                conn.execute("SELECT before_snapshot_json FROM llm_decisions LIMIT 1")
+            except sqlite3.OperationalError:
+                conn.execute("ALTER TABLE llm_decisions ADD COLUMN before_snapshot_json TEXT")
+                conn.execute("ALTER TABLE llm_decisions ADD COLUMN after_snapshot_json TEXT")
+                logger.info("llm_decisions 테이블에 before/after 스냅샷 컬럼 추가 완료")
+
+            # 마이그레이션: news_articles에 impact_score/scope 컬럼 추가 (#154)
+            try:
+                conn.execute("SELECT impact_score FROM news_articles LIMIT 1")
+            except sqlite3.OperationalError:
+                conn.execute("ALTER TABLE news_articles ADD COLUMN impact_score INTEGER")
+                conn.execute("ALTER TABLE news_articles ADD COLUMN scope TEXT")
+                logger.info("news_articles 테이블에 impact_score/scope 컬럼 추가 완료")
+
             # 마이그레이션: bot_config에 새 설정 추가 (기존 DB 호환)
             existing = conn.execute("SELECT key FROM bot_config WHERE key = 'strategy_switch_delay_seconds'").fetchone()
             if existing is None:

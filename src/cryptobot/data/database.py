@@ -220,6 +220,9 @@ CREATE TABLE IF NOT EXISTS llm_decisions (
     -- before/after 스냅샷 (#171). input_news_summary 재사용하던 방식 개선
     before_snapshot_json TEXT,
     after_snapshot_json TEXT,
+    -- Prompt Caching 토큰 집계 (#183). hit rate 모니터링용
+    cache_creation_tokens INTEGER,
+    cache_read_tokens INTEGER,
     FOREIGN KEY (input_market_snapshot_id) REFERENCES market_snapshots(id)
 );
 
@@ -740,6 +743,14 @@ class Database:
                 conn.execute("ALTER TABLE news_articles ADD COLUMN impact_score INTEGER")
                 conn.execute("ALTER TABLE news_articles ADD COLUMN scope TEXT")
                 logger.info("news_articles 테이블에 impact_score/scope 컬럼 추가 완료")
+
+            # 마이그레이션: llm_decisions에 캐시 토큰 컬럼 추가 (#183)
+            try:
+                conn.execute("SELECT cache_creation_tokens FROM llm_decisions LIMIT 1")
+            except sqlite3.OperationalError:
+                conn.execute("ALTER TABLE llm_decisions ADD COLUMN cache_creation_tokens INTEGER")
+                conn.execute("ALTER TABLE llm_decisions ADD COLUMN cache_read_tokens INTEGER")
+                logger.info("llm_decisions 테이블에 cache_creation_tokens/cache_read_tokens 컬럼 추가 완료")
 
             # 마이그레이션: coin_strategy_assignment 테이블 생성 (#152)
             try:

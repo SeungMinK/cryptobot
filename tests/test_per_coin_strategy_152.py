@@ -419,12 +419,15 @@ def test_strategy_extra_restored_after_override(db):
 
 
 def test_prompt_size_impact_within_bounds(db):
-    """coin_strategies 스펙이 프롬프트에 포함됐지만 크기 과도 증가 없음."""
-    # 스펙 추가된 프롬프트 길이
-    prompt_chars = len(ANALYSIS_PROMPT)
-    # 기본 스펙 추가량: 약 400~600 chars (합리적 범위)
-    # ANALYSIS_PROMPT 자체는 템플릿이므로 6000~8000 chars 정도
-    assert 5000 < prompt_chars < 10000, f"프롬프트 템플릿 크기 비정상: {prompt_chars}"
+    """coin_strategies 스펙이 프롬프트에 포함됐지만 크기 과도 증가 없음.
+
+    #183에서 SYSTEM/ANALYSIS 분리 — 합쳐서 검증.
+    """
+    from cryptobot.llm.analyzer import SYSTEM_PROMPT
+
+    total_chars = len(SYSTEM_PROMPT) + len(ANALYSIS_PROMPT)
+    # SYSTEM + 데이터 템플릿 합계가 합리적 범위
+    assert 5000 < total_chars < 15000, f"프롬프트 전체 크기 비정상: {total_chars}"
 
 
 # ===================================================================
@@ -433,9 +436,12 @@ def test_prompt_size_impact_within_bounds(db):
 
 
 def test_prompt_includes_coin_strategies_spec():
-    """ANALYSIS_PROMPT에 coin_strategies 스펙이 명시됨."""
-    assert "coin_strategies" in ANALYSIS_PROMPT
-    assert "코인별로" in ANALYSIS_PROMPT or "코인마다" in ANALYSIS_PROMPT
+    """coin_strategies 스펙이 프롬프트에 명시됨 (#183에서 SYSTEM으로 이동)."""
+    from cryptobot.llm.analyzer import SYSTEM_PROMPT
+
+    combined = SYSTEM_PROMPT + ANALYSIS_PROMPT
+    assert "coin_strategies" in combined
+    assert "코인별로" in combined or "코인마다" in combined
 
 
 # ===================================================================

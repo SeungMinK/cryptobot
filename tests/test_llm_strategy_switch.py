@@ -281,17 +281,17 @@ class TestGetActiveStrategyText:
     def test_get_active_strategy_text(self):
         analyzer, db = _make_analyzer()
         try:
-            # 기본 상태: volatility_breakout이 활성
+            # #197: 기본 활성 전략은 이제 bb_rsi_combined
             text = analyzer._get_active_strategy_text()
-            assert "volatility_breakout" in text, f"활성 전략 텍스트에 전략 이름 없음: {text}"
+            assert "bb_rsi_combined" in text, f"활성 전략 텍스트에 전략 이름 없음: {text}"
             assert "적합 시장" in text, f"적합 시장 정보 없음: {text}"
 
-            # 다른 전략으로 전환 후 확인
+            # 다른 전략으로 전환 후 확인 (volatility_breakout으로)
             repo = StrategyRepository(db)
-            repo.activate("bb_rsi_combined", source="test")
+            repo.activate("volatility_breakout", source="test")
             repo.complete_shutdown()
 
             text = analyzer._get_active_strategy_text()
-            assert "bb_rsi_combined" in text, f"전환 후 텍스트에 bb_rsi_combined 없음: {text}"
+            assert "volatility_breakout" in text, f"전환 후 텍스트에 volatility_breakout 없음: {text}"
         finally:
             db.close()

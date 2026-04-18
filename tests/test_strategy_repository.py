@@ -42,37 +42,40 @@ def test_get_by_name():
 
 
 def test_get_active_default():
-    """초기 상태에서 변동성 돌파만 활성화."""
+    """초기 상태에서 bb_rsi_combined만 활성화 (#197 기본값 변경)."""
     repo, db = _make_repo()
     try:
         active = repo.get_active()
         assert len(active) == 1
-        assert active[0]["name"] == "volatility_breakout"
+        assert active[0]["name"] == "bb_rsi_combined"
     finally:
         db.close()
 
 
 def test_activate_and_deactivate():
-    """전략 활성화/비활성화."""
+    """전략 활성화/비활성화 — 기본(bb_rsi_combined) + rsi_mean_reversion."""
     repo, db = _make_repo()
     try:
+        # activate가 기존 활성을 shutting_down으로 옮기지만 is_active는 TRUE 유지
         repo.activate("rsi_mean_reversion", source="manual", reason="횡보장 대비")
         active = repo.get_active()
+        # bb_rsi_combined(shutting_down, is_active=T) + rsi_mean_reversion(active) = 2
         assert len(active) == 2
 
         repo.deactivate("rsi_mean_reversion", source="manual")
         active = repo.get_active()
+        # 기본 전략만 남음
         assert len(active) == 1
     finally:
         db.close()
 
 
 def test_switch_strategy():
-    """전략 전환."""
+    """전략 전환 (#197 기본 bb_rsi_combined → rsi_mean_reversion)."""
     repo, db = _make_repo()
     try:
         repo.switch(
-            from_strategy="volatility_breakout",
+            from_strategy="bb_rsi_combined",
             to_strategy="rsi_mean_reversion",
             source="auto",
             market_state="sideways",
@@ -106,16 +109,18 @@ def test_activation_history():
 
 
 def test_get_active_for_market():
-    """시장 상태별 활성 전략 조회."""
+    """시장 상태별 활성 전략 조회 (#197 기본값 bb_rsi_combined로 변경 반영)."""
     repo, db = _make_repo()
     try:
-        repo.activate("rsi_mean_reversion")
+        # bullish용 전략 추가 활성화
+        repo.activate("volatility_breakout")
 
         bullish = repo.get_active_for_market("bullish")
         assert any(s["name"] == "volatility_breakout" for s in bullish)
 
+        # bb_rsi_combined은 sideways,bearish 기본 활성
         sideways = repo.get_active_for_market("sideways")
-        assert any(s["name"] == "rsi_mean_reversion" for s in sideways)
+        assert any(s["name"] == "bb_rsi_combined" for s in sideways)
     finally:
         db.close()
 

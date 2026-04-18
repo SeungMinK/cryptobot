@@ -188,37 +188,48 @@ class WeeklyReporter:
             return {"status": "error", "message": str(e)}
 
     def _send_report(self, results: dict) -> None:
-        """Slack 주간 리포트."""
-        lines = ["📊 *주간 리포트*\n"]
-
-        # 전략 성과
+        """Slack 주간 리포트 (#197: 승률 제거, 손익 % 강조, 가독성 개선)."""
         perf = results.get("strategy_performance", {})
         strategies = perf.get("strategies", [])
+
+        # 주간 총 손익 계산
+        total_pnl_week = sum(s.get("total_pnl", 0) for s in strategies) if strategies else 0
+        total_emoji = "📈" if total_pnl_week >= 0 else "📉"
+
+        lines = [
+            "📊 *주간 리포트* (지난 7일)",
+            "━━━━━━━━━━━━━━━━━━━",
+        ]
+
+        # 주간 총 손익 (헤드라인)
+        lines.append(f"*{total_emoji} 주간 총 손익*")
+        sign = "🟢" if total_pnl_week >= 0 else "🔴"
+        lines.append(f">  {sign}  `{total_pnl_week:+,.0f}원`")
+        lines.append("")
+
+        # 전략별 성과 — 승률 제거, 수익률 강조
         if strategies:
-            lines.append("*전략별 성과 (7일)*")
+            lines.append("*🎯 전략별 성과*")
             for s in strategies:
-                emoji = "🟢" if s["total_pnl"] > 0 else "🔴"
-                lines.append(
-                    f"  {emoji} {s['strategy']}: "
-                    f"{s['trades']}건, 승률 {s['win_rate']}%, "
-                    f"평균 {s['avg_pct']:+.2f}%, "
-                    f"손익 {s['total_pnl']:+,.0f}원"
-                )
+                e = "🟢" if s["total_pnl"] > 0 else "🔴" if s["total_pnl"] < 0 else "⚪"
+                lines.append(f">  {e}  *{s['strategy']}*  ·  `{s['trades']}건`")
+                lines.append(f">  　평균 `{s['avg_pct']:+.2f}%`  ·  손익 `{s['total_pnl']:+,.0f}원`")
         else:
-            lines.append("*전략별 성과*: 7일간 매매 없음")
+            lines.append("*🎯 전략별 성과*  ·  _7일간 매매 없음_")
 
         # 파라미터 드리프트
+        lines.append("")
         drift = results.get("param_drift", {})
-        lines.append(f"\n*파라미터 변경*: {drift.get('total_changes', 0)}건")
+        lines.append(f"*⚙️ LLM 파라미터 변경*  ·  `{drift.get('total_changes', 0)}건`")
 
-        # DB
+        # DB / 정리
+        lines.append("")
         db = results.get("db_optimize", {})
-        lines.append(f"*DB 크기*: {db.get('size_mb', '?')}MB")
-
         cleanup = results.get("data_cleanup", {})
         snap_del = cleanup.get("snapshots_deleted", 0)
         sig_del = cleanup.get("signals_deleted", 0)
+        lines.append(f"*💾 DB*  ·  크기 `{db.get('size_mb', '?')}MB`")
         if snap_del or sig_del:
-            lines.append(f"*정리*: 스냅샷 {snap_del}건 + 신호 {sig_del}건 삭제")
+            lines.append(f">  정리: 스냅샷 `{snap_del}건` · 신호 `{sig_del}건`")
 
         self._notifier.send("\n".join(lines))

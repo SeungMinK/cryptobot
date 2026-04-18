@@ -1,8 +1,19 @@
-.PHONY: start bot api web news tunnel install test lint
+.PHONY: start bot api web news tunnel install test lint daemon stop status
 
-# 전체 실행 (봇 + API + Admin + 터널)
+# 전체 실행 (봇 + API + Admin + 터널) — 포그라운드, 터미널 닫히면 종료
 start:
 	bash scripts/start_all.sh
+
+# 백그라운드 실행 — 터미널 닫아도 계속 돌아감 (nohup + setsid)
+# 상태: make status, 종료: make stop
+daemon:
+	bash scripts/start_daemon.sh
+
+stop:
+	bash scripts/stop_daemon.sh
+
+status:
+	bash scripts/status_daemon.sh
 
 # 개별 실행
 bot:

@@ -57,3 +57,7 @@ error/*
 # Admin (React)
 admin/node_modules/
 admin/dist/backups/
+
+# Daemon PID 파일
+pids/
+logs/daemon/

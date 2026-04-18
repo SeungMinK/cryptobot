@@ -161,14 +161,30 @@ class CryptoBot:
             self._coin_highest_prices[coin] = strategy._highest_price
         finally:
             # 카테고리별 파라미터 복원 (공유 인스턴스 보호)
-            if hasattr(strategy, "_orig_stop_loss"):
-                strategy.params.stop_loss_pct = strategy._orig_stop_loss
-                strategy.params.trailing_stop_pct = strategy._orig_trailing
-                strategy.params.position_size_pct = strategy._orig_position
+            # #186: 복원 중 자체에서도 예외 안전하게 — 각 속성별 try/except
+            for attr_restore in (
+                ("_orig_stop_loss", "stop_loss_pct"),
+                ("_orig_trailing", "trailing_stop_pct"),
+                ("_orig_position", "position_size_pct"),
+            ):
+                marker, field = attr_restore
+                if hasattr(strategy, marker):
+                    try:
+                        setattr(strategy.params, field, getattr(strategy, marker))
+                    finally:
+                        try:
+                            delattr(strategy, marker)
+                        except AttributeError:
+                            pass
             # #152: 코인별 assignment_params로 오버라이드한 extra 복원
             if hasattr(strategy, "_orig_extra"):
-                strategy.params.extra = strategy._orig_extra
-                del strategy._orig_extra
+                try:
+                    strategy.params.extra = strategy._orig_extra
+                finally:
+                    try:
+                        delattr(strategy, "_orig_extra")
+                    except AttributeError:
+                        pass
             self._strategy_sel.current_strategy = orig
             self._strategy_sel.current_strategy_name = orig_name
 

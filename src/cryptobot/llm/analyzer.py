@@ -165,7 +165,11 @@ SYSTEM_PROMPT = """당신은 암호화폐 자동매매 봇의 시장 분석 전�
     "roi_10min": 3.0,
     "roi_30min": 2.0,
     "roi_60min": 1.0,
-    "roi_120min": 0.3
+    "roi_120min": 0.3,
+    // 전략별 추가 — recommended_strategy가 bb_rsi_combined일 때 예:
+    "rsi_oversold": 30,
+    "bb_std": 2.0
+    // 다른 전략이면 해당 전략의 파라미터만 포함 (아래 표 참조)
   },
   "coin_recommendations": {
     "add": [],
@@ -1426,12 +1430,16 @@ class LLMAnalyzer:
                     messages=[{"role": "user", "content": prompt}],
                 )
 
-                usage = response.usage
-                total_input += getattr(usage, "input_tokens", 0) or 0
-                total_output += getattr(usage, "output_tokens", 0) or 0
-                # 캐시 토큰 — SDK 응답에 있을 때만 집계 (없으면 0)
-                total_cache_creation += getattr(usage, "cache_creation_input_tokens", 0) or 0
-                total_cache_read += getattr(usage, "cache_read_input_tokens", 0) or 0
+                # #186: usage 객체가 없거나 malformed여도 응답 처리는 계속
+                try:
+                    usage = response.usage
+                    total_input += getattr(usage, "input_tokens", 0) or 0
+                    total_output += getattr(usage, "output_tokens", 0) or 0
+                    # 캐시 토큰 — SDK 응답에 있을 때만 집계 (없으면 0)
+                    total_cache_creation += getattr(usage, "cache_creation_input_tokens", 0) or 0
+                    total_cache_read += getattr(usage, "cache_read_input_tokens", 0) or 0
+                except Exception as _usage_e:
+                    logger.warning("usage 파싱 실패 (집계 건너뜀): %s", _usage_e)
 
                 content = response.content[0].text.strip()
 
@@ -1846,7 +1854,19 @@ class LLMAnalyzer:
             ).fetchall()
             held = {dict(r)["coin"] for r in held_rows}
 
-            bulk = coin_repo.apply_bulk(coin_strategies, available, held_coins=held)
+            # #186: 현재 모니터링 중인 코인만 허용 — 최근 1시간 스냅샷 기준
+            # 모니터링 외 코인 배정을 DB에 저장하지 않음 (안 쓰일 배정)
+            active_rows = self._db.execute(
+                "SELECT DISTINCT coin FROM market_snapshots WHERE timestamp >= datetime('now', '-1 hour')"
+            ).fetchall()
+            active_coins = {dict(r)["coin"] for r in active_rows}
+
+            bulk = coin_repo.apply_bulk(
+                coin_strategies,
+                available,
+                held_coins=held,
+                active_coins=active_coins if active_coins else None,
+            )
             logger.info(
                 "coin_strategies 적용: %d건 반영, %d건 거부",
                 len(bulk["applied"]),

@@ -166,10 +166,12 @@ class StrategySelector:
             return self.current_strategy, self.current_strategy_name
 
         # 코인별 assignment_params 적용 — 전략 파라미터 오버라이드
-        if assignment_params:
+        # #186: 항상 _orig_extra 세팅 (빈 dict여도). finally 복원 일관성 보장.
+        if assignment_params is not None:
             strategy._orig_extra = dict(strategy.params.extra)
-            for k, v in assignment_params.items():
-                strategy.params.extra[k] = v
+            if assignment_params:
+                for k, v in assignment_params.items():
+                    strategy.params.extra[k] = v
 
         # 카테고리별 리스크 파라미터 (공유 인스턴스 보호 — 매 틱 후 복원)
         row = self._db.execute("SELECT * FROM coin_strategy_config WHERE category = ?", (coin_category,)).fetchone()

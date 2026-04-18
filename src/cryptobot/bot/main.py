@@ -102,8 +102,12 @@ class CryptoBot:
             self._coin_mgr.refresh()
 
             self._risk.limits.max_daily_trades = int(self._config_mgr.get("max_daily_trades", "10"))
-            self._risk.limits.max_daily_loss_pct = float(self._config_mgr.get("max_daily_loss_pct", "-10.0"))
+            self._risk.limits.max_daily_loss_pct = float(self._config_mgr.get("max_daily_loss_pct", "-7.0"))
             self._risk.limits.max_consecutive_losses = int(self._config_mgr.get("max_consecutive_losses", "3"))
+            self._risk.limits.max_position_size_krw = float(self._config_mgr.get("max_position_size_krw", "300000"))
+            self._risk.limits.max_daily_account_loss_pct = float(
+                self._config_mgr.get("max_daily_account_loss_pct", "-10.0")
+            )
 
             new_interval = int(self._config_mgr.get("tick_interval_seconds", "60"))
             if new_interval != self._tick_interval:
@@ -233,7 +237,24 @@ class CryptoBot:
             return
 
         bal = self._trader.get_balance_krw()
-        max_pct = float(self._config_mgr.get("max_position_per_coin_pct", "50"))
+        # 계좌 전체 일일 손실 한도 체크 — 매수만 차단, 매도는 영향 없음
+        ok_acct, reason_acct = self._risk.check_account_daily_loss(bal)
+        if not ok_acct:
+            self._recorder.record_signal(
+                coin=coin,
+                signal_type="buy",
+                strategy=sn,
+                confidence=sig.confidence,
+                trigger_reason=sig.reason,
+                current_price=price,
+                trigger_value=sig.trigger_value,
+                skip_reason=reason_acct,
+                snapshot_id=snapshot_id,
+                strategy_params_json=pj,
+            )
+            return
+
+        max_pct = float(self._config_mgr.get("max_position_per_coin_pct", "25"))
         avail = min(bal * max_pct / 100, bal - self._risk.limits.min_balance_krw)
         if avail <= 0:
             return

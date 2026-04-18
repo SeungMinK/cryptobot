@@ -63,6 +63,7 @@ def test_order_uuid_persisted_to_trades(db):
     )
     bot._risk = MagicMock()
     bot._risk.check_can_buy.return_value = (True, "OK")
+    bot._risk.check_account_daily_loss.return_value = (True, "OK")
     bot._risk.limits = MagicMock(min_balance_krw=5000, max_position_size_krw=1_000_000)
     bot._config_mgr = MagicMock()
     bot._config_mgr.get.return_value = "50"
@@ -130,6 +131,7 @@ def test_duplicate_buy_blocked_when_active_position_exists(db):
     )
     bot._risk = MagicMock()
     bot._risk.check_can_buy.return_value = (True, "OK")
+    bot._risk.check_account_daily_loss.return_value = (True, "OK")
     bot._risk.limits = MagicMock(min_balance_krw=5000, max_position_size_krw=1_000_000)
     bot._config_mgr = MagicMock()
     bot._config_mgr.get.return_value = "50"

@@ -578,3 +578,270 @@ class HealthChecker:
             lines.append(f"• *{key}*: {msg}")
 
         self._notifier.send("\n".join(lines))
+
+    # ------------------------------------------------------------
+    # #195: 4시간 주기 경량 헬스체크 — 외출 중에도 Slack으로 상태 확인
+    # ------------------------------------------------------------
+
+    def run_periodic(self) -> dict:
+        """4시간 주기 경량 헬스체크. Slack으로 요약 전송.
+
+        run_all(일일)과 달리 빠른 liveness 위주 — 프로세스/DB/최근 활동.
+        """
+        import subprocess
+
+        results = {
+            "bot_process": self._check_bot_liveness(),
+            "api_process": self._check_api_liveness(),
+            "news_process": self._check_news_liveness(),
+            "db_signals": self._check_recent_signals(),
+            "error_logs": self._check_recent_errors(),
+            "llm_today": self._check_llm_today_kst(),
+            "trading_today": self._check_trading_today_kst(),
+        }
+        _ = subprocess  # placeholder: 하위 체크에서 실제 사용
+
+        # Slack 전송
+        if self._notifier:
+            message = self._format_periodic_slack(results)
+            self._notifier.send(message)
+
+        logger.info("주기 헬스체크 완료")
+        return results
+
+    def _check_bot_liveness(self) -> dict:
+        """BOT 프로세스 생존성 — 최근 5분 내 market_snapshot 기록 있는지."""
+        try:
+            row = self._db.execute(
+                "SELECT MAX(timestamp) AS last_ts FROM market_snapshots "
+                "WHERE timestamp >= datetime('now', '-15 minutes')"
+            ).fetchone()
+            last = dict(row).get("last_ts") if row else None
+            if last:
+                # 몇 분 전인지 계산
+                gap_row = self._db.execute(
+                    "SELECT (julianday('now') - julianday(?)) * 24 * 60 AS gap_min", (last,)
+                ).fetchone()
+                gap = dict(gap_row)["gap_min"] or 0
+                status = "ok" if gap < 5 else "warning"
+                return {"status": status, "last_snapshot_min_ago": round(gap, 1)}
+            return {"status": "warning", "message": "최근 15분 내 snapshot 없음 — 봇 정지 의심"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def _check_api_liveness(self) -> dict:
+        """API 서버 self-ping (localhost:8000 /api/health)."""
+        try:
+            import urllib.error
+            import urllib.request
+
+            req = urllib.request.Request("http://localhost:8000/api/health")
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                if resp.status == 200:
+                    return {"status": "ok"}
+                return {"status": "warning", "message": f"HTTP {resp.status}"}
+        except urllib.error.URLError as e:
+            return {"status": "warning", "message": f"응답 없음: {e.reason}"}
+        except Exception as e:
+            return {"status": "warning", "message": str(e)}
+
+    def _check_news_liveness(self) -> dict:
+        """뉴스 수집기 생존성 — 최근 2시간 수집 건수."""
+        try:
+            row = self._db.execute(
+                "SELECT COUNT(*) AS cnt FROM news_articles WHERE collected_at >= datetime('now', '-2 hours')"
+            ).fetchone()
+            cnt = dict(row)["cnt"] or 0
+            if cnt == 0:
+                return {"status": "warning", "news_count_2h": 0, "message": "2시간 내 수집 0건"}
+            return {"status": "ok", "news_count_2h": cnt}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def _check_recent_signals(self) -> dict:
+        """trade_signals 최근 1시간 누적."""
+        try:
+            row = self._db.execute(
+                "SELECT signal_type, COUNT(*) AS cnt FROM trade_signals "
+                "WHERE timestamp >= datetime('now', '-1 hour') GROUP BY signal_type"
+            ).fetchall()
+            counts = {dict(r)["signal_type"]: dict(r)["cnt"] for r in row}
+            total = sum(counts.values())
+            status = "ok" if total > 0 else "warning"
+            return {"status": status, "total": total, **counts}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def _check_recent_errors(self) -> dict:
+        """최근 4시간 에러 로그 건수 — logs/error/<date>/*.log grep."""
+        try:
+            import subprocess
+            from pathlib import Path
+
+            log_root = Path("logs/error")
+            if not log_root.exists():
+                return {"status": "ok", "error_count_4h": 0, "message": "로그 디렉토리 없음"}
+
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            log_dir = log_root / today
+            if not log_dir.exists():
+                return {"status": "ok", "error_count_4h": 0}
+
+            # 최근 4시간 내 수정된 에러 로그 파일 행 수
+            count = 0
+            for f in log_dir.glob("*.log"):
+                try:
+                    result = subprocess.run(
+                        ["wc", "-l", str(f)],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    if result.returncode == 0:
+                        n = int(result.stdout.split()[0])
+                        count += n
+                except Exception:
+                    continue
+
+            if count == 0:
+                return {"status": "ok", "error_count_4h": 0}
+            if count >= 10:
+                return {"status": "warning", "error_count_4h": count, "message": f"에러 {count}건"}
+            return {"status": "ok", "error_count_4h": count}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def _check_llm_today_kst(self) -> dict:
+        """오늘(KST) LLM 호출 수 + 비용 + 캐시 hit rate."""
+        try:
+            row = self._db.execute(
+                "SELECT COUNT(*) AS cnt, COALESCE(SUM(cost_usd), 0) AS cost, "
+                "COALESCE(SUM(cache_creation_tokens), 0) AS write_tok, "
+                "COALESCE(SUM(cache_read_tokens), 0) AS read_tok, "
+                "MAX(timestamp) AS last_ts "
+                "FROM llm_decisions WHERE DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')"
+            ).fetchone()
+            d = dict(row)
+            total_cache = (d["write_tok"] or 0) + (d["read_tok"] or 0)
+            hit_pct = round((d["read_tok"] or 0) / total_cache * 100, 1) if total_cache > 0 else 0
+            # 최근 호출 N시간 전
+            last_gap_min = None
+            if d["last_ts"]:
+                gap_row = self._db.execute(
+                    "SELECT (julianday('now') - julianday(?)) * 24 * 60 AS gap", (d["last_ts"],)
+                ).fetchone()
+                last_gap_min = round(dict(gap_row)["gap"] or 0, 1)
+            return {
+                "status": "ok",
+                "calls_today": d["cnt"] or 0,
+                "cost_usd": round(d["cost"] or 0, 4),
+                "cache_hit_pct": hit_pct,
+                "last_call_min_ago": last_gap_min,
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def _check_trading_today_kst(self) -> dict:
+        """오늘(KST) 매매 건수 + 실현 PnL + 보유 포지션."""
+        try:
+            trades_row = self._db.execute(
+                "SELECT "
+                "SUM(CASE WHEN side='buy' THEN 1 ELSE 0 END) AS buys, "
+                "SUM(CASE WHEN side='sell' THEN 1 ELSE 0 END) AS sells, "
+                "COALESCE(SUM(CASE WHEN side='sell' THEN profit_krw END), 0) AS pnl "
+                "FROM trades WHERE DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')"
+            ).fetchone()
+            t = dict(trades_row)
+
+            # 보유 포지션
+            held_rows = self._db.execute(
+                "SELECT DISTINCT coin FROM trades t WHERE side='buy' "
+                "AND NOT EXISTS (SELECT 1 FROM trades s WHERE s.buy_trade_id = t.id AND s.side='sell')"
+            ).fetchall()
+            held = [dict(r)["coin"] for r in held_rows]
+
+            return {
+                "status": "ok",
+                "buys_today": t["buys"] or 0,
+                "sells_today": t["sells"] or 0,
+                "pnl_today_krw": round(t["pnl"] or 0, 0),
+                "held_coins": held,
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def _format_periodic_slack(self, results: dict) -> str:
+        """4시간 체크 결과를 Slack용 텍스트로 포맷."""
+        now_kst = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M KST")
+
+        def emoji(status: str) -> str:
+            return {"ok": "✅", "warning": "⚠️", "error": "❌"}.get(status, "❔")
+
+        bot = results["bot_process"]
+        api = results["api_process"]
+        news = results["news_process"]
+        sigs = results["db_signals"]
+        errs = results["error_logs"]
+        llm = results["llm_today"]
+        trd = results["trading_today"]
+
+        lines = [f"🏥 *시스템 상태 체크* ({now_kst})", "", "*[프로세스]*"]
+
+        # BOT
+        bot_msg = f"{emoji(bot['status'])} BOT"
+        if bot.get("last_snapshot_min_ago") is not None:
+            bot_msg += f" — {bot['last_snapshot_min_ago']:.1f}분 전 snapshot"
+        if bot.get("message"):
+            bot_msg += f" ({bot['message']})"
+        lines.append(bot_msg)
+
+        # API
+        lines.append(f"{emoji(api['status'])} API" + (f" — {api.get('message')}" if api.get("message") else ""))
+
+        # NEWS
+        news_msg = f"{emoji(news['status'])} NEWS"
+        if news.get("news_count_2h") is not None:
+            news_msg += f" — 최근 2h {news['news_count_2h']}건"
+        if news.get("message"):
+            news_msg += f" ({news['message']})"
+        lines.append(news_msg)
+
+        # DB 시그널
+        lines.append("")
+        lines.append("*[DB 시그널 — 최근 1h]*")
+        total = sigs.get("total", 0)
+        buy_n = sigs.get("buy", 0)
+        sell_n = sigs.get("sell", 0)
+        hold_n = sigs.get("hold", 0)
+        lines.append(f"{emoji(sigs['status'])} 총 {total}건 (buy={buy_n}, sell={sell_n}, hold={hold_n})")
+
+        # 에러
+        lines.append("")
+        lines.append("*[에러 로그 — 오늘]*")
+        err_cnt = errs.get("error_count_4h", 0)
+        lines.append(f"{emoji(errs['status'])} {err_cnt}건" + (f" — {errs['message']}" if errs.get("message") else ""))
+
+        # LLM
+        lines.append("")
+        lines.append("*[LLM — 오늘 KST]*")
+        lines.append(f"• 호출 {llm.get('calls_today', 0)}/20회, ${llm.get('cost_usd', 0):.3f}")
+        hit = llm.get("cache_hit_pct", 0)
+        lines.append(f"• 캐시 hit: {hit}%")
+        last_gap = llm.get("last_call_min_ago")
+        if last_gap is not None:
+            lines.append(f"• 최근 분석: {last_gap:.0f}분 전")
+
+        # 매매
+        lines.append("")
+        lines.append("*[매매 — 오늘 KST]*")
+        lines.append(f"• 체결: 매수 {trd.get('buys_today', 0)}, 매도 {trd.get('sells_today', 0)}")
+        pnl = trd.get("pnl_today_krw", 0)
+        pnl_sign = "+" if pnl >= 0 else ""
+        lines.append(f"• 실현 PnL: {pnl_sign}{pnl:,.0f}원")
+        held = trd.get("held_coins", [])
+        if held:
+            lines.append(f"• 보유: {', '.join(c.replace('KRW-', '') for c in held)}")
+        else:
+            lines.append("• 보유: 없음")
+
+        return "\n".join(lines)

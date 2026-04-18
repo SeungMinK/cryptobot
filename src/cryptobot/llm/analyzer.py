@@ -1461,6 +1461,10 @@ class LLMAnalyzer:
         "roi_120min",
     ]
     MAX_RETRIES = 2
+    # #200 opportunity-focused 프롬프트는 coin_strategies dict + reasoning으로
+    # 응답이 길어져 기존 1024로는 JSON이 잘림("Unterminated string" 파싱 실패).
+    # 2048로 상향 — 실제 출력만큼만 과금되므로 비용 영향 없음.
+    MAX_TOKENS = 2048
 
     def _call_claude(self, prompt: str) -> dict | None:
         """Claude API 호출 (최대 2회 재시도 + 응답 검증)."""
@@ -1484,7 +1488,7 @@ class LLMAnalyzer:
                     try:
                         response = client.messages.create(
                             model=self._model,
-                            max_tokens=1024,
+                            max_tokens=self.MAX_TOKENS,
                             system=[
                                 {
                                     "type": "text",
@@ -1505,7 +1509,7 @@ class LLMAnalyzer:
                             use_caching = False
                             response = client.messages.create(
                                 model=self._model,
-                                max_tokens=1024,
+                                max_tokens=self.MAX_TOKENS,
                                 system=SYSTEM_PROMPT,
                                 messages=[{"role": "user", "content": prompt}],
                             )
@@ -1515,7 +1519,7 @@ class LLMAnalyzer:
                     # 이전 시도에서 캐싱 실패했으면 남은 시도는 캐싱 없이
                     response = client.messages.create(
                         model=self._model,
-                        max_tokens=1024,
+                        max_tokens=self.MAX_TOKENS,
                         system=SYSTEM_PROMPT,
                         messages=[{"role": "user", "content": prompt}],
                     )

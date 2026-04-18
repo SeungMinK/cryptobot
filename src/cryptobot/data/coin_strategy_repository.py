@@ -100,7 +100,8 @@ class CoinStrategyRepository:
                 except (ValueError, TypeError):
                     pass  # 타임스탬프 파싱 실패 시 허용
 
-        params_json = json.dumps(params, ensure_ascii=False) if params else None
+        # #186: None과 빈 dict 구분 — 빈 dict는 명시적 "기본값 사용" 의사 표현
+        params_json = json.dumps(params, ensure_ascii=False) if params is not None else None
         self._db.execute(
             """
             INSERT INTO coin_strategy_assignment (coin, strategy_name, params_json, assigned_by, reason, assigned_at)
@@ -134,6 +135,7 @@ class CoinStrategyRepository:
         coin_strategies: dict[str, dict],
         available_strategies: set[str],
         held_coins: set[str] | None = None,
+        active_coins: set[str] | None = None,
     ) -> dict:
         """LLM이 준 coin_strategies dict 일괄 적용.
 
@@ -141,6 +143,8 @@ class CoinStrategyRepository:
             coin_strategies: {coin: {"strategy": name, "params": {...}}}
             available_strategies: DB에 등록된 유효 전략명 집합
             held_coins: 보유 중인 코인 (전략 변경 금지 대상)
+            active_coins: 현재 모니터링 중인 코인 (#186). 지정 시 외부 코인 배정 거부.
+                None이면 기존 동작(필터 없음) 유지.
 
         Returns:
             {"applied": [...], "rejected": [{coin, strategy, reason}, ...]}
@@ -160,6 +164,10 @@ class CoinStrategyRepository:
                 continue
             if strategy not in available_strategies:
                 rejected.append({"coin": coin_norm, "strategy": strategy, "reason": "unknown strategy"})
+                continue
+            # #186: 모니터링 외 코인 배정 거부 — 사용되지 않는 배정이 DB에 쌓이는 것 방지
+            if active_coins is not None and coin_norm not in active_coins:
+                rejected.append({"coin": coin_norm, "strategy": strategy, "reason": "coin not monitored"})
                 continue
             if coin_norm in held_coins:
                 # 보유 중인 코인은 전략 교체 금지 — 다음 라운드 때 반영

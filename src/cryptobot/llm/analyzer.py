@@ -308,11 +308,13 @@ class LLMAnalyzer:
     # Haiku 4.5 공식가 (platform.claude.com/docs/en/docs/about-claude/pricing)
     PRICE_INPUT_PER_M = 1.00  # $1.00 / 1M 입력 토큰
     PRICE_OUTPUT_PER_M = 5.00  # $5.00 / 1M 출력 토큰
-    MAX_DAILY_CALLS = 36  # 하드 리밋 (활발 시 24회 + 긴급 여유)
+    MAX_DAILY_CALLS = 20  # 하드 리밋 (#190)
     # 동적 주기 (시장 활동량에 따라)
     INTERVAL_ACTIVE_MIN = 60  # 활발: 1시간 (30분은 파라미터 진동만 유발)
     INTERVAL_NORMAL_MIN = 120  # 보통: 2시간
     INTERVAL_QUIET_MIN = 240  # 한산: 4시간
+    # #190: Emergency 과호출 방지 — force=True여도 이 시간 경과해야 실행
+    EMERGENCY_MIN_COOLDOWN_MIN = 20
 
     def _get_dynamic_interval_minutes(self) -> int:
         """시장 활동량에 따른 LLM 호출 간격(분) 결정.
@@ -362,22 +364,35 @@ class LLMAnalyzer:
             logger.warning("LLM 일일 호출 제한 도달: %d/%d", daily_count, self.MAX_DAILY_CALLS)
             return False
 
-        # 강제 실행 (시장 급변)
-        if force:
-            logger.info("LLM 즉시 분석 (시장 급변 감지)")
-            return True
-
-        # 동적 간격 체크
+        # 동적 간격 체크 (force도 최소 쿨다운 적용)
+        # #190: 기존에는 force=True면 즉시 실행 → check_emergency가 거의 매번 발동해
+        # 10분 간격 호출을 유발. 이제 force라도 EMERGENCY_MIN_COOLDOWN_MIN 이상
+        # 경과해야 실행되도록 해서 과호출 차단.
         row = self._db.execute("SELECT timestamp FROM llm_decisions ORDER BY id DESC LIMIT 1").fetchone()
         if row is None:
+            # 첫 호출은 무조건 허용
+            if force:
+                logger.info("LLM 즉시 분석 (첫 호출, 시장 급변 감지)")
             return True
 
         last = datetime.fromisoformat(dict(row)["timestamp"])
         if last.tzinfo is None:
             last = last.replace(tzinfo=timezone.utc)
         elapsed_min = (datetime.now(timezone.utc) - last).total_seconds() / 60
-        interval = self._get_dynamic_interval_minutes()
 
+        if force:
+            # #190: Emergency도 최소 쿨다운 — 10분 간격 스파이크 차단
+            if elapsed_min < self.EMERGENCY_MIN_COOLDOWN_MIN:
+                logger.info(
+                    "LLM Emergency 스킵: %.0f분 전 (최소 쿨다운 %d분)",
+                    elapsed_min,
+                    self.EMERGENCY_MIN_COOLDOWN_MIN,
+                )
+                return False
+            logger.info("LLM 즉시 분석 (시장 급변, %.0f분 경과)", elapsed_min)
+            return True
+
+        interval = self._get_dynamic_interval_minutes()
         if elapsed_min < interval:
             logger.info("LLM 스킵: %.0f분 전 (다음: %d분 간격)", elapsed_min, interval)
             return False

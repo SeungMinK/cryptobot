@@ -385,7 +385,11 @@ class TestAnalysisPromptTextRules:
     """프롬프트 규칙 블록 — should_alert_stop 기준, 손익비 목표 표기."""
 
     def test_should_alert_stop_criteria_block_present(self):
-        from cryptobot.llm.analyzer import ANALYSIS_PROMPT
+        # #183: 규칙 블록은 SYSTEM_PROMPT로 이동 (Prompt Caching).
+        # SYSTEM + ANALYSIS 합쳐서 검증.
+        from cryptobot.llm.analyzer import ANALYSIS_PROMPT, SYSTEM_PROMPT
+
+        ANALYSIS_PROMPT = SYSTEM_PROMPT + "\n" + ANALYSIS_PROMPT  # noqa: F811 — 로컬 변수로 오버라이드
 
         # 개선 전: "시장이 극도로 위험하면 should_alert_stop = true" 한 줄
         # 개선 후: 4개 구체 기준을 나열
@@ -395,7 +399,11 @@ class TestAnalysisPromptTextRules:
         assert "거시 충격 뉴스" in ANALYSIS_PROMPT
 
     def test_fear_greed_neutralized(self):
-        from cryptobot.llm.analyzer import ANALYSIS_PROMPT
+        # #183: 규칙 블록은 SYSTEM_PROMPT로 이동 (Prompt Caching).
+        # SYSTEM + ANALYSIS 합쳐서 검증.
+        from cryptobot.llm.analyzer import ANALYSIS_PROMPT, SYSTEM_PROMPT
+
+        ANALYSIS_PROMPT = SYSTEM_PROMPT + "\n" + ANALYSIS_PROMPT  # noqa: F811 — 로컬 변수로 오버라이드
 
         # 개선 전: "역사적 매수 적기 (7년 백테스트 1,145% 수익)"
         # 개선 후: "단기 추가 하락 위험도 공존"
@@ -403,7 +411,11 @@ class TestAnalysisPromptTextRules:
         assert "1,145%" not in ANALYSIS_PROMPT
 
     def test_reward_risk_goal_1p5(self):
-        from cryptobot.llm.analyzer import ANALYSIS_PROMPT
+        # #183: 규칙 블록은 SYSTEM_PROMPT로 이동 (Prompt Caching).
+        # SYSTEM + ANALYSIS 합쳐서 검증.
+        from cryptobot.llm.analyzer import ANALYSIS_PROMPT, SYSTEM_PROMPT
+
+        ANALYSIS_PROMPT = SYSTEM_PROMPT + "\n" + ANALYSIS_PROMPT  # noqa: F811 — 로컬 변수로 오버라이드
 
         # 개선 후: "1.5 이상을 목표"로 표기 일관화
         assert "1.5 이상" in ANALYSIS_PROMPT

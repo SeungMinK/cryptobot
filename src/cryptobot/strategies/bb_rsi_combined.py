@@ -39,7 +39,7 @@ class BBRSICombined(BaseStrategy):
             return None
         deltas = df["close"].diff().dropna()
         gains = deltas.where(deltas > 0, 0)
-        losses = (-deltas.where(deltas < 0, 0))
+        losses = -deltas.where(deltas < 0, 0)
         avg_gain = gains.rolling(self._rsi_period).mean().iloc[-1]
         avg_loss = losses.rolling(self._rsi_period).mean().iloc[-1]
         if avg_loss == 0:
@@ -114,7 +114,8 @@ class BBRSICombined(BaseStrategy):
         # RSI 정상 복귀 → 전략적 매도 (수수료 무관, 알고리즘 판단 존중)
         if rsi >= self._rsi_overbought:
             return Signal(
-                "sell", 0.7,
+                "sell",
+                0.7,
                 f"RSI({rsi:.0f}) 정상 복귀 (실질 {net_pnl:+.1f}%)",
                 trigger_value=round(rsi, 1),
             )
@@ -122,7 +123,8 @@ class BBRSICombined(BaseStrategy):
         # 볼린저 중간선 도달 → 익절 (실질 수익 있을 때만)
         if current_price >= ma and net_pnl > 0:
             return Signal(
-                "sell", 0.6,
+                "sell",
+                0.6,
                 f"볼린저 중간선 도달 (실질 +{net_pnl:.1f}%)",
                 trigger_value=round(ma, 2),
                 is_profit_taking=True,

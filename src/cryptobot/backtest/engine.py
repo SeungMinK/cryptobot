@@ -66,8 +66,7 @@ class BacktestEngine:
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         df = pd.read_sql_query(
-            "SELECT date, open, high, low, close, volume FROM ohlcv_daily "
-            "WHERE coin = ? ORDER BY date ASC",
+            "SELECT date, open, high, low, close, volume FROM ohlcv_daily WHERE coin = ? ORDER BY date ASC",
             conn,
             params=(coin,),
         )
@@ -116,8 +115,13 @@ class BacktestEngine:
                 signal = self.strategy.check_sell(window, current_price, entry_price)
                 if signal.signal_type == "sell":
                     trade = self._make_trade(
-                        entry_date, current_date, entry_price, current_price,
-                        days_held, entry_reason, signal.reason,
+                        entry_date,
+                        current_date,
+                        entry_price,
+                        current_price,
+                        days_held,
+                        entry_reason,
+                        signal.reason,
                     )
                     trades.append(trade)
                     self.strategy.reset()
@@ -133,8 +137,13 @@ class BacktestEngine:
             last_date = str(df.iloc[-1]["date"])
             days_held = (n - 1) - self._entry_index
             trade = self._make_trade(
-                entry_date, last_date, entry_price, last_price,
-                days_held, entry_reason, "백테스트 종료 (강제 청산)",
+                entry_date,
+                last_date,
+                entry_price,
+                last_price,
+                days_held,
+                entry_reason,
+                "백테스트 종료 (강제 청산)",
             )
             trades.append(trade)
             self.strategy.reset()

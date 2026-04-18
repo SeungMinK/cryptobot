@@ -13,9 +13,7 @@ router = APIRouter(prefix="/api/market", tags=["market"])
 def get_current_market(_: UserResponse = Depends(get_current_user)):
     """현재 시장 상태 (BTC 기준 최근 스냅샷)."""
     db = get_db()
-    row = db.execute(
-        "SELECT * FROM market_snapshots WHERE coin = 'KRW-BTC' ORDER BY id DESC LIMIT 1"
-    ).fetchone()
+    row = db.execute("SELECT * FROM market_snapshots WHERE coin = 'KRW-BTC' ORDER BY id DESC LIMIT 1").fetchone()
 
     if row is None:
         # BTC 없으면 아무거나
@@ -31,19 +29,6 @@ def get_current_market(_: UserResponse = Depends(get_current_user)):
 def get_monitored_coins(_: UserResponse = Depends(get_current_user)):
     """현재 모니터링 중인 코인별 최신 데이터."""
     db = get_db()
-
-    # 모니터링 중인 코인 = 최근 1시간 내 스냅샷이 있는 코인들
-    rows = db.execute(
-        """
-        SELECT coin, MAX(id) as latest_id
-        FROM (
-            SELECT 'KRW-BTC' as coin, id, price, market_state, rsi_14 as rsi, change_pct_24h as change_pct
-            FROM market_snapshots
-            WHERE timestamp >= datetime('now', '-1 hour')
-        )
-        GROUP BY coin
-        """
-    ).fetchall()
 
     # 전체 코인의 최신 스냅샷 (각 코인별)
     # market_snapshots는 현재 BTC만 저장하므로, trade_signals에서 코인 목록을 가져옴
@@ -91,9 +76,11 @@ def get_monitored_coins(_: UserResponse = Depends(get_current_user)):
                 entry["buy_price"] = held["buy_price"]
                 entry["buy_total_krw"] = held["total_krw"]
                 entry["buy_time"] = held["buy_time"]
-                entry["unrealized_pnl_pct"] = round(
-                    (entry["current_price"] - held["buy_price"]) / held["buy_price"] * 100, 2
-                ) if entry["current_price"] and held["buy_price"] else 0
+                entry["unrealized_pnl_pct"] = (
+                    round((entry["current_price"] - held["buy_price"]) / held["buy_price"] * 100, 2)
+                    if entry["current_price"] and held["buy_price"]
+                    else 0
+                )
             else:
                 entry["holding"] = False
 
@@ -202,14 +189,16 @@ def get_coin_strategies(_: UserResponse = Depends(get_current_user)):
             (coin,),
         ).fetchone()
 
-        result.append({
-            "coin": coin,
-            "strategy": r["strategy"],
-            "market_state": r["market_state"],
-            "current_price": r["current_price"],
-            "signal_type": r["signal_type"],
-            "confidence": r["confidence"],
-            "holding": held is not None,
-        })
+        result.append(
+            {
+                "coin": coin,
+                "strategy": r["strategy"],
+                "market_state": r["market_state"],
+                "current_price": r["current_price"],
+                "signal_type": r["signal_type"],
+                "confidence": r["confidence"],
+                "holding": held is not None,
+            }
+        )
 
     return result

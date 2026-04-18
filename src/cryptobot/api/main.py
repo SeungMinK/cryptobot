@@ -6,12 +6,20 @@ NestJS의 main.ts (bootstrap) + AppModule과 동일.
     uvicorn cryptobot.api.main:app --reload --port 8000
 """
 
+import logging as _logging
 import os
+import time as _time
+from collections import defaultdict as _defaultdict
 
+from fastapi import Depends as _Depends
 from fastapi import FastAPI, Request
+from fastapi import Query as _Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel as _BaseModel
 
+from cryptobot.api.auth import UserResponse, get_current_user
+from cryptobot.api.deps import get_db as _get_db
 from cryptobot.api.routes import auth, balance, coin_strategy, config, market, news, public, signals, strategies, trades
 from cryptobot.logging_config import setup_logging
 
@@ -58,6 +66,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     return response
 
+
 # 라우트 등록
 app.include_router(public.router)  # 공개 API (인증 불필요)
 app.include_router(auth.router)
@@ -71,15 +80,11 @@ app.include_router(news.router)
 app.include_router(coin_strategy.router)
 
 
-from cryptobot.api.auth import UserResponse, get_current_user
-from cryptobot.api.deps import get_db as _get_db
-from fastapi import Query as _Query, Depends as _Depends
-
-
 @app.get("/api/llm/hard-limits", tags=["llm"])
 def get_hard_limits(_: UserResponse = _Depends(get_current_user)):
     """LLM 하드 리밋 조회 (읽기 전용)."""
     from cryptobot.llm.analyzer import HARD_LIMITS
+
     return {k: {"min": v[0], "max": v[1]} for k, v in HARD_LIMITS.items()}
 
 
@@ -95,7 +100,9 @@ def get_llm_decisions(limit: int = _Query(4, ge=1, le=50), _: UserResponse = _De
 def get_llm_prompts(_: UserResponse = _Depends(get_current_user)):
     """프롬프트 버전 목록."""
     db = _get_db()
-    rows = db.execute("SELECT id, version, description, is_active, created_at, activated_at FROM prompt_versions ORDER BY id DESC").fetchall()
+    rows = db.execute(
+        "SELECT id, version, description, is_active, created_at, activated_at FROM prompt_versions ORDER BY id DESC"
+    ).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -115,12 +122,7 @@ def health_check():
     return {"status": "ok", "service": "cryptobot-api"}
 
 
-import logging as _logging
-
 _web_logger = _logging.getLogger("web")
-
-
-from pydantic import BaseModel as _BaseModel
 
 
 class _WebErrorReport(_BaseModel):
@@ -130,9 +132,6 @@ class _WebErrorReport(_BaseModel):
     url: str | None = None
     user_agent: str | None = None
 
-
-import time as _time
-from collections import defaultdict as _defaultdict
 
 _error_report_attempts: dict[str, list[float]] = _defaultdict(list)
 

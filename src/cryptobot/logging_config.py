@@ -6,7 +6,6 @@
 """
 
 import logging
-import os
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -88,10 +87,9 @@ def setup_logging(service: str, log_level: str = "INFO") -> None:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     error_fmt = logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s (%(filename)s:%(lineno)d)\n"
-        "  %(message)s\n"
-        "  %(exc_text)s" if False else
-        "%(asctime)s [%(levelname)s] %(name)s (%(filename)s:%(lineno)d): %(message)s",
+        "%(asctime)s [%(levelname)s] %(name)s (%(filename)s:%(lineno)d)\n  %(message)s\n  %(exc_text)s"
+        if False
+        else "%(asctime)s [%(levelname)s] %(name)s (%(filename)s:%(lineno)d): %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
@@ -113,4 +111,6 @@ def setup_logging(service: str, log_level: str = "INFO") -> None:
     warn_handler.setFormatter(fmt)
     root_logger.addHandler(warn_handler)
 
-    logging.getLogger(service).info("로깅 초기화: %s (콘솔=%s, 에러파일=error/<date>/%s.log)", service, log_level, service)
+    logging.getLogger(service).info(
+        "로깅 초기화: %s (콘솔=%s, 에러파일=error/<date>/%s.log)", service, log_level, service
+    )

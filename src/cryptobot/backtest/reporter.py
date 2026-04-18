@@ -79,7 +79,11 @@ class BacktestReporter:
                         param_str = self._format_key_params(result.params, name)
                         logger.info(
                             "백테스트 완료: %s × %s%s → %d건, %.1f%%",
-                            coin, name, param_str, result.num_trades, result.total_return_pct,
+                            coin,
+                            name,
+                            param_str,
+                            result.num_trades,
+                            result.total_return_pct,
                         )
                     except Exception as e:
                         logger.warning("백테스트 스킵: %s × %s — %s", coin, name, e)
@@ -216,6 +220,7 @@ class BacktestReporter:
             try:
                 dates = period.split(" ~ ")
                 from datetime import datetime
+
                 d1 = datetime.strptime(dates[0], "%Y-%m-%d")
                 d2 = datetime.strptime(dates[1], "%Y-%m-%d")
                 days = (d2 - d1).days

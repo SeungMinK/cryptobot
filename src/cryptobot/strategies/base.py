@@ -49,12 +49,14 @@ class StrategyParams:
 
     # 시간 기반 ROI 테이블: {보유 분: 최소 수익%}
     # 보유 시간이 길어질수록 목표 수익을 낮춤
-    roi_table: dict = field(default_factory=lambda: {
-        10: 3.0,    # 10분 내 +3% 이상이면 매도
-        30: 2.0,    # 30분 내 +2%
-        60: 1.0,    # 60분 내 +1%
-        120: 0.1,   # 120분 내 실질 +0.1% 이상이면 탈출
-    })
+    roi_table: dict = field(
+        default_factory=lambda: {
+            10: 3.0,  # 10분 내 +3% 이상이면 매도
+            30: 2.0,  # 30분 내 +2%
+            60: 1.0,  # 60분 내 +1%
+            120: 0.1,  # 120분 내 실질 +0.1% 이상이면 탈출
+        }
+    )
 
 
 class BaseStrategy(ABC):
@@ -106,8 +108,11 @@ class BaseStrategy(ABC):
         return pnl_pct - self.ROUND_TRIP_FEE_PCT
 
     def check_trailing_stop(
-        self, current_price: float, buy_price: float,
-        hold_minutes: int | None = None, current_rsi: float | None = None,
+        self,
+        current_price: float,
+        buy_price: float,
+        hold_minutes: int | None = None,
+        current_rsi: float | None = None,
     ) -> Signal | None:
         """공통 트레일링 스탑 + 손절 + ROI + 수수료 반영."""
         # 최고가 갱신
@@ -137,14 +142,16 @@ class BaseStrategy(ABC):
                         strong_roi = abs(self.params.stop_loss_pct) * 0.5
                         if net_pnl >= strong_roi:
                             return Signal(
-                                "sell", 0.9,
+                                "sell",
+                                0.9,
                                 f"ROI 강제 (RSI={current_rsi:.0f} 과매도이나 실질 +{net_pnl:.2f}% 충분)",
                                 trigger_value=round(net_pnl, 2),
                                 is_profit_taking=True,
                             )
                         return None  # RSI 과매도 + ROI 약함 → 매도 보류
                     return Signal(
-                        "sell", 0.9,
+                        "sell",
+                        0.9,
                         f"ROI 도달 ({hold_minutes}분 보유, 실질 +{net_pnl:.2f}% >= {min_roi}%)",
                         trigger_value=round(net_pnl, 2),
                         is_profit_taking=True,
@@ -155,7 +162,8 @@ class BaseStrategy(ABC):
         if drop_pct <= self.params.trailing_stop_pct:
             if net_pnl > 0:
                 return Signal(
-                    "sell", 0.8,
+                    "sell",
+                    0.8,
                     f"트레일링 스탑 (실질 {net_pnl:+.2f}%)",
                     trigger_value=round(drop_pct, 2),
                     is_profit_taking=True,

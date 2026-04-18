@@ -141,11 +141,14 @@ class TestHardLimitsClipping:
         analyzer, db = _make_analyzer()
         try:
             # 범위 밖 값으로 결과 생성
-            result = _build_llm_result("volatility_breakout", extra_params={
-                "k_value": 99.0,  # 범위: 0.2~0.8
-                "stop_loss_pct": -100.0,  # 범위: -20.0~-5.0
-                "rsi_oversold": 99,  # 범위: 20~45
-            })
+            result = _build_llm_result(
+                "volatility_breakout",
+                extra_params={
+                    "k_value": 99.0,  # 범위: 0.2~0.8
+                    "stop_loss_pct": -100.0,  # 범위: -20.0~-5.0
+                    "rsi_oversold": 99,  # 범위: 20~45
+                },
+            )
             result["aggression"] = 5.0  # 범위: 0.1~1.0
 
             clipped = analyzer._apply_hard_limits(result)
@@ -199,12 +202,15 @@ class TestCommonParamsNotInStrategy:
     def test_common_params_not_in_strategy(self):
         analyzer, db = _make_analyzer()
         try:
-            result = _build_llm_result("bb_rsi_combined", extra_params={
-                "bb_std": 1.5,
-                "rsi_oversold": 35,
-                "bb_period": 20,
-                "rsi_period": 14,
-            })
+            result = _build_llm_result(
+                "bb_rsi_combined",
+                extra_params={
+                    "bb_std": 1.5,
+                    "rsi_oversold": 35,
+                    "bb_period": 20,
+                    "rsi_period": 14,
+                },
+            )
 
             repo = StrategyRepository(db)
             repo.complete_shutdown()

@@ -1,15 +1,16 @@
-import logging
-logger = logging.getLogger(__name__)
 """매매 내역 라우트.
 
 NestJS의 TradeController와 동일.
 """
+
+import logging
 
 from fastapi import APIRouter, Depends, Query
 
 from cryptobot.api.auth import UserResponse, get_current_user
 from cryptobot.api.deps import get_db
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/trades", tags=["trades"])
 
 
@@ -49,9 +50,7 @@ def get_trades(
     offset = (page - 1) * limit
 
     # 총 개수
-    total = db.execute(
-        f"SELECT COUNT(*) FROM trades t {where}", tuple(params)
-    ).fetchone()[0]
+    total = db.execute(f"SELECT COUNT(*) FROM trades t {where}", tuple(params)).fetchone()[0]
 
     # 데이터 (trade_signals에서 confidence JOIN)
     rows = db.execute(
@@ -114,10 +113,13 @@ def get_trade_stats(
 
     if held:
         import pyupbit
+
         # 배치 API 호출 (N개 → 1개)
         coins = list(set(h["coin"] for h in held))
         try:
-            prices = pyupbit.get_current_price(coins) if len(coins) > 1 else {coins[0]: pyupbit.get_current_price(coins[0])}
+            prices = (
+                pyupbit.get_current_price(coins) if len(coins) > 1 else {coins[0]: pyupbit.get_current_price(coins[0])}
+            )
         except Exception as e:
             logger.warning("코인 가격 조회 실패: %s", e)
             prices = {}

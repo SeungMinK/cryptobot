@@ -262,7 +262,11 @@ class LLMAnalyzer:
                     if not (mn <= value <= mx):
                         logger.warning(
                             "bot_config.%s 값 %s가 HARD_LIMITS 범위 [%s, %s] 밖 — 기본값 %s 사용",
-                            key, value, mn, mx, default,
+                            key,
+                            value,
+                            mn,
+                            mx,
+                            default,
                         )
                         return default
                 return value
@@ -323,8 +327,7 @@ class LLMAnalyzer:
         # KST 기준 23시~익일 0시 구간에서 새 날짜로 잘못 인식되는 문제.
         daily_count = (
             self._db.execute(
-                "SELECT COUNT(*) FROM llm_decisions "
-                "WHERE DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')"
+                "SELECT COUNT(*) FROM llm_decisions WHERE DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')"
             ).fetchone()[0]
             or 0
         )
@@ -519,9 +522,7 @@ class LLMAnalyzer:
                 new_val = max(mn, min(mx, original))
                 if new_val != original:
                     logger.warning("하드 리밋 클리핑: aggression = %s → %s (범위 %s~%s)", original, new_val, mn, mx)
-                    clipped.append(
-                        {"field": "aggression", "original": original, "clipped": new_val, "range": [mn, mx]}
-                    )
+                    clipped.append({"field": "aggression", "original": original, "clipped": new_val, "range": [mn, mx]})
                 result["aggression"] = new_val
             except (ValueError, TypeError):
                 pass
@@ -1407,14 +1408,19 @@ class LLMAnalyzer:
                 ) VALUES (datetime('now'), ?, ?, ?, ?, 'FAILED', ?)
                 """,
                 (
-                    self._model, input_tokens, output_tokens, cost,
+                    self._model,
+                    input_tokens,
+                    output_tokens,
+                    cost,
                     f"MAX_RETRIES {attempts}회 전부 실패 — 토큰만 집계",
                 ),
             )
             self._db.commit()
             logger.warning(
                 "실패 호출 토큰 기록: in=%d out=%d cost=$%.4f",
-                input_tokens, output_tokens, cost,
+                input_tokens,
+                output_tokens,
+                cost,
             )
         except Exception as e:
             logger.error("실패 호출 DB 기록 실패: %s", e)
@@ -1636,9 +1642,7 @@ class LLMAnalyzer:
                 # LLM이 존재하지 않는 전략 이름을 반환한 경우
                 # — 다음 호출의 이전 피드백에 반영하기 위해 결과 딕셔너리에 마킹
                 logger.warning("전략 활성화 실패: %s — 기존 전략 유지, 다음 프롬프트에 반영", strategy)
-                available = self._db.execute(
-                    "SELECT name FROM strategies WHERE is_available = TRUE"
-                ).fetchall()
+                available = self._db.execute("SELECT name FROM strategies WHERE is_available = TRUE").fetchall()
                 names = ", ".join(dict(r)["name"] for r in available) or "(없음)"
                 result["_rejected_strategy"] = strategy
                 result["_rejected_strategy_reason"] = f"'{strategy}'은 존재하지 않음. 사용 가능: {names}"

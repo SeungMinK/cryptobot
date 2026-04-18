@@ -3,10 +3,8 @@
 import json
 import sqlite3
 
-import pytest
-
 from cryptobot.backtest.reporter import SWEEP_CONFIGS, BacktestReporter
-from cryptobot.llm.analyzer import COMMON_PARAM_KEYS, LLMAnalyzer
+from cryptobot.llm.analyzer import LLMAnalyzer
 
 
 class TestGenerateSweepCombos:
@@ -83,9 +81,7 @@ class TestFormatKeyParams:
 
     def test_bb_rsi_combined(self):
         """BB RSI 복합 전략 파라미터 표시."""
-        result = BacktestReporter._format_key_params(
-            {"rsi_oversold": 35, "bb_std": 1.5}, "bb_rsi_combined"
-        )
+        result = BacktestReporter._format_key_params({"rsi_oversold": 35, "bb_std": 1.5}, "bb_rsi_combined")
         assert "rsi_os=35" in result
         assert "bb=1.5" in result
 
@@ -187,7 +183,11 @@ class TestBacktestTextTopNLimit:
         # 15개 결과 삽입 (Top N만 표시되어야 함)
         for i in range(15):
             _insert_backtest_row(
-                db, "2026-04-13", f"strategy_{i}", "KRW-BTC", 10.0 - i,
+                db,
+                "2026-04-13",
+                f"strategy_{i}",
+                "KRW-BTC",
+                10.0 - i,
                 {"param": i},
             )
         db.commit()

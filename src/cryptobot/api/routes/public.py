@@ -141,6 +141,7 @@ def get_public_portfolio(request: Request):
     krw = 0
     try:
         from cryptobot.bot.trader import Trader
+
         trader = Trader()
         if trader.is_ready:
             krw = trader.get_balance_krw()
@@ -186,12 +187,14 @@ def get_public_analysis(request: Request, limit: int = Query(3, ge=1, le=10)):
         reasoning = d["output_reasoning"] or ""
         # 첫 문단만 (상세 근거는 비공개)
         summary = reasoning.split("\n\n")[0] if reasoning else ""
-        results.append({
-            "market_state": d["output_market_state"],
-            "aggression": d["output_aggression"],
-            "summary": summary,
-            "timestamp": d["timestamp"],
-        })
+        results.append(
+            {
+                "market_state": d["output_market_state"],
+                "aggression": d["output_aggression"],
+                "summary": summary,
+                "timestamp": d["timestamp"],
+            }
+        )
 
     return results
 
@@ -209,9 +212,7 @@ def get_public_news(request: Request, limit: int = Query(20, ge=1, le=50)):
         (limit,),
     ).fetchall()
 
-    fg = db.execute(
-        "SELECT value, classification, timestamp FROM fear_greed_index ORDER BY id DESC LIMIT 1"
-    ).fetchone()
+    fg = db.execute("SELECT value, classification, timestamp FROM fear_greed_index ORDER BY id DESC LIMIT 1").fetchone()
 
     return {
         "news": [dict(r) for r in news],
@@ -324,9 +325,7 @@ def get_public_strategy_stats(request: Request):
         {
             "strategy": dict(r)["strategy"],
             "trades": dict(r)["trades"],
-            "win_rate": round(
-                (dict(r)["wins"] or 0) / dict(r)["trades"] * 100, 1
-            ) if dict(r)["trades"] > 0 else 0,
+            "win_rate": round((dict(r)["wins"] or 0) / dict(r)["trades"] * 100, 1) if dict(r)["trades"] > 0 else 0,
             "avg_pct": dict(r)["avg_pct"] or 0,
         }
         for r in rows

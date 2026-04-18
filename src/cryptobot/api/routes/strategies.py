@@ -142,7 +142,6 @@ def simulate_strategy(name: str, body: SimulateRequest, _: UserResponse = Depend
         snapshot = dict(snapshot)
         ma_20 = snapshot.get("ma_20")
         bb_upper = snapshot.get("bb_upper")
-        bb_lower = snapshot.get("bb_lower")
         current_price = snapshot.get("price", 0)
         yesterday_high = snapshot.get("high_24h", 0)
         yesterday_low = snapshot.get("low_24h", 0)
@@ -168,8 +167,12 @@ def simulate_strategy(name: str, body: SimulateRequest, _: UserResponse = Depend
                     "new_band_width": round(one_std * new_bb_std * 2),
                     "current_distance_to_lower": round(current_price - (ma_20 - one_std * current_bb_std)),
                     "new_distance_to_lower": round(current_price - (ma_20 - one_std * new_bb_std)),
-                    "current_distance_to_lower_pct": round((current_price - (ma_20 - one_std * current_bb_std)) / current_price * 100, 2),
-                    "new_distance_to_lower_pct": round((current_price - (ma_20 - one_std * new_bb_std)) / current_price * 100, 2),
+                    "current_distance_to_lower_pct": round(
+                        (current_price - (ma_20 - one_std * current_bb_std)) / current_price * 100, 2
+                    ),
+                    "new_distance_to_lower_pct": round(
+                        (current_price - (ma_20 - one_std * new_bb_std)) / current_price * 100, 2
+                    ),
                 }
 
         if name == "volatility_breakout":

@@ -173,9 +173,7 @@ class DataRecorder:
                 (coin,),
             ).fetchall()
         else:
-            rows = self._db.execute(
-                "SELECT * FROM trades WHERE DATE(timestamp) = DATE('now') ORDER BY id"
-            ).fetchall()
+            rows = self._db.execute("SELECT * FROM trades WHERE DATE(timestamp) = DATE('now') ORDER BY id").fetchall()
         return [dict(r) for r in rows]
 
     def save_daily_report(

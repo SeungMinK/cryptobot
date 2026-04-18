@@ -58,7 +58,11 @@ class CryptoBot:
         logger.info("종목: %s (%d개)", ", ".join(self._coin_mgr.active_coins), len(self._coin_mgr.active_coins))
         logger.info("활성 전략: %s", self._strategy_sel.current_strategy_name)
         logger.info("등록 전략: %s", ", ".join(self._strategy_sel.registry.list_names()))
-        logger.info("API Key: %s | Slack: %s", "O" if self._trader.is_ready else "X", "O" if self._notifier.is_configured else "X")
+        logger.info(
+            "API Key: %s | Slack: %s",
+            "O" if self._trader.is_ready else "X",
+            "O" if self._notifier.is_configured else "X",
+        )
 
         self._notifier.notify_bot_status("시작됨")
         self._safety_check()
@@ -69,7 +73,12 @@ class CryptoBot:
         self._scheduler.add_job(self._hourly_reconciliation, "interval", hours=1, id="hourly_reconciliation")
         self._scheduler.add_job(self._weekly_report, "cron", day_of_week="sun", hour=3, minute=0, id="weekly_report")
         self._scheduler.add_job(
-            self._weekly_backtest, "cron", day_of_week="sun", hour=2, minute=0, id="weekly_backtest",
+            self._weekly_backtest,
+            "cron",
+            day_of_week="sun",
+            hour=2,
+            minute=0,
+            id="weekly_backtest",
         )
         self._scheduler.add_job(self._monthly_audit, "cron", day=1, hour=4, minute=0, id="monthly_audit")
         self._scheduler.add_job(self._llm_analyze, "interval", minutes=10, id="llm_analyze")
@@ -173,10 +182,32 @@ class CryptoBot:
         pj = self._config_mgr.get_strategy_params_json(sn)
 
         if sig.signal_type != "buy":
-            self._recorder.record_signal(coin=coin, signal_type=sig.signal_type, strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=sig.reason, snapshot_id=snapshot_id, strategy_params_json=pj)
+            self._recorder.record_signal(
+                coin=coin,
+                signal_type=sig.signal_type,
+                strategy=sn,
+                confidence=sig.confidence,
+                trigger_reason=sig.reason,
+                current_price=price,
+                trigger_value=sig.trigger_value,
+                skip_reason=sig.reason,
+                snapshot_id=snapshot_id,
+                strategy_params_json=pj,
+            )
             return
         if not self._trader.is_ready:
-            self._recorder.record_signal(coin=coin, signal_type="buy", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason="api_key_not_configured", snapshot_id=snapshot_id, strategy_params_json=pj)
+            self._recorder.record_signal(
+                coin=coin,
+                signal_type="buy",
+                strategy=sn,
+                confidence=sig.confidence,
+                trigger_reason=sig.reason,
+                current_price=price,
+                trigger_value=sig.trigger_value,
+                skip_reason="api_key_not_configured",
+                snapshot_id=snapshot_id,
+                strategy_params_json=pj,
+            )
             return
 
         bal = self._trader.get_balance_krw()
@@ -189,7 +220,18 @@ class CryptoBot:
 
         ok, reason = self._risk.check_can_buy(coin, amount, bal)
         if not ok:
-            self._recorder.record_signal(coin=coin, signal_type="buy", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=reason, snapshot_id=snapshot_id, strategy_params_json=pj)
+            self._recorder.record_signal(
+                coin=coin,
+                signal_type="buy",
+                strategy=sn,
+                confidence=sig.confidence,
+                trigger_reason=sig.reason,
+                current_price=price,
+                trigger_value=sig.trigger_value,
+                skip_reason=reason,
+                snapshot_id=snapshot_id,
+                strategy_params_json=pj,
+            )
             return
 
         # 중복 매수 방지 — 매수 직전 재확인
@@ -208,10 +250,38 @@ class CryptoBot:
                 f"Upbit에서 수동 확인 필요.\n{e}"
             )
             skip = f"API 예외: {type(e).__name__}"
-            self._recorder.record_signal(coin=coin, signal_type="buy", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=skip, snapshot_id=snapshot_id, strategy_params_json=pj)
+            self._recorder.record_signal(
+                coin=coin,
+                signal_type="buy",
+                strategy=sn,
+                confidence=sig.confidence,
+                trigger_reason=sig.reason,
+                current_price=price,
+                trigger_value=sig.trigger_value,
+                skip_reason=skip,
+                snapshot_id=snapshot_id,
+                strategy_params_json=pj,
+            )
             return
         if order.success:
-            tid = self._recorder.record_trade(coin=coin, side="buy", price=order.price, amount=order.amount, total_krw=order.total_krw, fee_krw=order.fee_krw, strategy=sn, trigger_reason=sig.reason, trigger_value=sig.trigger_value, param_k_value=s.params.extra.get("k_value"), param_stop_loss=s.params.stop_loss_pct, param_trailing_stop=s.params.trailing_stop_pct, market_state_at_trade=snapshot.get("market_state"), btc_price_at_trade=price, rsi_at_trade=snapshot.get("rsi_14"), order_uuid=order.order_uuid)
+            tid = self._recorder.record_trade(
+                coin=coin,
+                side="buy",
+                price=order.price,
+                amount=order.amount,
+                total_krw=order.total_krw,
+                fee_krw=order.fee_krw,
+                strategy=sn,
+                trigger_reason=sig.reason,
+                trigger_value=sig.trigger_value,
+                param_k_value=s.params.extra.get("k_value"),
+                param_stop_loss=s.params.stop_loss_pct,
+                param_trailing_stop=s.params.trailing_stop_pct,
+                market_state_at_trade=snapshot.get("market_state"),
+                btc_price_at_trade=price,
+                rsi_at_trade=snapshot.get("rsi_14"),
+                order_uuid=order.order_uuid,
+            )
             # 즉시 commit — 다음 틱이 이 buy를 찾지 못해 중복 매수하는 것을 방지
             try:
                 self._db.commit()
@@ -230,10 +300,33 @@ class CryptoBot:
             actual_diff = bal_before - bal_after
             if abs(actual_diff - expected_diff) > expected_diff * 0.05:
                 logger.warning("잔고 불일치: 예상 -%s, 실제 -%s", f"{expected_diff:,.0f}", f"{actual_diff:,.0f}")
-            self._recorder.record_signal(coin=coin, signal_type="buy", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, executed=True, trade_id=tid, snapshot_id=snapshot_id, strategy_params_json=pj)
+            self._recorder.record_signal(
+                coin=coin,
+                signal_type="buy",
+                strategy=sn,
+                confidence=sig.confidence,
+                trigger_reason=sig.reason,
+                current_price=price,
+                trigger_value=sig.trigger_value,
+                executed=True,
+                trade_id=tid,
+                snapshot_id=snapshot_id,
+                strategy_params_json=pj,
+            )
         else:
             # 사전 검증 실패 (최소 주문 금액 미달 등) — 기록만
-            self._recorder.record_signal(coin=coin, signal_type="buy", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=order.error or "주문 실패", snapshot_id=snapshot_id, strategy_params_json=pj)
+            self._recorder.record_signal(
+                coin=coin,
+                signal_type="buy",
+                strategy=sn,
+                confidence=sig.confidence,
+                trigger_reason=sig.reason,
+                current_price=price,
+                trigger_value=sig.trigger_value,
+                skip_reason=order.error or "주문 실패",
+                snapshot_id=snapshot_id,
+                strategy_params_json=pj,
+            )
 
     def _check_and_sell(self, active_trade, price, snapshot_id, snapshot=None, coin=None):
         """매도 신호 확인 및 실행."""
@@ -255,7 +348,18 @@ class CryptoBot:
         pj = self._config_mgr.get_strategy_params_json(sn)
 
         if sig.signal_type != "sell":
-            self._recorder.record_signal(coin=coin, signal_type=sig.signal_type, strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=sig.reason, snapshot_id=snapshot_id, strategy_params_json=pj)
+            self._recorder.record_signal(
+                coin=coin,
+                signal_type=sig.signal_type,
+                strategy=sn,
+                confidence=sig.confidence,
+                trigger_reason=sig.reason,
+                current_price=price,
+                trigger_value=sig.trigger_value,
+                skip_reason=sig.reason,
+                snapshot_id=snapshot_id,
+                strategy_params_json=pj,
+            )
             return
         if not self._trader.is_ready:
             return
@@ -266,7 +370,18 @@ class CryptoBot:
         # 익절 신호(ROI/트레일링/중간선 등)만 수수료로 인한 실질 음수 시 차단.
         # 손절/전략 판단(RSI 정상복귀, 데드크로스 등)은 통과.
         if sig.is_profit_taking and net_pnl <= 0:
-            self._recorder.record_signal(coin=coin, signal_type="sell", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=f"수수료 가드: 가격 {pnl_pct:+.2f}% 실질 {net_pnl:+.2f}%", snapshot_id=snapshot_id, strategy_params_json=pj)
+            self._recorder.record_signal(
+                coin=coin,
+                signal_type="sell",
+                strategy=sn,
+                confidence=sig.confidence,
+                trigger_reason=sig.reason,
+                current_price=price,
+                trigger_value=sig.trigger_value,
+                skip_reason=f"수수료 가드: 가격 {pnl_pct:+.2f}% 실질 {net_pnl:+.2f}%",
+                snapshot_id=snapshot_id,
+                strategy_params_json=pj,
+            )
             return
 
         try:
@@ -274,17 +389,49 @@ class CryptoBot:
         except (APIError, InsufficientBalanceError) as e:
             logger.error("매도 API 실패: %s — %s", coin, e)
             self._notifier.notify_error(
-                f"⚠️ 매도 주문 API 실패: {coin} — 접수 후 체결 조회 실패 가능성. "
-                f"Upbit에서 수동 확인 필요.\n{e}"
+                f"⚠️ 매도 주문 API 실패: {coin} — 접수 후 체결 조회 실패 가능성. Upbit에서 수동 확인 필요.\n{e}"
             )
             skip = f"API 예외: {type(e).__name__}"
-            self._recorder.record_signal(coin=coin, signal_type="sell", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=skip, snapshot_id=snapshot_id, strategy_params_json=pj)
+            self._recorder.record_signal(
+                coin=coin,
+                signal_type="sell",
+                strategy=sn,
+                confidence=sig.confidence,
+                trigger_reason=sig.reason,
+                current_price=price,
+                trigger_value=sig.trigger_value,
+                skip_reason=skip,
+                snapshot_id=snapshot_id,
+                strategy_params_json=pj,
+            )
             return
         if order.success:
             bf = active_trade.get("fee_krw") or 0
             profit_krw = round((order.total_krw - order.fee_krw) - (active_trade["total_krw"] + bf), 2)
-            profit_pct = round(profit_krw / (active_trade["total_krw"] + bf) * 100, 2) if (active_trade["total_krw"] + bf) > 0 else 0
-            tid = self._recorder.record_trade(coin=coin, side="sell", price=order.price, amount=order.amount, total_krw=order.total_krw, fee_krw=order.fee_krw, strategy=sn, trigger_reason=sig.reason, trigger_value=sig.trigger_value, param_k_value=s.params.extra.get("k_value"), param_stop_loss=s.params.stop_loss_pct, param_trailing_stop=s.params.trailing_stop_pct, buy_trade_id=active_trade["id"], profit_pct=profit_pct, profit_krw=profit_krw, hold_duration_minutes=s._hold_minutes, order_uuid=order.order_uuid)
+            profit_pct = (
+                round(profit_krw / (active_trade["total_krw"] + bf) * 100, 2)
+                if (active_trade["total_krw"] + bf) > 0
+                else 0
+            )
+            tid = self._recorder.record_trade(
+                coin=coin,
+                side="sell",
+                price=order.price,
+                amount=order.amount,
+                total_krw=order.total_krw,
+                fee_krw=order.fee_krw,
+                strategy=sn,
+                trigger_reason=sig.reason,
+                trigger_value=sig.trigger_value,
+                param_k_value=s.params.extra.get("k_value"),
+                param_stop_loss=s.params.stop_loss_pct,
+                param_trailing_stop=s.params.trailing_stop_pct,
+                buy_trade_id=active_trade["id"],
+                profit_pct=profit_pct,
+                profit_krw=profit_krw,
+                hold_duration_minutes=s._hold_minutes,
+                order_uuid=order.order_uuid,
+            )
             # 즉시 commit — 미커밋으로 다음 틱이 이 매도를 놓치면 이중 매도 위험
             try:
                 self._db.commit()
@@ -297,14 +444,38 @@ class CryptoBot:
             if not verify:
                 logger.error("DB 쓰기 검증 실패: trade_id=%s", tid)
                 self._notifier.notify_error(f"DB 쓰기 검증 실패: {coin} 매도 기록 누락")
-            self._recorder.record_signal(coin=coin, signal_type="sell", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, executed=True, trade_id=tid, snapshot_id=snapshot_id, strategy_params_json=pj)
+            self._recorder.record_signal(
+                coin=coin,
+                signal_type="sell",
+                strategy=sn,
+                confidence=sig.confidence,
+                trigger_reason=sig.reason,
+                current_price=price,
+                trigger_value=sig.trigger_value,
+                executed=True,
+                trade_id=tid,
+                snapshot_id=snapshot_id,
+                strategy_params_json=pj,
+            )
             s.reset()
         else:
-            self._recorder.record_signal(coin=coin, signal_type="sell", strategy=sn, confidence=sig.confidence, trigger_reason=sig.reason, current_price=price, trigger_value=sig.trigger_value, skip_reason=order.error or "주문 실패", snapshot_id=snapshot_id, strategy_params_json=pj)
+            self._recorder.record_signal(
+                coin=coin,
+                signal_type="sell",
+                strategy=sn,
+                confidence=sig.confidence,
+                trigger_reason=sig.reason,
+                current_price=price,
+                trigger_value=sig.trigger_value,
+                skip_reason=order.error or "주문 실패",
+                snapshot_id=snapshot_id,
+                strategy_params_json=pj,
+            )
 
     def _llm_analyze(self):
         try:
             from cryptobot.llm.analyzer import LLMAnalyzer
+
             a = LLMAnalyzer(self._db)
             if not a.is_configured:
                 return
@@ -319,7 +490,8 @@ class CryptoBot:
                 if recommended and recommended != self._strategy_sel.current_strategy_name:
                     logger.warning(
                         "전략 불일치: LLM 추천=%s, 실제=%s",
-                        recommended, self._strategy_sel.current_strategy_name,
+                        recommended,
+                        self._strategy_sel.current_strategy_name,
                     )
                     self._notifier.notify_error(
                         f"전략 불일치: 추천={recommended}, 실제={self._strategy_sel.current_strategy_name}"
@@ -356,14 +528,8 @@ class CryptoBot:
             realized = sum(t.get("profit_krw", 0) or 0 for t in sells)
             total_fees = sum(t.get("fee_krw", 0) or 0 for t in trades)
 
-            avg_profit = (
-                sum(t.get("profit_pct", 0) or 0 for t in wins) / len(wins)
-                if wins else 0
-            )
-            avg_loss = (
-                sum(t.get("profit_pct", 0) or 0 for t in losses) / len(losses)
-                if losses else 0
-            )
+            avg_profit = sum(t.get("profit_pct", 0) or 0 for t in wins) / len(wins) if wins else 0
+            avg_loss = sum(t.get("profit_pct", 0) or 0 for t in losses) / len(losses) if losses else 0
 
             self._recorder.save_daily_report(
                 report_date=today,
@@ -388,9 +554,7 @@ class CryptoBot:
             if self._config_mgr.get_bool("slack_daily_report", True):
                 self._notifier.notify_daily_report(
                     date_str=today.isoformat(),
-                    daily_return_pct=sum(
-                        t.get("profit_pct", 0) or 0 for t in sells
-                    ),
+                    daily_return_pct=sum(t.get("profit_pct", 0) or 0 for t in sells),
                     total_trades=len(trades),
                     win_rate=wr,
                     balance_krw=total_asset,
@@ -458,6 +622,7 @@ class CryptoBot:
 
 def main():
     from cryptobot.logging_config import setup_logging
+
     setup_logging("bot", config.bot.log_level)
     CryptoBot().start()
 

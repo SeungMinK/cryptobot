@@ -21,8 +21,12 @@ class CoinScanner:
 
     # 스테이블코인 + 매매 부적합 종목 제외
     EXCLUDED_COINS = {
-        "KRW-USDT", "KRW-USDC", "KRW-DAI", "KRW-BUSD",
-        "KRW-TUSD", "KRW-PAXG",
+        "KRW-USDT",
+        "KRW-USDC",
+        "KRW-DAI",
+        "KRW-BUSD",
+        "KRW-TUSD",
+        "KRW-PAXG",
     }
 
     def __init__(
@@ -69,8 +73,7 @@ class CoinScanner:
 
             # 1차 필터: 제외 코인 + 최소 가격
             candidates = [
-                t for t in tickers
-                if t not in self.EXCLUDED_COINS and all_prices.get(t, 0) >= self._min_price_krw
+                t for t in tickers if t not in self.EXCLUDED_COINS and all_prices.get(t, 0) >= self._min_price_krw
             ]
 
             # 상위 50개 OHLCV 조회 (30개 모니터링 커버)
@@ -78,6 +81,7 @@ class CoinScanner:
 
             results = []
             import time as _time
+
             for idx, ticker in enumerate(candidates):
                 price = all_prices.get(ticker, 0)
 
@@ -130,7 +134,7 @@ class CoinScanner:
                 if len(df) >= 14:
                     deltas = df["close"].diff().dropna()
                     gains = deltas.where(deltas > 0, 0)
-                    losses = (-deltas.where(deltas < 0, 0))
+                    losses = -deltas.where(deltas < 0, 0)
                     avg_gain = gains.rolling(14).mean().iloc[-1]
                     avg_loss = losses.rolling(14).mean().iloc[-1]
                     if avg_loss > 0:

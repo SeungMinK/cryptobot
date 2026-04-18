@@ -742,13 +742,17 @@ class HealthChecker:
             return {"status": "error", "message": str(e)}
 
     def _check_trading_today_kst(self) -> dict:
-        """오늘(KST) 매매 건수 + 실현 PnL + 보유 포지션."""
+        """오늘(KST) 매매 건수 + 실현 PnL + 보유 포지션.
+
+        #197: 실현 수익률 % 추가 (승률 제거, 사용자는 금일 몇 % 벌었는지가 핵심).
+        """
         try:
             trades_row = self._db.execute(
                 "SELECT "
                 "SUM(CASE WHEN side='buy' THEN 1 ELSE 0 END) AS buys, "
                 "SUM(CASE WHEN side='sell' THEN 1 ELSE 0 END) AS sells, "
-                "COALESCE(SUM(CASE WHEN side='sell' THEN profit_krw END), 0) AS pnl "
+                "COALESCE(SUM(CASE WHEN side='sell' THEN profit_krw END), 0) AS pnl, "
+                "COALESCE(SUM(CASE WHEN side='buy' THEN total_krw END), 0) AS buy_cost "
                 "FROM trades WHERE DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')"
             ).fetchone()
             t = dict(trades_row)
@@ -760,18 +764,28 @@ class HealthChecker:
             ).fetchall()
             held = [dict(r)["coin"] for r in held_rows]
 
+            # 실현 수익률 % (대략치): 실현 PnL / 오늘 매수 금액 총합
+            realized_pct = 0.0
+            buy_cost = t["buy_cost"] or 0
+            if buy_cost > 0:
+                realized_pct = round((t["pnl"] or 0) / buy_cost * 100, 2)
+
             return {
                 "status": "ok",
                 "buys_today": t["buys"] or 0,
                 "sells_today": t["sells"] or 0,
                 "pnl_today_krw": round(t["pnl"] or 0, 0),
+                "pnl_today_pct": realized_pct,
                 "held_coins": held,
             }
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
     def _format_periodic_slack(self, results: dict) -> str:
-        """4시간 체크 결과를 Slack용 텍스트로 포맷."""
+        """4시간 체크 결과를 Slack용 텍스트로 포맷.
+
+        #197: 가독성 개선 — Slack mrkdwn 활용 + 금일 손익 % 강조.
+        """
         now_kst = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M KST")
 
         def emoji(status: str) -> str:
@@ -785,63 +799,76 @@ class HealthChecker:
         llm = results["llm_today"]
         trd = results["trading_today"]
 
-        lines = [f"🏥 *시스템 상태 체크* ({now_kst})", "", "*[프로세스]*"]
+        lines = [
+            f"🏥 *시스템 상태 체크* — _{now_kst}_",
+            "━━━━━━━━━━━━━━━━━━━",
+        ]
 
+        # 프로세스
+        lines.append("*🖥️  프로세스*")
         # BOT
-        bot_msg = f"{emoji(bot['status'])} BOT"
+        bot_line = f">  {emoji(bot['status'])}  BOT"
         if bot.get("last_snapshot_min_ago") is not None:
-            bot_msg += f" — {bot['last_snapshot_min_ago']:.1f}분 전 snapshot"
+            bot_line += f"  ·  마지막 tick `{bot['last_snapshot_min_ago']:.1f}분 전`"
         if bot.get("message"):
-            bot_msg += f" ({bot['message']})"
-        lines.append(bot_msg)
+            bot_line += f"  ·  _{bot['message']}_"
+        lines.append(bot_line)
 
         # API
-        lines.append(f"{emoji(api['status'])} API" + (f" — {api.get('message')}" if api.get("message") else ""))
+        api_line = f">  {emoji(api['status'])}  API"
+        if api.get("message"):
+            api_line += f"  ·  _{api['message']}_"
+        lines.append(api_line)
 
         # NEWS
-        news_msg = f"{emoji(news['status'])} NEWS"
+        news_line = f">  {emoji(news['status'])}  NEWS"
         if news.get("news_count_2h") is not None:
-            news_msg += f" — 최근 2h {news['news_count_2h']}건"
-        if news.get("message"):
-            news_msg += f" ({news['message']})"
-        lines.append(news_msg)
+            news_line += f"  ·  최근 2h `{news['news_count_2h']}건`"
+        lines.append(news_line)
+
+        # 매매 (핵심) — 오늘 몇 % 벌었는지
+        lines.append("")
+        pnl_pct = trd.get("pnl_today_pct", 0)
+        pnl_krw = trd.get("pnl_today_krw", 0)
+        pnl_icon = "📈" if pnl_pct >= 0 else "📉"
+        trend_emoji = "🟢" if pnl_pct >= 0 else "🔴"
+        lines.append(f"*{pnl_icon} 오늘 매매 손익*")
+        lines.append(f">  {trend_emoji}  `{pnl_pct:+.2f}%`  ({pnl_krw:+,.0f}원)")
+        lines.append(f">  체결: 매수 `{trd.get('buys_today', 0)}` · 매도 `{trd.get('sells_today', 0)}`")
+        held = trd.get("held_coins", [])
+        if held:
+            lines.append(f">  보유: {', '.join(c.replace('KRW-', '') for c in held)}")
+        else:
+            lines.append(">  보유: _없음_")
 
         # DB 시그널
         lines.append("")
-        lines.append("*[DB 시그널 — 최근 1h]*")
+        lines.append("*📡 신호 — 최근 1h*")
         total = sigs.get("total", 0)
         buy_n = sigs.get("buy", 0)
         sell_n = sigs.get("sell", 0)
         hold_n = sigs.get("hold", 0)
-        lines.append(f"{emoji(sigs['status'])} 총 {total}건 (buy={buy_n}, sell={sell_n}, hold={hold_n})")
-
-        # 에러
-        lines.append("")
-        lines.append("*[에러 로그 — 오늘]*")
-        err_cnt = errs.get("error_count_4h", 0)
-        lines.append(f"{emoji(errs['status'])} {err_cnt}건" + (f" — {errs['message']}" if errs.get("message") else ""))
+        lines.append(
+            f">  {emoji(sigs['status'])}  총 `{total}건`  ·  buy `{buy_n}` · sell `{sell_n}` · hold `{hold_n}`"
+        )
 
         # LLM
         lines.append("")
-        lines.append("*[LLM — 오늘 KST]*")
-        lines.append(f"• 호출 {llm.get('calls_today', 0)}/20회, ${llm.get('cost_usd', 0):.3f}")
+        lines.append("*🤖 LLM — 오늘*")
+        calls = llm.get("calls_today", 0)
+        cost = llm.get("cost_usd", 0)
         hit = llm.get("cache_hit_pct", 0)
-        lines.append(f"• 캐시 hit: {hit}%")
+        lines.append(f">  호출 `{calls}/20`  ·  비용 `${cost:.3f}`  ·  캐시 hit `{hit}%`")
         last_gap = llm.get("last_call_min_ago")
         if last_gap is not None:
-            lines.append(f"• 최근 분석: {last_gap:.0f}분 전")
+            lines.append(f">  마지막 분석 `{last_gap:.0f}분 전`")
 
-        # 매매
+        # 에러
         lines.append("")
-        lines.append("*[매매 — 오늘 KST]*")
-        lines.append(f"• 체결: 매수 {trd.get('buys_today', 0)}, 매도 {trd.get('sells_today', 0)}")
-        pnl = trd.get("pnl_today_krw", 0)
-        pnl_sign = "+" if pnl >= 0 else ""
-        lines.append(f"• 실현 PnL: {pnl_sign}{pnl:,.0f}원")
-        held = trd.get("held_coins", [])
-        if held:
-            lines.append(f"• 보유: {', '.join(c.replace('KRW-', '') for c in held)}")
-        else:
-            lines.append("• 보유: 없음")
+        err_cnt = errs.get("error_count_4h", 0)
+        err_line = f"*⚠️ 에러 로그* · {emoji(errs['status'])} `{err_cnt}건`"
+        if errs.get("message"):
+            err_line += f"\n>  _{errs['message']}_"
+        lines.append(err_line)
 
         return "\n".join(lines)

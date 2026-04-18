@@ -327,7 +327,7 @@ _DEFAULT_STRATEGIES = [
         "timeframe": "1d",
         "difficulty": "easy",
         "default_params_json": '{"k_value": 0.5}',
-        "is_active": True,
+        "is_active": False,
     },
     {
         "name": "ma_crossover",
@@ -428,7 +428,7 @@ _DEFAULT_STRATEGIES = [
         "default_params_json": (
             '{"bb_period": 20, "bb_std": 2.0, "rsi_period": 14, "rsi_oversold": 30, "rsi_overbought": 50}'
         ),
-        "is_active": False,
+        "is_active": True,  # #197: 신규 DB 기본 전략 (운영 의도 반영)
     },
 ]
 

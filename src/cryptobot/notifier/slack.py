@@ -102,27 +102,28 @@ class SlackNotifier:
             return False
 
     def notify_trade(self, side: str, coin: str, price: float, amount: float, total_krw: float) -> bool:
-        """매매 체결 알림."""
+        """매매 체결 알림 (#197: 가독성 강화)."""
         emoji = "🟢" if side == "buy" else "🔴"
         side_kr = "매수" if side == "buy" else "매도"
+        sym = coin.replace("KRW-", "")
         text = (
-            f"{emoji} *{side_kr} 체결*\n"
-            f"• 종목: {coin}\n"
-            f"• 가격: {price:,.0f}원\n"
-            f"• 수량: {amount:.8f}\n"
-            f"• 금액: {total_krw:,.0f}원"
+            f"{emoji} *{side_kr} 체결 — {sym}*\n"
+            f">  가격 `{price:,.0f}원`  ·  수량 `{amount:.6f}`\n"
+            f">  금액 `{total_krw:,.0f}원`"
         )
         return self.send(text)
 
     def notify_profit(self, coin: str, profit_pct: float, profit_krw: float, hold_minutes: int) -> bool:
-        """매도 시 수익/손실 알림."""
+        """매도 시 수익/손실 알림 (#197: 가독성 강화)."""
         emoji = "💰" if profit_pct > 0 else "💸"
+        trend = "🟢" if profit_pct > 0 else "🔴"
+        sym = coin.replace("KRW-", "")
+        # 보유 시간 포맷
+        hold_str = f"{hold_minutes}분" if hold_minutes < 60 else f"{hold_minutes // 60}시간 {hold_minutes % 60}분"
         text = (
-            f"{emoji} *매매 결과*\n"
-            f"• 종목: {coin}\n"
-            f"• 수익률: {profit_pct:+.2f}%\n"
-            f"• 수익금: {profit_krw:+,.0f}원\n"
-            f"• 보유시간: {hold_minutes}분"
+            f"{emoji} *매매 완료 — {sym}*\n"
+            f">  {trend}  수익률 `{profit_pct:+.2f}%`  ·  `{profit_krw:+,.0f}원`\n"
+            f">  보유 시간 `{hold_str}`"
         )
         return self.send(text)
 
@@ -174,18 +175,37 @@ class SlackNotifier:
     def notify_daily_report(
         self,
         date_str: str,
-        daily_return_pct: float,
+        realized_pnl_pct: float,
+        realized_pnl_krw: float,
+        unrealized_pnl_krw: float,
+        total_asset_krw: float,
         total_trades: int,
-        win_rate: float,
-        balance_krw: float,
     ) -> bool:
-        """일일 정산 리포트."""
-        emoji = "📈" if daily_return_pct >= 0 else "📉"
+        """일일 정산 리포트 (#197: 승률 제거, 금일 손익 % 강조).
+
+        - realized_pnl_pct: 실현 손익 / 시작자산 × 100
+        - realized_pnl_krw: 실현 손익 금액
+        - unrealized_pnl_krw: 미실현 (보유 포지션 평가)
+        - total_asset_krw: 현재 총자산 (KRW + 코인 평가액)
+        """
+        emoji = "📈" if realized_pnl_pct >= 0 else "📉"
+        trend_emoji = "🟢" if realized_pnl_pct >= 0 else "🔴"
+        total_pnl = realized_pnl_krw + unrealized_pnl_krw
+        total_emoji = "🟢" if total_pnl >= 0 else "🔴"
+
         text = (
-            f"{emoji} *일일 리포트 ({date_str})*\n"
-            f"• 수익률: {daily_return_pct:+.2f}%\n"
-            f"• 거래: {total_trades}건\n"
-            f"• 승률: {win_rate:.0f}%\n"
-            f"• 잔고: {balance_krw:,.0f}원"
+            f"{emoji} *일일 정산 — {date_str}*\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"{trend_emoji} *금일 실현 손익*\n"
+            f">  `{realized_pnl_pct:+.2f}%`  ({realized_pnl_krw:+,.0f}원)\n"
+            f"\n"
+            f"{total_emoji} *미실현 포함 총손익*\n"
+            f">  실현 {realized_pnl_krw:+,.0f}원  +  미실현 {unrealized_pnl_krw:+,.0f}원\n"
+            f">  = *{total_pnl:+,.0f}원*\n"
+            f"\n"
+            f"💼 *현재 총자산*\n"
+            f">  {total_asset_krw:,.0f}원\n"
+            f"\n"
+            f"📊 *오늘 체결*: {total_trades}건"
         )
         return self.send(text)

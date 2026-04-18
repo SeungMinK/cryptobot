@@ -92,7 +92,8 @@ def test_get_active_strategies(client, auth_header):
     assert response.status_code == 200
     active = response.json()
     assert len(active) == 1
-    assert active[0]["name"] == "volatility_breakout"
+    # #197: 기본 활성 전략 bb_rsi_combined로 변경
+    assert active[0]["name"] == "bb_rsi_combined"
 
 
 def test_activate_strategy(client, auth_header):

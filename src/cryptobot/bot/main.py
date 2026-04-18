@@ -574,12 +574,17 @@ class CryptoBot:
             )
 
             if self._config_mgr.get_bool("slack_daily_report", True):
+                # #197: 승률 제거 + 금일 실현 수익률 % 계산 (시작 자산 기준)
+                # 시작 자산 = 현재 총자산 - 실현 PnL - 미실현 PnL
+                start_asset = total_asset - realized - unrealized
+                realized_pct = (realized / start_asset * 100) if start_asset > 0 else 0
                 self._notifier.notify_daily_report(
                     date_str=today.isoformat(),
-                    daily_return_pct=sum(t.get("profit_pct", 0) or 0 for t in sells),
+                    realized_pnl_pct=round(realized_pct, 2),
+                    realized_pnl_krw=round(realized, 0),
+                    unrealized_pnl_krw=round(unrealized, 0),
+                    total_asset_krw=round(total_asset, 0),
                     total_trades=len(trades),
-                    win_rate=wr,
-                    balance_krw=total_asset,
                 )
         except Exception as e:
             logger.error("일일 정산 에러: %s", e, exc_info=True)

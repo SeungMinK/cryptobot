@@ -177,14 +177,16 @@ def test_run_periodic_sends_slack(db):
 
     notifier.send.assert_called_once()
     sent_msg = notifier.send.call_args[0][0]
-    # 포맷 검증
+    # 포맷 검증 (#197 가독성 개선 반영)
     assert "시스템 상태 체크" in sent_msg
     assert "BOT" in sent_msg
     assert "API" in sent_msg
     assert "NEWS" in sent_msg
-    assert "DB 시그널" in sent_msg
+    assert "신호 — 최근 1h" in sent_msg
     assert "LLM" in sent_msg
-    assert "매매" in sent_msg
+    assert "매매 손익" in sent_msg  # #197 "오늘 매매 손익" 섹션
+    # #197 금일 손익 % 포함
+    assert "%" in sent_msg
 
 
 def test_run_periodic_includes_emoji_status(db):

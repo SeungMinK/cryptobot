@@ -10,7 +10,6 @@ import logging
 import signal
 import sqlite3
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -20,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from sources.fear_greed import fetch_fear_greed
 from sources.rss import fetch_all_rss
-from sources.upbit_notice import fetch_upbit_notices
+from sources.tagger import tag_article
 
 logger = logging.getLogger(__name__)
 
@@ -48,13 +47,26 @@ def save_articles(articles: list[dict]) -> int:
         if existing:
             continue
 
+        # impact_score / scope 자동 태깅 (#154)
+        tags = tag_article(a.get("title", ""), a.get("summary", ""))
         conn.execute(
             """INSERT INTO news_articles
-            (source, title, summary, url, published_at, collected_at, category, coins_mentioned, sentiment_keyword)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (a["source"], a["title"], a["summary"], a["url"],
-             a["published_at"], a["collected_at"], a["category"],
-             a["coins_mentioned"], a["sentiment_keyword"]),
+            (source, title, summary, url, published_at, collected_at, category,
+             coins_mentioned, sentiment_keyword, impact_score, scope)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                a["source"],
+                a["title"],
+                a["summary"],
+                a["url"],
+                a["published_at"],
+                a["collected_at"],
+                a["category"],
+                a["coins_mentioned"],
+                a["sentiment_keyword"],
+                tags["impact_score"],
+                tags["scope"],
+            ),
         )
         saved += 1
 
@@ -103,9 +115,7 @@ def collect_all() -> None:
     fg = fetch_fear_greed()
     if fg:
         fg_saved = save_fear_greed(fg)
-        logger.info("Fear & Greed: %d (%s) %s",
-                     fg["value"], fg["classification"],
-                     "저장" if fg_saved else "중복 스킵")
+        logger.info("Fear & Greed: %d (%s) %s", fg["value"], fg["classification"], "저장" if fg_saved else "중복 스킵")
 
     logger.info("=== 수집 완료 (RSS %d + 업비트 %d + F&G) ===", rss_saved, upbit_saved)
 
@@ -113,6 +123,7 @@ def collect_all() -> None:
 def main() -> None:
     """진입점."""
     from cryptobot.logging_config import setup_logging
+
     setup_logging("news", "INFO")
 
     logger.info("=== 뉴스 수집기 시작 ===")

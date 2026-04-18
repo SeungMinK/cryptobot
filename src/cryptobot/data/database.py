@@ -234,7 +234,10 @@ CREATE TABLE IF NOT EXISTS news_articles (
     category TEXT,
     coins_mentioned TEXT,
     sentiment_keyword TEXT,
-    is_processed BOOLEAN DEFAULT FALSE
+    is_processed BOOLEAN DEFAULT FALSE,
+    -- LLM 시장 판단 정밀도 향상 (#154)
+    impact_score INTEGER,  -- 0~10: 시장 영향 크기
+    scope TEXT             -- "macro" (거시/규제/Fed) / "micro" (개별 프로젝트/기업)
 );
 
 CREATE TABLE IF NOT EXISTS fear_greed_index (

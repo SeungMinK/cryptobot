@@ -38,6 +38,8 @@ HARD_LIMITS = {
     "bb_std": (0.8, 2.5),
     "rsi_oversold": (20, 45),
     "aggression": (0.1, 1.0),
+    # #167: bb_rsi_combined 부분 점수
+    "partial_confidence": (0.2, 0.6),  # 부분 신호 confidence 범위
     "roi_10min": (1.0, 5.0),
     "roi_30min": (0.5, 3.0),
     "roi_60min": (0.3, 2.0),
@@ -1106,8 +1108,24 @@ class LLMAnalyzer:
         return "\n".join(lines) if lines else "시장 데이터 없음"
 
     def _get_performance_text(self) -> str:
-        """최근 매매 성과 + 손익비 + 매매 상세 + 보유 포지션."""
+        """최근 매매 성과 + 손익비 + 매매 상세 + 보유 포지션.
+
+        #167: "매매 기회 부족" 감지 — 최근 12시간 buy 0건이면 경고 추가.
+        LLM이 전략 완화(allow_partial_signal=True) 또는 전략 전환을 고려하도록 유도.
+        """
         lines = []
+
+        # 0. 매매 기회 부족 경고 (#167)
+        recent_buy = self._db.execute(
+            "SELECT COUNT(*) FROM trades WHERE side='buy' "
+            "AND timestamp >= datetime('now', '-12 hours')"
+        ).fetchone()[0] or 0
+        if recent_buy == 0:
+            lines.append(
+                "⚠️ 최근 12시간 매수 0건 — 전략이 너무 엄격할 가능성. "
+                "허용 범위: `allow_partial_signal`(true/false) 또는 `rsi_oversold` 완화, "
+                "또는 다른 전략(volatility_breakout / bollinger_bands 등) 고려"
+            )
 
         # 1. 24시간 요약
         row = self._db.execute(

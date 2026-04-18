@@ -23,14 +23,22 @@ RSS_FEEDS = [
 
 # 코인 키워드 → 티커 매핑
 COIN_KEYWORDS = {
-    "bitcoin": "BTC", "btc": "BTC",
-    "ethereum": "ETH", "eth": "ETH", "ether": "ETH",
-    "xrp": "XRP", "ripple": "XRP",
-    "solana": "SOL", "sol": "SOL",
-    "dogecoin": "DOGE", "doge": "DOGE",
-    "cardano": "ADA", "ada": "ADA",
+    "bitcoin": "BTC",
+    "btc": "BTC",
+    "ethereum": "ETH",
+    "eth": "ETH",
+    "ether": "ETH",
+    "xrp": "XRP",
+    "ripple": "XRP",
+    "solana": "SOL",
+    "sol": "SOL",
+    "dogecoin": "DOGE",
+    "doge": "DOGE",
+    "cardano": "ADA",
+    "ada": "ADA",
     "trump": "TRUMP",
-    "tao": "TAO", "bittensor": "TAO",
+    "tao": "TAO",
+    "bittensor": "TAO",
 }
 
 # 감성 키워드
@@ -96,6 +104,7 @@ def fetch_rss(feed: dict) -> list[dict]:
             summary = description
             if "<" in summary:
                 import re
+
                 summary = re.sub(r"<[^>]+>", "", summary)
             summary = summary.strip()[:500]
 
@@ -104,22 +113,25 @@ def fetch_rss(feed: dict) -> list[dict]:
             if pub_date:
                 try:
                     from email.utils import parsedate_to_datetime
+
                     published_at = parsedate_to_datetime(pub_date).strftime("%Y-%m-%d %H:%M:%S")
                 except Exception:
                     pass
 
             combined_text = f"{title} {summary}"
-            articles.append({
-                "source": feed["name"],
-                "title": title,
-                "summary": summary,
-                "url": link,
-                "published_at": published_at,
-                "collected_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
-                "category": categorize(combined_text),
-                "coins_mentioned": extract_coins(combined_text),
-                "sentiment_keyword": detect_sentiment(combined_text),
-            })
+            articles.append(
+                {
+                    "source": feed["name"],
+                    "title": title,
+                    "summary": summary,
+                    "url": link,
+                    "published_at": published_at,
+                    "collected_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+                    "category": categorize(combined_text),
+                    "coins_mentioned": extract_coins(combined_text),
+                    "sentiment_keyword": detect_sentiment(combined_text),
+                }
+            )
 
         logger.info("%s: %d건 수집", feed["name"], len(articles))
         return articles

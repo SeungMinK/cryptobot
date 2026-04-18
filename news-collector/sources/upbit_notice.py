@@ -40,17 +40,19 @@ def fetch_upbit_notices(limit: int = 20) -> list[dict]:
             elif any(w in title_lower for w in ["폐지", "delist", "거래 지원 종료"]):
                 category = "delisting"
 
-            articles.append({
-                "source": "upbit",
-                "title": title,
-                "summary": title,  # 공지는 제목이 곧 요약
-                "url": f"https://upbit.com/service_center/notice?id={item.get('id', '')}",
-                "published_at": created[:19].replace("T", " ") if created else None,
-                "collected_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
-                "category": category,
-                "coins_mentioned": "",
-                "sentiment_keyword": "neutral",
-            })
+            articles.append(
+                {
+                    "source": "upbit",
+                    "title": title,
+                    "summary": title,  # 공지는 제목이 곧 요약
+                    "url": f"https://upbit.com/service_center/notice?id={item.get('id', '')}",
+                    "published_at": created[:19].replace("T", " ") if created else None,
+                    "collected_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+                    "category": category,
+                    "coins_mentioned": "",
+                    "sentiment_keyword": "neutral",
+                }
+            )
 
         logger.info("업비트 공지: %d건 수집", len(articles))
         return articles

@@ -405,10 +405,12 @@ class TestAnalysisPromptTextRules:
 
         ANALYSIS_PROMPT = SYSTEM_PROMPT + "\n" + ANALYSIS_PROMPT  # noqa: F811 — 로컬 변수로 오버라이드
 
-        # 개선 전: "역사적 매수 적기 (7년 백테스트 1,145% 수익)"
-        # 개선 후: "단기 추가 하락 위험도 공존"
-        assert "단기 추가 하락 위험도 공존" in ANALYSIS_PROMPT
+        # 개선 이후: 과도한 기대(1,145% 등)는 제거.
+        # 프롬프트 재작성(#opportunity-focused) 후: "기회 구간" 명시.
+        # 단 과잉 확신(예: "1,145%")은 여전히 없어야.
         assert "1,145%" not in ANALYSIS_PROMPT
+        # bullish/bearish/sideways 각 상태별 지침 포함 (재작성 후)
+        assert "극도 공포" in ANALYSIS_PROMPT or "공포/탐욕" in ANALYSIS_PROMPT
 
     def test_reward_risk_goal_1p5(self):
         # #183: 규칙 블록은 SYSTEM_PROMPT로 이동 (Prompt Caching).

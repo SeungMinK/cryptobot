@@ -241,6 +241,35 @@ def test_call_claude_passes_system_with_cache_control(db, monkeypatch):
     assert captured["messages"][0]["content"] == "user data prompt"
 
 
+def test_call_claude_uses_max_tokens_constant(db, monkeypatch):
+    """#200 프롬프트는 응답이 길어 1024로 잘림 — MAX_TOKENS(2048)를 전달해야."""
+    assert LLMAnalyzer.MAX_TOKENS >= 2048, (
+        "opportunity-focused 프롬프트 응답에 최소 2048 토큰 필요"
+    )
+
+    a = LLMAnalyzer(db)
+    a._api_key = "sk-test"
+
+    captured = {}
+
+    class _FakeClient:
+        def __init__(self, api_key):
+            pass
+
+        @property
+        def messages(self):
+            return self
+
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return _mock_response()
+
+    monkeypatch.setattr("anthropic.Anthropic", _FakeClient)
+    a._call_claude("user data prompt")
+
+    assert captured.get("max_tokens") == LLMAnalyzer.MAX_TOKENS
+
+
 def test_call_claude_aggregates_cache_tokens(db, monkeypatch):
     """응답의 cache_creation/cache_read 토큰이 result에 반영."""
     a = LLMAnalyzer(db)

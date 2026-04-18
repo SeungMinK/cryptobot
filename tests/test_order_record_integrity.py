@@ -44,6 +44,7 @@ def test_check_and_buy_api_error_notifies_and_records_signal(db):
     # RiskManager/strategy selector mock
     bot._risk = MagicMock()
     bot._risk.check_can_buy.return_value = (True, "OK")
+    bot._risk.check_account_daily_loss.return_value = (True, "OK")
     bot._risk.limits = MagicMock(min_balance_krw=5000, max_position_size_krw=1_000_000)
     bot._config_mgr = MagicMock()
     bot._config_mgr.get.return_value = "50"
@@ -158,6 +159,7 @@ def test_check_and_buy_commits_immediately_after_record(db):
     )
     bot._risk = MagicMock()
     bot._risk.check_can_buy.return_value = (True, "OK")
+    bot._risk.check_account_daily_loss.return_value = (True, "OK")
     bot._risk.limits = MagicMock(min_balance_krw=5000, max_position_size_krw=1_000_000)
     bot._config_mgr = MagicMock()
     bot._config_mgr.get.return_value = "50"

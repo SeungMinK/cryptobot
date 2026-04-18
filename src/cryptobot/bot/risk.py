@@ -17,12 +17,15 @@ class RiskLimits:
     """리스크 한도 설정."""
 
     max_daily_trades: int = 10  # 일일 최대 거래 횟수
-    max_daily_loss_pct: float = -10.0  # 일일 최대 손실률 (%)
-    max_position_size_krw: float = 1_000_000  # 최대 1회 매수 금액 (원)
+    max_daily_loss_pct: float = -7.0  # 코인별 일일 최대 손실률 (%)
+    max_position_size_krw: float = 300_000  # 최대 1회 매수 금액 (원)
     min_balance_krw: float = 5_000  # 최소 유지 잔고 (업비트 최소 주문금액)
-    max_consecutive_losses: int = 5  # 연속 손실 시 매매 중단 (최근 1일 윈도우)
+    max_consecutive_losses: int = 3  # 연속 손실 시 매매 중단 (최근 1일 윈도우)
     consecutive_loss_window_hours: int = 24  # 연속 손실 판정 윈도우
     min_order_krw: float = 5_000  # 업비트 최소 주문 금액 (원)
+    # 계좌 전체 일일 실현 손실 한도 (매수 차단용, 매도는 허용).
+    # 코인별 한도(max_daily_loss_pct)와 별도로 "계좌 전체"를 보호.
+    max_daily_account_loss_pct: float = -10.0
 
 
 class RiskManager:
@@ -80,6 +83,55 @@ class RiskManager:
     def check_can_sell(self, coin: str) -> tuple[bool, str]:
         """매도 가능 여부 점검. (현재는 항상 허용 — 손절은 막으면 안 됨)"""
         return True, "매도 허용"
+
+    def check_account_daily_loss(self, current_krw: float) -> tuple[bool, str]:
+        """계좌 전체 오늘(KST) 실현 손실 %가 한도 이하면 매수 차단.
+
+        매도는 영향 없음 (check_can_sell은 항상 허용) — 손절·익절은 계속 작동해야 함.
+
+        계산 근사:
+          시작_자산 ≈ 현재_KRW + 보유_코인_원가_합 - 오늘_실현_PnL
+          손실% = 오늘_실현_PnL / 시작_자산 × 100
+
+        미실현 손익은 무시. "확정 손실" 기준.
+        """
+        today_pnl = self._get_today_account_pnl_krw()
+        if today_pnl >= 0:
+            return True, "오늘 흑자"
+
+        held_cost = self._get_held_coins_total_cost()
+        start_asset = current_krw + held_cost - today_pnl
+        if start_asset <= 0:
+            return True, "시작 자산 산정 불가"
+
+        loss_pct = today_pnl / start_asset * 100
+        limit = self.limits.max_daily_account_loss_pct
+        if loss_pct <= limit:
+            return False, (
+                f"계좌 일일 손실 한도 도달: {loss_pct:.1f}% ≤ {limit:.1f}% "
+                f"(실현 {today_pnl:,.0f}원 / 시작 {start_asset:,.0f}원). "
+                f"매도는 계속 허용, 매수만 차단."
+            )
+        return True, f"계좌 손실 {loss_pct:.1f}% (한도 {limit:.1f}%)"
+
+    def _get_today_account_pnl_krw(self) -> float:
+        """오늘(KST) 전체 실현 손익 합계."""
+        row = self._db.execute(
+            "SELECT COALESCE(SUM(profit_krw), 0) FROM trades "
+            "WHERE side='sell' AND DATE(timestamp, '+9 hours') = DATE('now', '+9 hours')"
+        ).fetchone()
+        return float(row[0]) if row else 0.0
+
+    def _get_held_coins_total_cost(self) -> float:
+        """현재 보유 중인 모든 코인의 매수 원가(+수수료) 합계."""
+        row = self._db.execute(
+            """
+            SELECT COALESCE(SUM(total_krw + COALESCE(fee_krw, 0)), 0)
+            FROM trades t WHERE side='buy'
+            AND NOT EXISTS (SELECT 1 FROM trades s WHERE s.buy_trade_id = t.id AND s.side='sell')
+            """
+        ).fetchone()
+        return float(row[0]) if row else 0.0
 
     def get_safe_position_size(
         self, balance_krw: float, confidence: float = 1.0, position_size_pct: float = 100.0

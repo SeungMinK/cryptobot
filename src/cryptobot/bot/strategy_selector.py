@@ -118,14 +118,42 @@ class StrategySelector:
                 self.current_strategy = updated
 
     def get_coin_strategy(self, coin: str, coin_category: str, collectors: dict) -> tuple[BaseStrategy | None, str]:
-        """코인의 시장 상태에 맞는 전략 반환. LLM 추천 전략 우선."""
-        # LLM 추천 전략 우선 사용
-        strategy = self.current_strategy
-        if strategy is not None:
-            # 현재 활성 전략(LLM이 선택한 전략) 사용
-            pass
-        else:
-            # 폴백: 시장 상태 기반 자동 선택
+        """코인의 시장 상태에 맞는 전략 반환.
+
+        우선순위 (#152):
+        1. coin_strategy_assignment — LLM이 코인별로 지정한 전략
+        2. current_strategy — 기존 단일 LLM 추천 전략 (호환)
+        3. registry.select_by_market — 시장 상태 기반 폴백
+        4. fallback — bot_config.fallback_strategy
+        """
+        # 1순위: 코인별 배정 (LLM이 coin_strategies dict로 준 것)
+        strategy: BaseStrategy | None = None
+        assignment_params: dict | None = None
+        try:
+            row = self._db.execute(
+                "SELECT strategy_name, params_json FROM coin_strategy_assignment WHERE coin = ?",
+                (coin,),
+            ).fetchone()
+        except Exception:
+            row = None
+        if row:
+            name = dict(row)["strategy_name"]
+            assigned = self.registry.get(name)
+            if assigned is not None:
+                strategy = assigned
+                pj = dict(row).get("params_json")
+                if pj:
+                    try:
+                        assignment_params = json.loads(pj)
+                    except json.JSONDecodeError:
+                        pass
+
+        # 2순위: 기존 단일 추천 전략 (코인별 배정 없을 때)
+        if strategy is None:
+            strategy = self.current_strategy
+
+        # 3순위: 시장 상태 기반 폴백
+        if strategy is None:
             collector = collectors.get(coin)
             snapshot = collector.get_latest_snapshot() if collector else None
             market_state = snapshot.get("market_state", "sideways") if snapshot else "sideways"
@@ -136,6 +164,12 @@ class StrategySelector:
             strategy = self.registry.get(fallback)
         if strategy is None:
             return self.current_strategy, self.current_strategy_name
+
+        # 코인별 assignment_params 적용 — 전략 파라미터 오버라이드
+        if assignment_params:
+            strategy._orig_extra = dict(strategy.params.extra)
+            for k, v in assignment_params.items():
+                strategy.params.extra[k] = v
 
         # 카테고리별 리스크 파라미터 (공유 인스턴스 보호 — 매 틱 후 복원)
         row = self._db.execute("SELECT * FROM coin_strategy_config WHERE category = ?", (coin_category,)).fetchone()

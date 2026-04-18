@@ -165,6 +165,10 @@ class CryptoBot:
                 strategy.params.stop_loss_pct = strategy._orig_stop_loss
                 strategy.params.trailing_stop_pct = strategy._orig_trailing
                 strategy.params.position_size_pct = strategy._orig_position
+            # #152: 코인별 assignment_params로 오버라이드한 extra 복원
+            if hasattr(strategy, "_orig_extra"):
+                strategy.params.extra = strategy._orig_extra
+                del strategy._orig_extra
             self._strategy_sel.current_strategy = orig
             self._strategy_sel.current_strategy_name = orig_name
 

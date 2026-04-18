@@ -86,8 +86,10 @@ def test_partial_mode_rsi_only_returns_buy():
     """allow_partial_signal=True: RSI 과매도만 충족 → 약한 매수."""
     params = StrategyParams(
         extra={
-            "rsi_oversold": 30, "bb_std": 2.0,
-            "allow_partial_signal": True, "partial_confidence": 0.4,
+            "rsi_oversold": 30,
+            "bb_std": 2.0,
+            "allow_partial_signal": True,
+            "partial_confidence": 0.4,
         }
     )
     strat = BBRSICombined(params)
@@ -101,9 +103,7 @@ def test_partial_mode_rsi_only_returns_buy():
 
 def test_partial_confidence_configurable():
     """partial_confidence 파라미터로 confidence 수준 조절."""
-    params = StrategyParams(
-        extra={"allow_partial_signal": True, "partial_confidence": 0.3}
-    )
+    params = StrategyParams(extra={"allow_partial_signal": True, "partial_confidence": 0.3})
     strat = BBRSICombined(params)
     assert strat._partial_confidence == 0.3
 
@@ -120,8 +120,10 @@ def test_partial_mode_both_conditions_still_strong():
     # 가격을 아주 낮게
     params = StrategyParams(
         extra={
-            "rsi_oversold": 30, "bb_std": 2.0,
-            "allow_partial_signal": True, "partial_confidence": 0.4,
+            "rsi_oversold": 30,
+            "bb_std": 2.0,
+            "allow_partial_signal": True,
+            "partial_confidence": 0.4,
         }
     )
     strat = BBRSICombined(params)
@@ -147,8 +149,14 @@ def test_performance_text_no_warning_with_recent_buy(db):
     """최근 12시간 buy 1건 이상이면 경고 없음."""
     recorder = DataRecorder(db)
     recorder.record_trade(
-        coin="KRW-BTC", side="buy", price=100, amount=1, total_krw=100, fee_krw=1,
-        strategy="test", trigger_reason="test",
+        coin="KRW-BTC",
+        side="buy",
+        price=100,
+        amount=1,
+        total_krw=100,
+        fee_krw=1,
+        strategy="test",
+        trigger_reason="test",
     )
     db.commit()
 

@@ -270,6 +270,17 @@ CREATE TABLE IF NOT EXISTS coin_strategy_config (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 코인별 전략 배정 (#152). LLM이 coin_strategies dict로 지정.
+-- coin_strategy_config(카테고리 기반 기본값)과 별개.
+CREATE TABLE IF NOT EXISTS coin_strategy_assignment (
+    coin TEXT PRIMARY KEY,
+    strategy_name TEXT NOT NULL,
+    params_json TEXT,
+    assigned_by TEXT NOT NULL DEFAULT 'llm',  -- 'llm' | 'manual' | 'backtest'
+    reason TEXT,
+    assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS backtest_results (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     run_date DATE NOT NULL,
@@ -729,6 +740,24 @@ class Database:
                 conn.execute("ALTER TABLE news_articles ADD COLUMN impact_score INTEGER")
                 conn.execute("ALTER TABLE news_articles ADD COLUMN scope TEXT")
                 logger.info("news_articles 테이블에 impact_score/scope 컬럼 추가 완료")
+
+            # 마이그레이션: coin_strategy_assignment 테이블 생성 (#152)
+            try:
+                conn.execute("SELECT 1 FROM coin_strategy_assignment LIMIT 1")
+            except sqlite3.OperationalError:
+                conn.execute(
+                    """
+                    CREATE TABLE coin_strategy_assignment (
+                        coin TEXT PRIMARY KEY,
+                        strategy_name TEXT NOT NULL,
+                        params_json TEXT,
+                        assigned_by TEXT NOT NULL DEFAULT 'llm',
+                        reason TEXT,
+                        assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+                logger.info("coin_strategy_assignment 테이블 생성 완료")
 
             # 마이그레이션: bot_config에 새 설정 추가 (기존 DB 호환)
             existing = conn.execute("SELECT key FROM bot_config WHERE key = 'strategy_switch_delay_seconds'").fetchone()

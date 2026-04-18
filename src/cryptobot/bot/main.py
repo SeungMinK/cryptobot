@@ -70,6 +70,8 @@ class CryptoBot:
         self._scheduler.add_job(self._tick, "interval", seconds=self._tick_interval, id="main_tick")
         self._scheduler.add_job(self._daily_report, "cron", hour=0, minute=0, id="daily_report")
         self._scheduler.add_job(self._daily_health_check, "cron", hour=6, minute=0, id="daily_health")
+        # #195: 4시간 주기 경량 헬스체크 — 외출 중에도 Slack으로 상태 확인
+        self._scheduler.add_job(self._periodic_health_check, "interval", hours=4, id="periodic_health")
         self._scheduler.add_job(self._hourly_reconciliation, "interval", hours=1, id="hourly_reconciliation")
         self._scheduler.add_job(self._weekly_report, "cron", day_of_week="sun", hour=3, minute=0, id="weekly_report")
         self._scheduler.add_job(
@@ -589,6 +591,14 @@ class CryptoBot:
             checker.run_all()
         except Exception as e:
             logger.error("헬스체크 에러: %s", e, exc_info=True)
+
+    def _periodic_health_check(self):
+        """#195: 4시간 주기 경량 헬스체크 — 외부에서도 Slack으로 상태 확인."""
+        try:
+            checker = HealthChecker(self._db, self._trader, self._notifier)
+            checker.run_periodic()
+        except Exception as e:
+            logger.error("주기 헬스체크 에러: %s", e, exc_info=True)
 
     def _hourly_reconciliation(self):
         """매시간 체결 정합성 검증."""

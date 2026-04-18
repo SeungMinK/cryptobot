@@ -22,6 +22,10 @@ class BBRSICombined(BaseStrategy):
         self._rsi_period = int(self.params.extra.get("rsi_period", 14))
         self._rsi_oversold = self.params.extra.get("rsi_oversold", 30)
         self._rsi_overbought = self.params.extra.get("rsi_overbought", 50)
+        # 부분 점수 허용 (#167): 한쪽 조건만 충족 시 낮은 confidence로 매수 신호.
+        # 기본 False (기존 엄격한 AND 동작 유지). LLM이 매매 0건 지속 시 True로 전환.
+        self._allow_partial_signal = bool(self.params.extra.get("allow_partial_signal", False))
+        self._partial_confidence = float(self.params.extra.get("partial_confidence", 0.4))
 
     def info(self) -> StrategyInfo:
         return StrategyInfo(
@@ -85,10 +89,27 @@ class BBRSICombined(BaseStrategy):
                 stop_loss=round(current_price * (1 + self.params.stop_loss_pct / 100), 2),
             )
 
+        # 부분 충족 — allow_partial_signal=True면 낮은 confidence로 매수 신호 (#167)
         if rsi_oversold and not below_lower:
+            if self._allow_partial_signal:
+                return Signal(
+                    "buy",
+                    self._partial_confidence,
+                    f"[부분] RSI({rsi:.0f}) 과매도 (하단 미이탈이지만 약한 매수)",
+                    trigger_value=round(lower, 2),
+                    stop_loss=round(current_price * (1 + self.params.stop_loss_pct / 100), 2),
+                )
             return Signal("hold", 0.0, f"RSI({rsi:.0f}) 과매도이나 볼린저 하단 미이탈")
 
         if below_lower and not rsi_oversold:
+            if self._allow_partial_signal:
+                return Signal(
+                    "buy",
+                    self._partial_confidence,
+                    f"[부분] 볼린저 하단 이탈 (RSI={rsi:.0f} 정상이지만 약한 매수)",
+                    trigger_value=round(lower, 2),
+                    stop_loss=round(current_price * (1 + self.params.stop_loss_pct / 100), 2),
+                )
             return Signal("hold", 0.0, f"볼린저 하단 이탈이나 RSI({rsi:.0f}) 정상")
 
         return Signal("hold", 0.0, f"조건 미충족 (RSI={rsi:.0f})")

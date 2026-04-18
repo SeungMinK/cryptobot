@@ -19,6 +19,35 @@ from cryptobot.data.database import Database
 logger = logging.getLogger(__name__)
 
 
+def _clip_to_hard_limits(params: dict) -> tuple[dict, list[dict]]:
+    """#188: coin_strategy_assignment 저장 직전 HARD_LIMITS 범위로 클리핑.
+
+    LLM이 범위 밖 값(예: bb_std=5.0, rsi_oversold=100)을 보내도 실제 전략에는
+    안전한 값만 적용되도록 한다. 원본과 클리핑 후 값을 함께 반환해 로깅.
+
+    Returns:
+        (clipped_params, clipped_log) — log는 [{field, original, clipped, range}]
+    """
+    # 순환 import 방지 — 함수 내부 import
+    from cryptobot.llm.analyzer import HARD_LIMITS
+
+    clipped = dict(params)
+    log: list[dict] = []
+    for key, val in list(params.items()):
+        if key not in HARD_LIMITS:
+            continue
+        try:
+            fv = float(val)
+        except (ValueError, TypeError):
+            continue
+        mn, mx = HARD_LIMITS[key]
+        new_val = max(mn, min(mx, fv))
+        if new_val != fv:
+            clipped[key] = new_val
+            log.append({"field": key, "original": fv, "clipped": new_val, "range": [mn, mx]})
+    return clipped, log
+
+
 class CoinStrategyRepository:
     """coin_strategy_assignment 테이블 CRUD."""
 
@@ -99,6 +128,18 @@ class CoinStrategyRepository:
                         return False
                 except (ValueError, TypeError):
                     pass  # 타임스탬프 파싱 실패 시 허용
+
+        # #188: HARD_LIMITS 범위 밖 파라미터 클리핑 (저장 전)
+        # LLM이 bb_std=5.0, rsi_oversold=100 같은 범위 밖 값 보내도 안전한 값만 저장됨
+        clipped_log: list[dict] = []
+        if params is not None:
+            params, clipped_log = _clip_to_hard_limits(params)
+            if clipped_log:
+                logger.warning(
+                    "coin_strategy_assignment 파라미터 클리핑: coin=%s | %s",
+                    coin,
+                    ", ".join(f"{c['field']}: {c['original']}→{c['clipped']}" for c in clipped_log),
+                )
 
         # #186: None과 빈 dict 구분 — 빈 dict는 명시적 "기본값 사용" 의사 표현
         params_json = json.dumps(params, ensure_ascii=False) if params is not None else None

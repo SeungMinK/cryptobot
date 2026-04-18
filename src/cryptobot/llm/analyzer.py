@@ -1412,23 +1412,52 @@ class LLMAnalyzer:
         total_cache_creation = 0
         total_cache_read = 0
 
+        # #188: 캐싱 기능 에러 시 폴백 — 한 번 실패하면 남은 시도는 캐싱 없이
+        use_caching = True
         for attempt in range(1, self.MAX_RETRIES + 1):
             try:
                 client = anthropic.Anthropic(api_key=self._api_key)
                 # #183: Prompt Caching — SYSTEM은 1h 캐시, USER는 매번 새 데이터.
                 # ACTIVE 60분 간격 × 1h 캐시로 대부분 호출이 cache hit.
-                response = client.messages.create(
-                    model=self._model,
-                    max_tokens=1024,
-                    system=[
-                        {
-                            "type": "text",
-                            "text": SYSTEM_PROMPT,
-                            "cache_control": {"type": "ephemeral", "ttl": "1h"},
-                        }
-                    ],
-                    messages=[{"role": "user", "content": prompt}],
-                )
+                if use_caching:
+                    try:
+                        response = client.messages.create(
+                            model=self._model,
+                            max_tokens=1024,
+                            system=[
+                                {
+                                    "type": "text",
+                                    "text": SYSTEM_PROMPT,
+                                    "cache_control": {"type": "ephemeral", "ttl": "1h"},
+                                }
+                            ],
+                            messages=[{"role": "user", "content": prompt}],
+                        )
+                    except Exception as cache_err:
+                        # 캐싱 관련 에러 의심 — 메시지에 cache/ephemeral/control 포함되면 fallback
+                        msg = str(cache_err).lower()
+                        if any(kw in msg for kw in ("cache", "ephemeral", "control")):
+                            logger.warning(
+                                "Prompt Caching 실패 — 이번 세션 캐싱 없이 재시도: %s",
+                                cache_err,
+                            )
+                            use_caching = False
+                            response = client.messages.create(
+                                model=self._model,
+                                max_tokens=1024,
+                                system=SYSTEM_PROMPT,
+                                messages=[{"role": "user", "content": prompt}],
+                            )
+                        else:
+                            raise
+                else:
+                    # 이전 시도에서 캐싱 실패했으면 남은 시도는 캐싱 없이
+                    response = client.messages.create(
+                        model=self._model,
+                        max_tokens=1024,
+                        system=SYSTEM_PROMPT,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
 
                 # #186: usage 객체가 없거나 malformed여도 응답 처리는 계속
                 try:
